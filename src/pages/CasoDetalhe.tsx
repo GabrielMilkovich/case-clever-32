@@ -8,13 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -39,9 +32,12 @@ import {
   Clock,
   Edit,
   Trash2,
+  ShieldCheck,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FactValidationView } from "@/components/cases/FactValidationView";
+import { CalculatorSuggestions } from "@/components/cases/CalculatorSuggestions";
 
 // Types
 interface CaseData {
@@ -365,9 +361,13 @@ export default function CasoDetalhe() {
               <FileText className="h-4 w-4" />
               Documentos ({documents.length})
             </TabsTrigger>
-            <TabsTrigger value="fatos" className="gap-2">
+            <TabsTrigger value="validacao" className="gap-2">
+              <ShieldCheck className="h-4 w-4" />
+              Validação ({pendingFacts.length} pendentes)
+            </TabsTrigger>
+            <TabsTrigger value="calculadoras" className="gap-2">
               <Sparkles className="h-4 w-4" />
-              Fatos ({facts.length})
+              Sugestões
             </TabsTrigger>
             <TabsTrigger value="calculo" className="gap-2">
               <Calculator className="h-4 w-4" />
@@ -472,108 +472,29 @@ export default function CasoDetalhe() {
             )}
           </TabsContent>
 
-          {/* Facts Tab */}
-          <TabsContent value="fatos" className="space-y-4">
-            {pendingFacts.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-yellow-500" />
-                    Fatos Pendentes de Confirmação ({pendingFacts.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {pendingFacts.map((fact) => (
-                      <div
-                        key={fact.id}
-                        className="flex items-center justify-between p-4 rounded-lg bg-yellow-50 border border-yellow-200"
-                      >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{fact.chave}</span>
-                            <Badge variant="outline" className="text-xs">
-                              {fact.tipo}
-                            </Badge>
-                            {fact.confianca && (
-                              <Badge variant="secondary" className="text-xs">
-                                {Math.round(fact.confianca * 100)}% confiança
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-lg font-semibold mt-1">{fact.valor}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Origem: {fact.origem}
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => confirmFactMutation.mutate({ factId: fact.id, confirmed: true })}
-                          >
-                            <Check className="h-4 w-4 mr-1" />
-                            Confirmar
-                          </Button>
-                          <Button size="sm" variant="ghost">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+          {/* Validation Tab - New Split View */}
+          <TabsContent value="validacao" className="space-y-4">
+            <FactValidationView
+              caseId={id!}
+              facts={facts}
+              documents={documents}
+              onFactsChange={() => queryClient.invalidateQueries({ queryKey: ["facts", id] })}
+              onValidationComplete={() => {
+                // Switch to calculation tab when validation is complete
+                const calculoTab = document.querySelector('[value="calculo"]') as HTMLButtonElement;
+                calculoTab?.click();
+              }}
+            />
+          </TabsContent>
 
-            {confirmedFacts.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <CheckCircle className="h-5 w-5 text-green-500" />
-                    Fatos Confirmados ({confirmedFacts.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                    {confirmedFacts.map((fact) => (
-                      <div
-                        key={fact.id}
-                        className="p-4 rounded-lg bg-green-50 border border-green-200"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-muted-foreground">
-                            {fact.chave}
-                          </span>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-6 w-6"
-                            onClick={() => confirmFactMutation.mutate({ factId: fact.id, confirmed: false })}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                        <p className="font-semibold">{fact.valor}</p>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {facts.length === 0 && (
-              <Card className="border-dashed">
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Sparkles className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground text-center">
-                    Nenhum fato extraído ainda.
-                    <br />
-                    Faça upload de documentos e use a IA para extrair fatos.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+          {/* Calculator Suggestions Tab */}
+          <TabsContent value="calculadoras" className="space-y-4">
+            <CalculatorSuggestions
+              facts={facts}
+              onSelectionChange={(selected) => {
+                console.log("Selected calculators:", selected);
+              }}
+            />
           </TabsContent>
 
           {/* Calculation Tab */}
