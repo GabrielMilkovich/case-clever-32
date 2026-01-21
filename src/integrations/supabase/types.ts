@@ -450,6 +450,39 @@ export type Database = {
         }
         Relationships: []
       }
+      profile_calculators: {
+        Row: {
+          calculator_version_id: string
+          criado_em: string | null
+          profile_id: string
+        }
+        Insert: {
+          calculator_version_id: string
+          criado_em?: string | null
+          profile_id: string
+        }
+        Update: {
+          calculator_version_id?: string
+          criado_em?: string | null
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_calculators_calculator_version_id_fkey"
+            columns: ["calculator_version_id"]
+            isOneToOne: false
+            referencedRelation: "calculator_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_calculators_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "calculation_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tax_tables: {
         Row: {
           criado_em: string | null
