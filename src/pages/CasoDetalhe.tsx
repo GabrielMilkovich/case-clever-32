@@ -33,6 +33,7 @@ import {
   Edit,
   Trash2,
   ShieldCheck,
+  RefreshCw,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -220,6 +221,23 @@ export default function CasoDetalhe() {
     },
     enabled: !!id,
   });
+
+  const refreshChunksCount = async () => {
+    if (!id) return;
+    try {
+      const { count, error } = await supabase
+        .from("document_chunks")
+        .select("id", { count: "exact" })
+        .eq("case_id", id);
+      if (error) throw error;
+      const next = typeof count === "number" ? count : 0;
+      queryClient.setQueryData(["document_chunks_count", id], next);
+      toast.success(`Recontagem concluída: ${next} chunks`);
+    } catch (e) {
+      console.error(e);
+      toast.error("Falha ao recontar chunks: " + (e as Error).message);
+    }
+  };
 
   // Confirm fact
   const confirmFactMutation = useMutation({
@@ -452,6 +470,17 @@ export default function CasoDetalhe() {
                         <Sparkles className="h-4 w-4" />
                       )}
                       Rodar extração agora
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={refreshChunksCount}
+                      className="gap-2"
+                      disabled={!id}
+                      title="Força uma recontagem dos chunks para este caso"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Recontar
                     </Button>
                     <Badge variant="outline">
                       {typeof chunksCount === "number" ? `${chunksCount} chunks` : "chunks: —"}
