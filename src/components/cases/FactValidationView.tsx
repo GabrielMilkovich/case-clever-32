@@ -50,6 +50,8 @@ import {
   Sparkles,
   Lock,
   Unlock,
+  ExternalLink,
+  Download,
 } from "lucide-react";
 
 // =====================================================
@@ -142,6 +144,7 @@ export function FactValidationView({
   const queryClient = useQueryClient();
   const [selectedFact, setSelectedFact] = useState<Fact | null>(null);
   const [selectedDocUrl, setSelectedDocUrl] = useState<string | null>(null);
+  const [tryEmbedPreview, setTryEmbedPreview] = useState(false);
   const [editingFact, setEditingFact] = useState<Fact | null>(null);
   const [editForm, setEditForm] = useState({ valor: "", tipo: "" });
 
@@ -322,6 +325,7 @@ export function FactValidationView({
 
   const handleViewDocument = (fact: Fact) => {
     setSelectedFact(fact);
+    setTryEmbedPreview(false);
     // Por enquanto, abre o primeiro documento disponível
     // Futuramente, linkar com fact_sources para abrir o documento específico
     if (documents.length > 0 && documents[0].arquivo_url) {
@@ -662,12 +666,70 @@ export function FactValidationView({
           </CardHeader>
           <CardContent>
             {selectedDocUrl ? (
-              <div className="h-[600px] rounded-lg overflow-hidden border">
-                <iframe
-                  src={selectedDocUrl}
-                  className="w-full h-full"
-                  title="Document Preview"
-                />
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-sm text-muted-foreground">
+                    {selectedFact ? (
+                      <span>
+                        Documento para: <span className="text-foreground font-medium">{chaveLabels[selectedFact.chave] || selectedFact.chave}</span>
+                      </span>
+                    ) : (
+                      <span>Documento selecionado</span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                    >
+                      <a href={selectedDocUrl} target="_blank" rel="noreferrer">
+                        <ExternalLink className="h-4 w-4" />
+                        Abrir em nova aba
+                      </a>
+                    </Button>
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                    >
+                      <a href={selectedDocUrl} download rel="noreferrer">
+                        <Download className="h-4 w-4" />
+                        Baixar
+                      </a>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setTryEmbedPreview((v) => !v)}
+                    >
+                      {tryEmbedPreview ? "Ocultar prévia" : "Tentar prévia aqui"}
+                    </Button>
+                  </div>
+                </div>
+
+                {!tryEmbedPreview ? (
+                  <div className="h-[600px] rounded-lg border-2 border-dashed flex items-center justify-center bg-muted/20">
+                    <div className="text-center text-muted-foreground max-w-md">
+                      <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p className="font-medium">Pré-visualização bloqueada pelo navegador</p>
+                      <p className="text-sm mt-1">
+                        Isso acontece porque o servidor do arquivo impede abertura embutida (iframe). Use <span className="text-foreground">“Abrir em nova aba”</span>.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-[600px] rounded-lg overflow-hidden border">
+                    <iframe
+                      src={selectedDocUrl}
+                      className="w-full h-full"
+                      title="Document Preview"
+                    />
+                  </div>
+                )}
               </div>
             ) : (
               <div className="h-[600px] rounded-lg border-2 border-dashed flex items-center justify-center bg-muted/20">
