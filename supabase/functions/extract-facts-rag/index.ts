@@ -240,18 +240,24 @@ Para CADA fato extraído, você DEVE:
 ## O QUE É PROIBIDO ##
 ❌ Inventar valores que não estão nos chunks
 ❌ Inferir dados de contexto
-❌ Calcular valores (ex: salário mensal a partir de diário)
 ❌ Presumir datas não escritas
 ❌ Usar chunk_id de um chunk diferente do que contém a informação
 
 ## CHAVES ESPERADAS ##
 - data_admissao (YYYY-MM-DD)
 - data_demissao (YYYY-MM-DD)
-- salario_base (número decimal)
+- salario_base (número decimal OU texto "variavel" se for comissão/variável)
+- salario_mensal (número decimal - valor médio mensal se disponível)
 - jornada_contratual (formato HH:MM-HH:MM ou horas semanais)
 - cargo (texto exato)
 - adicional_insalubridade (percentual ou valor)
 - adicional_periculosidade (percentual ou valor)
+
+## EXTRAÇÃO DE DEPÓSITOS FGTS ##
+Se encontrar extrato FGTS com depósitos mensais (ex: "115-DEPOSITO JANEIRO 2024 R$ 200,00"):
+- Extraia cada depósito como: deposito_fgts_YYYY_MM (ex: deposito_fgts_2024_01)
+- O valor deve ser o número decimal (ex: 200.00)
+- Use tipo "moeda"
 - adicional_noturno (percentual ou valor)
 - horas_extras (quantidade mensal se explícita)
 - motivo_demissao (justa_causa/sem_justa_causa/pedido_demissao)
@@ -350,28 +356,136 @@ Liste inconsistências em "alertas".`;
       }
     }
 
+    // === CÁLCULO AUTOMÁTICO DE SALÁRIO MÉDIO VIA FGTS ===
+    // Se salário é variável/comissão, calcula média a partir dos depósitos FGTS
+    const salarioBaseFact = validFacts.find(f => f.chave === "salario_base");
+    const salarioMensalFact = validFacts.find(f => f.chave === "salario_mensal");
+    
+    // Detectar se salário é variável (comissão, variável, etc.)
+    const isVariableSalary = salarioBaseFact && 
+      (typeof salarioBaseFact.valor === "string") &&
+      /vari[aá]vel|comiss[aã]o|exclusivamente/i.test(salarioBaseFact.valor);
+    
+    // Se não tem salario_mensal explícito e tem salário variável, calcular via FGTS
+    let calculatedMonthlySalary: {
+      valor: number;
+      deposits: Array<{ competencia: string; deposit: number; salary: number }>;
+      citacao: string;
+      chunk_id: string;
+    } | null = null;
+
+    if (!salarioMensalFact && isVariableSalary) {
+      console.log("Detected variable salary, looking for FGTS deposits...");
+      
+      // Buscar fatos de depósito FGTS extraídos (deposito_fgts_YYYY_MM)
+      const fgtsDeposits = validFacts.filter(f => f.chave.startsWith("deposito_fgts_"));
+      
+      if (fgtsDeposits.length >= 3) {
+        // Calcular salário a partir de cada depósito (FGTS = 8% do salário)
+        const salariesFromFGTS = fgtsDeposits.map(dep => {
+          const depositValue = parseFloat(String(dep.valor).replace(/[^\d.,]/g, "").replace(",", "."));
+          const salary = depositValue / 0.08;
+          // Extrair competência do nome da chave (deposito_fgts_2024_01 -> 2024-01)
+          const match = dep.chave.match(/deposito_fgts_(\d{4})_(\d{2})/);
+          const competencia = match ? `${match[1]}-${match[2]}` : "unknown";
+          return { competencia, deposit: depositValue, salary };
+        }).filter(s => !isNaN(s.salary) && s.salary > 0);
+
+        if (salariesFromFGTS.length >= 3) {
+          // Calcular média
+          const avgSalary = salariesFromFGTS.reduce((sum, s) => sum + s.salary, 0) / salariesFromFGTS.length;
+          const roundedAvg = Math.round(avgSalary * 100) / 100;
+          
+          // Usar o chunk_id do primeiro depósito como referência
+          const refDeposit = fgtsDeposits[0];
+          
+          calculatedMonthlySalary = {
+            valor: roundedAvg,
+            deposits: salariesFromFGTS,
+            citacao: `Calculado automaticamente a partir de ${salariesFromFGTS.length} depósitos FGTS (8% do salário). Depósitos: ${salariesFromFGTS.map(s => `${s.competencia}: R$ ${s.deposit.toFixed(2)} → R$ ${s.salary.toFixed(2)}`).join("; ")}`,
+            chunk_id: refDeposit.chunk_id,
+          };
+          
+          console.log(`Calculated average monthly salary: R$ ${roundedAvg} from ${salariesFromFGTS.length} FGTS deposits`);
+          serverValidations.push(`SALÁRIO MÉDIO CALCULADO: R$ ${roundedAvg.toFixed(2)} (baseado em ${salariesFromFGTS.length} depósitos FGTS)`);
+        }
+      } else {
+        // Tentar extrair depósitos diretamente dos chunks de FGTS
+        const fgtsChunks = allRelevantChunks.filter(c => 
+          /fgts|115-deposito|depósito/i.test(c.texto)
+        );
+        
+        if (fgtsChunks.length > 0) {
+          const depositPattern = /115-DEPOSITO\s+\w+\s+\d{4}\s+R\$\s*([\d.,]+)/gi;
+          const extractedDeposits: Array<{ valor: number; match: string }> = [];
+          
+          for (const chunk of fgtsChunks) {
+            let match;
+            while ((match = depositPattern.exec(chunk.texto)) !== null) {
+              const valor = parseFloat(match[1].replace(".", "").replace(",", "."));
+              if (!isNaN(valor) && valor > 0) {
+                extractedDeposits.push({ valor, match: match[0] });
+              }
+            }
+          }
+          
+          if (extractedDeposits.length >= 3) {
+            const salaries = extractedDeposits.map(d => d.valor / 0.08);
+            const avgSalary = salaries.reduce((sum, s) => sum + s, 0) / salaries.length;
+            const roundedAvg = Math.round(avgSalary * 100) / 100;
+            
+            calculatedMonthlySalary = {
+              valor: roundedAvg,
+              deposits: extractedDeposits.map((d, i) => ({
+                competencia: `dep_${i + 1}`,
+                deposit: d.valor,
+                salary: d.valor / 0.08,
+              })),
+              citacao: `Calculado de ${extractedDeposits.length} depósitos FGTS encontrados no extrato. Fórmula: depósito / 0.08 = salário bruto.`,
+              chunk_id: fgtsChunks[0].id,
+            };
+            
+            console.log(`Calculated avg salary from raw FGTS text: R$ ${roundedAvg}`);
+            serverValidations.push(`SALÁRIO MÉDIO CALCULADO: R$ ${roundedAvg.toFixed(2)} (baseado em ${extractedDeposits.length} depósitos FGTS extraídos do extrato)`);
+          }
+        }
+      }
+    }
+
     console.log(`Extracted ${facts.length} facts, ${validFacts.length} valid`);
 
-    // Inserir fatos válidos no banco
-    if (validFacts.length > 0) {
-      const factsToInsert = validFacts.map((fact) => ({
-        case_id,
-        chave: fact.chave,
-        valor: fact.valor,
-        tipo: fact.tipo === "boolean" ? "boolean" : fact.tipo,
-        origem: "ia_extracao" as const,
-        confianca: fact.confianca,
-        confirmado: false,
-        // Include the chunk id in the citation text so we keep traceability even if we can't persist FK.
-        citacao: `CHUNK_ID:${fact.chunk_id}\n${fact.citacao_literal}`,
-        pagina: fact.pagina || null,
-        // IMPORTANT:
-        // The current DB schema has `facts.chunk_id` referencing the legacy table `doc_chunks`.
-        // Our pipeline writes chunks to `document_chunks`, so inserting a document_chunks.id would violate the FK.
-        // To avoid breaking extraction, we store the chunk id in `citacao` and leave `chunk_id` null.
-        chunk_id: null,
-      }));
+    // Preparar fatos para inserção
+    const factsToInsert = validFacts.map((fact) => ({
+      case_id,
+      chave: fact.chave,
+      valor: fact.valor,
+      tipo: fact.tipo === "boolean" ? "boolean" : fact.tipo,
+      origem: "ia_extracao" as const,
+      confianca: fact.confianca,
+      confirmado: false,
+      citacao: `CHUNK_ID:${fact.chunk_id}\n${fact.citacao_literal}`,
+      pagina: fact.pagina || null,
+      chunk_id: null,
+    }));
 
+    // Adicionar salário mensal calculado se existir
+    if (calculatedMonthlySalary) {
+      factsToInsert.push({
+        case_id,
+        chave: "salario_mensal",
+        valor: String(calculatedMonthlySalary.valor),
+        tipo: "moeda",
+        origem: "ia_extracao" as const,
+        confianca: 0.85, // Confiança alta mas não 1.0 pois é calculado
+        confirmado: false,
+        citacao: `CHUNK_ID:${calculatedMonthlySalary.chunk_id}\n${calculatedMonthlySalary.citacao}`,
+        pagina: null,
+        chunk_id: null,
+      });
+    }
+
+    // Inserir fatos no banco
+    if (factsToInsert.length > 0) {
       const { error: insertError } = await supabase
         .from("facts")
         .insert(factsToInsert);
@@ -393,12 +507,18 @@ Liste inconsistências em "alertas".`;
         facts: validFacts,
         fatos_nao_encontrados: fatosNaoEncontrados,
         alertas: serverValidations,
-          documents_used: processedDocs.map((d: any) => ({
-            id: d.id,
-            tipo: d.tipo,
-            chunks: (d.metadata?.chunks_created ?? null),
-            status: d.status,
-          })),
+        salario_calculado: calculatedMonthlySalary ? {
+          valor: calculatedMonthlySalary.valor,
+          metodo: "FGTS (depósito / 0.08)",
+          depositos_analisados: calculatedMonthlySalary.deposits.length,
+          detalhes: calculatedMonthlySalary.deposits,
+        } : null,
+        documents_used: processedDocs.map((d: any) => ({
+          id: d.id,
+          tipo: d.tipo,
+          chunks: (d.metadata?.chunks_created ?? null),
+          status: d.status,
+        })),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
