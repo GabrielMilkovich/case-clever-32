@@ -1,5 +1,5 @@
 // =====================================================
-// CALCULADORA: INSS (Descontos)
+// CALCULADORA: INSS (Descontos) - Padrão Classe
 // =====================================================
 
 import {
@@ -12,193 +12,334 @@ import {
   Warning,
   VerbaOutput,
   CompetenciaOutput,
+  TaxTable,
   parseFactAsDate,
   arredondarMoeda,
   getMonthsBetween,
 } from '../types';
-import { getTaxTable, calcularImposto } from '../engine';
 
+// Inputs específicos para INSS
+interface INSSInputs extends CalculatorInputs {
+  valor_bruto?: number;
+  competencia?: string;
+  verbas_por_competencia?: Record<string, number>;
+  total_bruto?: number;
+}
+
+// Regras configuráveis
 interface INSSRules {
   tipo: 'progressivo' | 'simples';
   teto_aplicavel: boolean;
 }
 
 const DEFAULT_RULES: INSSRules = {
-  tipo: 'progressivo', // após reforma 2019
+  tipo: 'progressivo',
   teto_aplicavel: true,
 };
 
-export function createINSSCalculator(rulesData: CalculatorRules): Calculator {
-  const rules: INSSRules = {
-    ...DEFAULT_RULES,
-    ...(rulesData.regras as Partial<INSSRules>),
-  };
+// Classe principal do calculador INSS
+class INSSCalculator implements Calculator {
+  id = 'inss';
+  nome = 'INSS';
+  version: string;
+  private rules: INSSRules;
 
-  return {
-    id: 'inss',
-    nome: 'INSS',
-    version: rulesData.versao || '1.0',
+  constructor(rulesData: CalculatorRules) {
+    this.version = rulesData.versao || '1.0';
+    this.rules = {
+      ...DEFAULT_RULES,
+      ...(rulesData.regras as Partial<INSSRules>),
+    };
+  }
 
-    execute(ctx: CalcContext, inputs: CalculatorInputs): CalcResult {
-      const auditLines: AuditLine[] = [];
-      const warnings: Warning[] = [];
-      const verbas: VerbaOutput[] = [];
-      let linhaAtual = 0;
+  // Buscar tabela vigente para a competência
+  private getTabelaVigente(taxTables: TaxTable[], competencia: string | Date): TaxTable | null {
+    const data = typeof competencia === 'string' 
+      ? new Date(competencia + '-15') 
+      : competencia;
+    
+    return taxTables.find(
+      (t) =>
+        t.tipo === 'inss' &&
+        t.vigencia_inicio <= data &&
+        (!t.vigencia_fim || t.vigencia_fim >= data)
+    ) || null;
+  }
 
-      // Obter valores por competência
-      const verbasCompetencia = (inputs.verbas_por_competencia as Record<string, number>) || {};
-      const dataAdmissao = parseFactAsDate(ctx.facts['data_admissao']);
-      const dataDemissao = parseFactAsDate(ctx.facts['data_demissao']) || ctx.dataReferencia;
+  // Calcular desconto INSS progressivo (pós-reforma 2020)
+  private calcularDescontoProgressivo(valor_bruto: number, tabela: TaxTable): { 
+    desconto: number; 
+    aliquota_efetiva: number;
+    detalhes: Array<{ faixa: number; base: number; aliquota: number; valor: number }>;
+  } {
+    let desconto = 0;
+    let base_restante = valor_bruto;
+    let faixaAnterior = 0;
+    const detalhes: Array<{ faixa: number; base: number; aliquota: number; valor: number }> = [];
 
-      if (Object.keys(verbasCompetencia).length === 0) {
-        // Se não houver detalhamento, usar total
-        const totalBruto = (inputs.total_bruto as number) || 0;
+    for (const faixa of tabela.faixas) {
+      const limiteAteFaixa = faixa.ate - faixaAnterior;
+      const valor_faixa = Math.min(base_restante, limiteAteFaixa);
+      
+      if (valor_faixa > 0) {
+        const valorDesconto = valor_faixa * faixa.aliquota;
+        desconto += valorDesconto;
         
-        if (totalBruto <= 0) {
-          warnings.push({
-            tipo: 'info',
-            codigo: 'SEM_BASE_INSS',
-            mensagem: 'Não há base de cálculo para INSS',
-          });
-          return {
-            calculadoraId: 'inss',
-            calculadoraNome: 'INSS',
-            versao: this.version,
-            outputs: { total_bruto: 0, total_liquido: 0, verbas: [] },
-            auditLines,
-            warnings,
-          };
-        }
-
-        // Buscar tabela vigente
-        const tabelaINSS = getTaxTable(ctx.taxTables, 'inss', ctx.dataReferencia);
-        
-        if (!tabelaINSS) {
-          warnings.push({
-            tipo: 'atencao',
-            codigo: 'TABELA_INSS_NAO_ENCONTRADA',
-            mensagem: 'Tabela de INSS não encontrada para o período',
-            sugestao: 'Cadastre a tabela de INSS vigente',
-          });
-          return {
-            calculadoraId: 'inss',
-            calculadoraNome: 'INSS',
-            versao: this.version,
-            outputs: { total_bruto: 0, verbas: [] },
-            auditLines,
-            warnings,
-          };
-        }
-
-        // Calcular desconto simplificado
-        const { valor: desconto, aliquota_efetiva } = calcularImposto(totalBruto, tabelaINSS);
-        
-        auditLines.push({
-          linha: ++linhaAtual,
-          calculadora: 'inss',
-          descricao: `Desconto INSS (alíq. efetiva ${(aliquota_efetiva * 100).toFixed(2)}%)`,
-          formula: `Base ${totalBruto.toFixed(2)} → Desconto`,
-          valor_bruto: arredondarMoeda(desconto),
-          valor_liquido: arredondarMoeda(-desconto),
-          metadata: { base: totalBruto, aliquota_efetiva },
+        detalhes.push({
+          faixa: faixa.ate,
+          base: valor_faixa,
+          aliquota: faixa.aliquota,
+          valor: valorDesconto,
         });
+        
+        base_restante -= valor_faixa;
+      }
+      
+      if (base_restante <= 0) break;
+      faixaAnterior = faixa.ate;
+    }
 
-        verbas.push({
-          codigo: 'INSS_DESCONTO',
-          descricao: 'Desconto INSS',
-          valor_bruto: 0,
-          valor_liquido: arredondarMoeda(-desconto),
-        });
+    return {
+      desconto: arredondarMoeda(desconto),
+      aliquota_efetiva: valor_bruto > 0 ? desconto / valor_bruto : 0,
+      detalhes,
+    };
+  }
 
+  // Calcular desconto INSS simples (alíquota única)
+  private calcularDescontoSimples(valor_bruto: number, tabela: TaxTable): {
+    desconto: number;
+    aliquota_efetiva: number;
+  } {
+    for (const faixa of tabela.faixas) {
+      if (valor_bruto <= faixa.ate || faixa.ate === 0) {
+        const desconto = valor_bruto * faixa.aliquota;
         return {
-          calculadoraId: 'inss',
-          calculadoraNome: 'INSS',
-          versao: this.version,
-          outputs: {
-            total_bruto: 0,
-            total_liquido: arredondarMoeda(-desconto),
-            verbas,
-          },
-          auditLines,
-          warnings,
+          desconto: arredondarMoeda(desconto),
+          aliquota_efetiva: faixa.aliquota,
         };
       }
+    }
+    
+    // Última faixa (teto)
+    const ultimaFaixa = tabela.faixas[tabela.faixas.length - 1];
+    return {
+      desconto: arredondarMoeda(ultimaFaixa.ate * ultimaFaixa.aliquota),
+      aliquota_efetiva: ultimaFaixa.aliquota,
+    };
+  }
 
-      // Calcular por competência
-      const competencias: CompetenciaOutput[] = [];
-      let totalDesconto = 0;
+  // Método principal de execução
+  execute(ctx: CalcContext, inputs: INSSInputs): CalcResult {
+    const auditLines: AuditLine[] = [];
+    const warnings: Warning[] = [];
+    const verbas: VerbaOutput[] = [];
+    let linhaAtual = 0;
 
-      const meses = dataAdmissao && dataDemissao 
-        ? getMonthsBetween(dataAdmissao, dataDemissao)
-        : Object.keys(verbasCompetencia);
-
-      for (const competencia of meses) {
-        const baseCompetencia = verbasCompetencia[competencia] || 0;
-        if (baseCompetencia <= 0) continue;
-
-        // Buscar tabela vigente para a competência
-        const [ano, mes] = competencia.split('-').map(Number);
-        const dataComp = new Date(ano, mes - 1, 15);
-        const tabelaINSS = getTaxTable(ctx.taxTables, 'inss', dataComp);
-
-        if (!tabelaINSS) {
-          warnings.push({
-            tipo: 'atencao',
-            codigo: 'TABELA_INSS_NAO_ENCONTRADA',
-            mensagem: `Tabela INSS não encontrada para ${competencia}`,
-          });
-          continue;
-        }
-
-        const { valor: desconto, aliquota_efetiva } = calcularImposto(baseCompetencia, tabelaINSS);
-
-        auditLines.push({
-          linha: ++linhaAtual,
-          calculadora: 'inss',
-          competencia,
-          descricao: `INSS ${competencia} (${(aliquota_efetiva * 100).toFixed(1)}%)`,
-          formula: `${baseCompetencia.toFixed(2)} → ${desconto.toFixed(2)}`,
-          valor_liquido: arredondarMoeda(-desconto),
-          metadata: { base: baseCompetencia, aliquota_efetiva },
+    // Modo 1: Cálculo direto por valor e competência
+    if (inputs.valor_bruto !== undefined && inputs.competencia) {
+      const tabela = this.getTabelaVigente(ctx.taxTables, inputs.competencia);
+      
+      if (!tabela) {
+        warnings.push({
+          tipo: 'erro',
+          codigo: 'TABELA_NAO_ENCONTRADA',
+          mensagem: `Tabela INSS não encontrada para ${inputs.competencia}`,
         });
-
-        competencias.push({
-          competencia,
-          valor_bruto: 0,
-          valor_liquido: arredondarMoeda(-desconto),
-        });
-
-        totalDesconto += desconto;
+        return this.emptyResult(warnings);
       }
+
+      const { desconto, aliquota_efetiva, detalhes } = this.rules.tipo === 'progressivo'
+        ? this.calcularDescontoProgressivo(inputs.valor_bruto, tabela)
+        : { ...this.calcularDescontoSimples(inputs.valor_bruto, tabela), detalhes: [] };
+
+      // Auditoria detalhada por faixa (progressivo)
+      if (this.rules.tipo === 'progressivo' && detalhes) {
+        for (const det of detalhes) {
+          auditLines.push({
+            linha: ++linhaAtual,
+            calculadora: 'inss',
+            competencia: inputs.competencia,
+            descricao: `Faixa até R$ ${det.faixa.toFixed(2)} (${(det.aliquota * 100).toFixed(1)}%)`,
+            formula: `${det.base.toFixed(2)} × ${det.aliquota}`,
+            valor_liquido: arredondarMoeda(-det.valor),
+            metadata: { faixa: det.faixa, aliquota: det.aliquota },
+          });
+        }
+      }
+
+      auditLines.push({
+        linha: ++linhaAtual,
+        calculadora: 'inss',
+        competencia: inputs.competencia,
+        descricao: `INSS sobre R$ ${inputs.valor_bruto.toFixed(2)} (alíq. efetiva ${(aliquota_efetiva * 100).toFixed(2)}%)`,
+        valor_bruto: arredondarMoeda(-desconto),
+        metadata: { base: inputs.valor_bruto, aliquota_efetiva },
+      });
 
       verbas.push({
         codigo: 'INSS_DESCONTO',
         descricao: 'Desconto INSS',
         valor_bruto: 0,
-        valor_liquido: arredondarMoeda(-totalDesconto),
-        competencias,
-      });
-
-      // Total
-      auditLines.push({
-        linha: ++linhaAtual,
-        calculadora: 'inss',
-        descricao: 'TOTAL DESCONTO INSS',
-        valor_liquido: arredondarMoeda(-totalDesconto),
+        valor_liquido: arredondarMoeda(-desconto),
       });
 
       return {
-        calculadoraId: 'inss',
-        calculadoraNome: 'INSS',
+        calculadoraId: this.id,
+        calculadoraNome: this.nome,
         versao: this.version,
-        outputs: {
-          total_bruto: 0,
-          total_liquido: arredondarMoeda(-totalDesconto),
-          verbas,
-        },
+        outputs: { total_bruto: 0, total_liquido: arredondarMoeda(-desconto), verbas },
         auditLines,
         warnings,
       };
-    },
-  };
+    }
+
+    // Modo 2: Cálculo por competência (múltiplas competências)
+    const verbasCompetencia = inputs.verbas_por_competencia || {};
+    const dataAdmissao = parseFactAsDate(ctx.facts['data_admissao']);
+    const dataDemissao = parseFactAsDate(ctx.facts['data_demissao']) || ctx.dataReferencia;
+
+    if (Object.keys(verbasCompetencia).length === 0) {
+      const totalBruto = inputs.total_bruto || 0;
+      
+      if (totalBruto <= 0) {
+        warnings.push({
+          tipo: 'info',
+          codigo: 'SEM_BASE_INSS',
+          mensagem: 'Não há base de cálculo para INSS',
+        });
+        return this.emptyResult(warnings);
+      }
+
+      // Cálculo simplificado com tabela atual
+      const tabela = this.getTabelaVigente(ctx.taxTables, ctx.dataReferencia);
+      
+      if (!tabela) {
+        warnings.push({
+          tipo: 'atencao',
+          codigo: 'TABELA_INSS_NAO_ENCONTRADA',
+          mensagem: 'Tabela de INSS não encontrada para o período',
+          sugestao: 'Cadastre a tabela de INSS vigente',
+        });
+        return this.emptyResult(warnings);
+      }
+
+      const { desconto, aliquota_efetiva } = this.rules.tipo === 'progressivo'
+        ? this.calcularDescontoProgressivo(totalBruto, tabela)
+        : this.calcularDescontoSimples(totalBruto, tabela);
+
+      auditLines.push({
+        linha: ++linhaAtual,
+        calculadora: 'inss',
+        descricao: `Desconto INSS (alíq. efetiva ${(aliquota_efetiva * 100).toFixed(2)}%)`,
+        formula: `Base ${totalBruto.toFixed(2)} → Desconto`,
+        valor_bruto: arredondarMoeda(desconto),
+        valor_liquido: arredondarMoeda(-desconto),
+        metadata: { base: totalBruto, aliquota_efetiva },
+      });
+
+      verbas.push({
+        codigo: 'INSS_DESCONTO',
+        descricao: 'Desconto INSS',
+        valor_bruto: 0,
+        valor_liquido: arredondarMoeda(-desconto),
+      });
+
+      return {
+        calculadoraId: this.id,
+        calculadoraNome: this.nome,
+        versao: this.version,
+        outputs: { total_bruto: 0, total_liquido: arredondarMoeda(-desconto), verbas },
+        auditLines,
+        warnings,
+      };
+    }
+
+    // Processar cada competência
+    const competencias: CompetenciaOutput[] = [];
+    let totalDesconto = 0;
+
+    const meses = dataAdmissao && dataDemissao
+      ? getMonthsBetween(dataAdmissao, dataDemissao)
+      : Object.keys(verbasCompetencia);
+
+    for (const competencia of meses) {
+      const baseCompetencia = verbasCompetencia[competencia] || 0;
+      if (baseCompetencia <= 0) continue;
+
+      const tabela = this.getTabelaVigente(ctx.taxTables, competencia);
+
+      if (!tabela) {
+        warnings.push({
+          tipo: 'atencao',
+          codigo: 'TABELA_INSS_NAO_ENCONTRADA',
+          mensagem: `Tabela INSS não encontrada para ${competencia}`,
+        });
+        continue;
+      }
+
+      const { desconto, aliquota_efetiva } = this.rules.tipo === 'progressivo'
+        ? this.calcularDescontoProgressivo(baseCompetencia, tabela)
+        : this.calcularDescontoSimples(baseCompetencia, tabela);
+
+      auditLines.push({
+        linha: ++linhaAtual,
+        calculadora: 'inss',
+        competencia,
+        descricao: `INSS ${competencia} (${(aliquota_efetiva * 100).toFixed(1)}%)`,
+        formula: `${baseCompetencia.toFixed(2)} → ${desconto.toFixed(2)}`,
+        valor_liquido: arredondarMoeda(-desconto),
+        metadata: { base: baseCompetencia, aliquota_efetiva },
+      });
+
+      competencias.push({
+        competencia,
+        valor_bruto: 0,
+        valor_liquido: arredondarMoeda(-desconto),
+      });
+
+      totalDesconto += desconto;
+    }
+
+    verbas.push({
+      codigo: 'INSS_DESCONTO',
+      descricao: 'Desconto INSS',
+      valor_bruto: 0,
+      valor_liquido: arredondarMoeda(-totalDesconto),
+      competencias,
+    });
+
+    auditLines.push({
+      linha: ++linhaAtual,
+      calculadora: 'inss',
+      descricao: 'TOTAL DESCONTO INSS',
+      valor_liquido: arredondarMoeda(-totalDesconto),
+    });
+
+    return {
+      calculadoraId: this.id,
+      calculadoraNome: this.nome,
+      versao: this.version,
+      outputs: { total_bruto: 0, total_liquido: arredondarMoeda(-totalDesconto), verbas },
+      auditLines,
+      warnings,
+    };
+  }
+
+  // Helper para resultado vazio
+  private emptyResult(warnings: Warning[]): CalcResult {
+    return {
+      calculadoraId: this.id,
+      calculadoraNome: this.nome,
+      versao: this.version,
+      outputs: { total_bruto: 0, total_liquido: 0, verbas: [] },
+      auditLines: [],
+      warnings,
+    };
+  }
+}
+
+// Factory function para manter compatibilidade
+export function createINSSCalculator(rulesData: CalculatorRules): Calculator {
+  return new INSSCalculator(rulesData);
 }
