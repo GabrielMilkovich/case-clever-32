@@ -1,17 +1,16 @@
 // =====================================================
 // COMPONENTE: ASSISTENTE DE EXTRAÇÃO POR TEMA
 // Wizard com etapas temáticas para extração de fatos
+// Mapeamento para tabela facts + fact_evidences
 // =====================================================
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -33,24 +32,15 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
   Loader2,
   CheckCircle,
   XCircle,
   AlertTriangle,
   Play,
-  FileText,
   Edit,
   Check,
   X,
   Quote,
-  ChevronRight,
   Sparkles,
   Calendar,
   DollarSign,
@@ -58,6 +48,8 @@ import {
   Building,
   Gift,
   Search,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import {
   Tooltip,
@@ -70,23 +62,60 @@ interface ExtractionWizardProps {
   onFactsExtracted: () => void;
 }
 
-interface ExtractedFact {
-  chave: string;
-  valor: string;
-  tipo: "data" | "moeda" | "numero" | "texto" | "boolean";
+// Novo formato de fonte
+interface FactSource {
   chunk_id: string;
+  document_id: string;
   page_number: number;
   quote: string;
+}
+
+// Novo formato de fato extraído
+interface ExtractedFact {
+  key: string;
+  label: string;
+  value: string | number | boolean;
+  value_type: "text" | "money" | "date" | "time" | "hours" | "percent" | "boolean";
   confidence: number;
+  conflict: boolean;
+  sources: FactSource[];
+  notes?: string;
+  // UI state
   isEditing?: boolean;
   editValue?: string;
 }
 
-interface ExtractionResult {
-  facts: ExtractedFact[];
-  not_found: string[];
+interface NotFoundItem {
+  expected_key: string;
+  why: string;
+}
+
+interface ReviewIssue {
+  fact_key: string;
+  issue_type: string;
+  severity: "error" | "warning" | "info";
+  description: string;
+  suggestion?: string;
+}
+
+interface ReviewResult {
+  valid: boolean;
+  total_facts: number;
+  issues: ReviewIssue[];
+  approved_facts: string[];
+  rejected_facts: string[];
   warnings: string[];
-  chunks_searched: number;
+}
+
+interface ExtractionResult {
+  task_type: string;
+  facts: ExtractedFact[];
+  not_found: NotFoundItem[];
+  warnings: string[];
+  chunks_searched?: number;
+  review?: ReviewResult;
+  extracted_at?: string;
+  reviewed_at?: string;
 }
 
 interface TaskTheme {
@@ -105,55 +134,68 @@ const taskThemes: TaskTheme[] = [
     label: "Vínculo e Datas",
     icon: Calendar,
     description: "Data de admissão, demissão, cargo, empregador",
-    query: "Encontre informações sobre vínculo empregatício: data de admissão, data de demissão ou término, cargo exercido, nome do empregador, tipo de contrato",
+    query: "Encontre informações sobre vínculo empregatício: data de admissão, data de demissão ou término, cargo exercido, nome do empregador, CNPJ, tipo de contrato, motivo da rescisão",
     doc_types: ["ctps", "contrato", "trct", "peticao"],
-    expectedKeys: ["data_admissao", "data_demissao", "cargo", "empregador", "tipo_contrato"],
+    expectedKeys: ["data_admissao", "data_demissao", "cargo", "empregador", "cnpj_empregador", "tipo_contrato", "motivo_rescisao"],
   },
   {
     id: "remuneracao",
     label: "Remuneração",
     icon: DollarSign,
     description: "Salário base, adicionais, comissões, gratificações",
-    query: "Encontre informações sobre remuneração: salário base, último salário, salário inicial, adicional de periculosidade, adicional de insalubridade, comissões, gratificações, média de salário",
+    query: "Encontre informações sobre remuneração: salário base mensal, último salário, salário inicial, adicional de periculosidade (%), adicional de insalubridade (%), adicional noturno, comissões médias, gratificações, horas extras habituais",
     doc_types: ["holerite", "contrato", "trct", "cct"],
-    expectedKeys: ["salario_base", "salario_inicial", "ultimo_salario", "adicional_periculosidade", "adicional_insalubridade", "comissoes"],
+    expectedKeys: ["salario_base", "salario_inicial", "ultimo_salario", "adicional_periculosidade", "adicional_insalubridade", "adicional_noturno", "comissoes_media"],
   },
   {
     id: "jornada",
     label: "Jornada e Ponto",
     icon: Clock,
     description: "Horário de trabalho, horas extras, intervalo",
-    query: "Encontre informações sobre jornada de trabalho: horário de entrada, horário de saída, intervalo para almoço, horas extras habituais, dias trabalhados por semana, jornada contratada",
+    query: "Encontre informações sobre jornada de trabalho: horário de entrada, horário de saída, intervalo para refeição em minutos, dias trabalhados por semana, média de horas extras diárias, trabalho noturno, escala de trabalho, banco de horas",
     doc_types: ["ponto", "contrato", "cct", "peticao"],
-    expectedKeys: ["horario_entrada", "horario_saida", "intervalo_almoco", "horas_extras_diarias", "dias_trabalhados_semana"],
+    expectedKeys: ["horario_entrada", "horario_saida", "intervalo_refeicao", "dias_semana", "horas_extras_media_diaria", "trabalho_noturno", "escala_trabalho"],
   },
   {
     id: "fgts",
     label: "FGTS",
     icon: Building,
     description: "Saldo, depósitos, multa 40%",
-    query: "Encontre informações sobre FGTS: saldo da conta, depósitos mensais, valor da multa de 40%, extratos de FGTS",
+    query: "Encontre informações sobre FGTS: saldo total da conta, depósitos regulares, multa de 40% paga, valor da multa rescisória, extrato disponível",
     doc_types: ["fgts", "trct"],
-    expectedKeys: ["saldo_fgts", "depositos_mensais", "multa_40"],
+    expectedKeys: ["saldo_fgts", "depositos_regulares", "multa_40_paga", "valor_multa_40"],
   },
   {
     id: "beneficios",
     label: "Benefícios",
     icon: Gift,
     description: "Vale transporte, alimentação, plano de saúde",
-    query: "Encontre informações sobre benefícios: vale transporte, vale alimentação, vale refeição, plano de saúde, outros benefícios, descontos",
+    query: "Encontre informações sobre benefícios: vale transporte, vale alimentação, vale refeição, plano de saúde, seguro de vida, outros benefícios",
     doc_types: ["holerite", "contrato", "cct"],
-    expectedKeys: ["vale_transporte", "vale_alimentacao", "plano_saude", "outros_beneficios"],
+    expectedKeys: ["vale_transporte", "vale_alimentacao", "vale_refeicao", "plano_saude", "seguro_vida", "outros_beneficios"],
   },
 ];
+
+// Mapear value_type do agente para fact_type do banco
+function mapValueTypeToFactType(valueType: string): "data" | "moeda" | "numero" | "texto" | "boolean" {
+  const mapping: Record<string, "data" | "moeda" | "numero" | "texto" | "boolean"> = {
+    date: "data",
+    money: "moeda",
+    percent: "numero",
+    hours: "numero",
+    time: "texto",
+    text: "texto",
+    boolean: "boolean",
+  };
+  return mapping[valueType] || "texto";
+}
 
 export function ExtractionWizard({ caseId, onFactsExtracted }: ExtractionWizardProps) {
   const [activeTheme, setActiveTheme] = useState<string>("vinculo_datas");
   const [isExtracting, setIsExtracting] = useState(false);
+  const [isReviewing, setIsReviewing] = useState(false);
   const [results, setResults] = useState<Record<string, ExtractionResult>>({});
   const [editingFact, setEditingFact] = useState<{theme: string; index: number} | null>(null);
-  const [showChunksDialog, setShowChunksDialog] = useState(false);
-  const [selectedChunks, setSelectedChunks] = useState<Array<{content: string; page_number: number}>>([]);
 
   // Executar extração para um tema
   const runExtraction = useCallback(async (themeId: string) => {
@@ -185,7 +227,7 @@ export function ExtractionWizard({ caseId, onFactsExtracted }: ExtractionWizardP
       if (taskError) throw taskError;
 
       // Executar tarefa
-      const { data, error } = await supabase.functions.invoke("run-extraction-task", {
+      const { error } = await supabase.functions.invoke("run-extraction-task", {
         body: { task_id: task.id },
       });
 
@@ -215,53 +257,116 @@ export function ExtractionWizard({ caseId, onFactsExtracted }: ExtractionWizardP
     }
   }, [caseId]);
 
-  // Confirmar um fato
+  // Executar revisão dos fatos extraídos
+  const runReview = useCallback(async (themeId: string) => {
+    const result = results[themeId];
+    if (!result || result.facts.length === 0) return;
+
+    setIsReviewing(true);
+    toast.info("Validando fatos extraídos...");
+
+    try {
+      // Buscar a task mais recente do tema
+      const { data: tasks } = await supabase
+        .from("extraction_tasks")
+        .select("id")
+        .eq("case_id", caseId)
+        .eq("task_type", themeId)
+        .eq("status", "done")
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (!tasks || tasks.length === 0) {
+        throw new Error("Tarefa de extração não encontrada");
+      }
+
+      const { data, error } = await supabase.functions.invoke("review-extraction", {
+        body: { task_id: tasks[0].id },
+      });
+
+      if (error) throw error;
+
+      // Atualizar resultado com revisão
+      if (data?.review) {
+        setResults(prev => ({
+          ...prev,
+          [themeId]: {
+            ...prev[themeId],
+            review: data.review,
+            reviewed_at: new Date().toISOString(),
+          },
+        }));
+        
+        if (data.review.valid) {
+          toast.success("Todos os fatos passaram na validação!");
+        } else {
+          const errorCount = data.review.issues.filter((i: ReviewIssue) => i.severity === "error").length;
+          toast.warning(`${errorCount} problemas encontrados na validação`);
+        }
+      }
+
+    } catch (err) {
+      console.error("Review error:", err);
+      toast.error("Erro na revisão: " + (err as Error).message);
+    } finally {
+      setIsReviewing(false);
+    }
+  }, [caseId, results]);
+
+  // Confirmar um fato e salvar no banco
   const confirmFact = useCallback(async (themeId: string, fact: ExtractedFact) => {
     try {
       const { data: session } = await supabase.auth.getSession();
       if (!session?.session?.user) throw new Error("Não autenticado");
 
+      // Mapear para o schema da tabela facts
+      const factData = {
+        case_id: caseId,
+        chave: fact.key,
+        valor: String(fact.value),
+        tipo: mapValueTypeToFactType(fact.value_type),
+        origem: "ia_extracao" as const,
+        confianca: fact.confidence,
+        confirmado: true,
+        confirmado_por: session.session.user.id,
+        confirmado_em: new Date().toISOString(),
+        // Usar a primeira source para citacao e pagina
+        citacao: fact.sources[0]?.quote || null,
+        pagina: fact.sources[0]?.page_number || null,
+        chunk_id: fact.sources[0]?.chunk_id || null,
+      };
+
       // Inserir fato confirmado
       const { data: insertedFact, error: factError } = await supabase
         .from("facts")
-        .insert({
-          case_id: caseId,
-          chave: fact.chave,
-          valor: fact.valor,
-          tipo: fact.tipo,
-          origem: "ia_extracao" as const,
-          confianca: fact.confidence,
-          confirmado: true,
-          confirmado_por: session.session.user.id,
-          confirmado_em: new Date().toISOString(),
-          citacao: fact.quote,
-          pagina: fact.page_number,
-          chunk_id: fact.chunk_id,
-        })
+        .insert(factData)
         .select()
         .single();
 
       if (factError) throw factError;
 
-      // Tentar inserir evidência
-      if (insertedFact && fact.chunk_id) {
-        // Buscar document_id do chunk
-        const { data: chunk } = await supabase
-          .from("document_chunks")
-          .select("document_id")
-          .eq("id", fact.chunk_id)
-          .single();
-
-        if (chunk?.document_id) {
-          await supabase.from("fact_evidences").insert({
+      // Inserir todas as evidências (uma para cada source)
+      if (insertedFact && fact.sources.length > 0) {
+        const evidences = fact.sources
+          .filter(s => s.chunk_id && s.document_id)
+          .map(source => ({
             case_id: caseId,
             fact_id: insertedFact.id,
-            document_id: chunk.document_id,
-            chunk_id: fact.chunk_id,
-            page_number: fact.page_number,
-            quote: fact.quote,
+            document_id: source.document_id,
+            chunk_id: source.chunk_id,
+            page_number: source.page_number,
+            quote: source.quote,
             confidence: fact.confidence,
-          });
+          }));
+
+        if (evidences.length > 0) {
+          const { error: evidenceError } = await supabase
+            .from("fact_evidences")
+            .insert(evidences);
+
+          if (evidenceError) {
+            console.warn("Error inserting evidences:", evidenceError);
+          }
         }
       }
 
@@ -270,11 +375,11 @@ export function ExtractionWizard({ caseId, onFactsExtracted }: ExtractionWizardP
         ...prev,
         [themeId]: {
           ...prev[themeId],
-          facts: prev[themeId].facts.filter(f => f.chave !== fact.chave || f.valor !== fact.valor),
+          facts: prev[themeId].facts.filter(f => f.key !== fact.key),
         },
       }));
 
-      toast.success(`Fato "${fact.chave}" confirmado!`);
+      toast.success(`Fato "${fact.label || fact.key}" confirmado!`);
       onFactsExtracted();
 
     } catch (err) {
@@ -303,7 +408,7 @@ export function ExtractionWizard({ caseId, onFactsExtracted }: ExtractionWizardP
       [themeId]: {
         ...prev[themeId],
         facts: prev[themeId].facts.map((f, i) => 
-          i === index ? { ...f, isEditing: true, editValue: f.valor } : f
+          i === index ? { ...f, isEditing: true, editValue: String(f.value) } : f
         ),
       },
     }));
@@ -316,7 +421,7 @@ export function ExtractionWizard({ caseId, onFactsExtracted }: ExtractionWizardP
       [themeId]: {
         ...prev[themeId],
         facts: prev[themeId].facts.map((f, i) => 
-          i === index ? { ...f, isEditing: false, valor: newValue, editValue: undefined } : f
+          i === index ? { ...f, isEditing: false, value: newValue, editValue: undefined } : f
         ),
       },
     }));
@@ -348,8 +453,19 @@ export function ExtractionWizard({ caseId, onFactsExtracted }: ExtractionWizardP
     }
   }, [results, confirmFact]);
 
-  const currentTheme = taskThemes.find(t => t.id === activeTheme);
-  const currentResult = results[activeTheme];
+  // Verificar se um fato tem issues na revisão
+  const getFactIssues = (themeId: string, factKey: string): ReviewIssue[] => {
+    const review = results[themeId]?.review;
+    if (!review) return [];
+    return review.issues.filter(i => i.fact_key === factKey);
+  };
+
+  // Verificar se um fato foi rejeitado na revisão
+  const isFactRejected = (themeId: string, factKey: string): boolean => {
+    const review = results[themeId]?.review;
+    if (!review) return false;
+    return review.rejected_facts.includes(factKey);
+  };
 
   return (
     <div className="space-y-6">
@@ -362,7 +478,7 @@ export function ExtractionWizard({ caseId, onFactsExtracted }: ExtractionWizardP
           </CardTitle>
           <CardDescription>
             Execute a extração por tema para encontrar fatos nos documentos indexados.
-            A IA buscará apenas nos trechos relevantes e sempre citará a origem.
+            A IA buscará apenas nos trechos relevantes e sempre citará a origem literal.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -415,23 +531,45 @@ export function ExtractionWizard({ caseId, onFactsExtracted }: ExtractionWizardP
                       </div>
                     </div>
                   </div>
-                  <Button
-                    onClick={() => runExtraction(theme.id)}
-                    disabled={isExtracting}
-                    className="gap-2"
-                  >
-                    {isExtracting && activeTheme === theme.id ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Extraindo...
-                      </>
-                    ) : (
-                      <>
-                        <Play className="h-4 w-4" />
-                        Executar Extração
-                      </>
+                  <div className="flex gap-2">
+                    {results[theme.id]?.facts?.length > 0 && !results[theme.id]?.review && (
+                      <Button
+                        variant="outline"
+                        onClick={() => runReview(theme.id)}
+                        disabled={isReviewing}
+                        className="gap-2"
+                      >
+                        {isReviewing ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Validando...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-4 w-4" />
+                            Validar Fatos
+                          </>
+                        )}
+                      </Button>
                     )}
-                  </Button>
+                    <Button
+                      onClick={() => runExtraction(theme.id)}
+                      disabled={isExtracting}
+                      className="gap-2"
+                    >
+                      {isExtracting && activeTheme === theme.id ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Extraindo...
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-4 w-4" />
+                          Executar Extração
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -476,6 +614,25 @@ export function ExtractionWizard({ caseId, onFactsExtracted }: ExtractionWizardP
                       </CardContent>
                     </Card>
                   )}
+                  {results[theme.id].review && (
+                    <Card className={`flex-1 ${results[theme.id].review?.valid ? 'border-green-200' : 'border-yellow-200'}`}>
+                      <CardContent className="pt-4">
+                        <div className="flex items-center gap-3">
+                          {results[theme.id].review?.valid ? (
+                            <CheckCircle className="h-5 w-5 text-green-500" />
+                          ) : (
+                            <AlertCircle className="h-5 w-5 text-yellow-500" />
+                          )}
+                          <div>
+                            <p className="text-2xl font-bold">
+                              {results[theme.id].review?.issues.filter(i => i.severity === "error").length || 0}
+                            </p>
+                            <p className="text-sm text-muted-foreground">Problemas críticos</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
 
                 {/* Warnings */}
@@ -508,11 +665,14 @@ export function ExtractionWizard({ caseId, onFactsExtracted }: ExtractionWizardP
                         </span>
                       </AccordionTrigger>
                       <AccordionContent>
-                        <div className="flex flex-wrap gap-2 pt-2">
+                        <div className="space-y-2 pt-2">
                           {results[theme.id].not_found.map((item, i) => (
-                            <Badge key={i} variant="outline" className="text-muted-foreground">
-                              {item}
-                            </Badge>
+                            <div key={i} className="flex items-start gap-2 text-sm">
+                              <Badge variant="outline" className="text-muted-foreground flex-shrink-0">
+                                {item.expected_key}
+                              </Badge>
+                              <span className="text-muted-foreground">{item.why}</span>
+                            </div>
                           ))}
                         </div>
                       </AccordionContent>
@@ -538,139 +698,199 @@ export function ExtractionWizard({ caseId, onFactsExtracted }: ExtractionWizardP
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Chave</TableHead>
+                            <TableHead>Chave / Descrição</TableHead>
                             <TableHead>Valor</TableHead>
+                            <TableHead className="text-center">Tipo</TableHead>
                             <TableHead className="text-center">Confiança</TableHead>
                             <TableHead>Citação</TableHead>
                             <TableHead className="text-right">Ações</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {results[theme.id].facts.map((fact, index) => (
-                            <TableRow key={index}>
-                              <TableCell>
-                                <code className="text-sm bg-muted px-1.5 py-0.5 rounded">
-                                  {fact.chave}
-                                </code>
-                              </TableCell>
-                              <TableCell>
-                                {fact.isEditing ? (
-                                  <div className="flex gap-2">
-                                    <Input
-                                      value={fact.editValue || fact.valor}
-                                      onChange={(e) => {
-                                        setResults(prev => ({
-                                          ...prev,
-                                          [theme.id]: {
-                                            ...prev[theme.id],
-                                            facts: prev[theme.id].facts.map((f, i) => 
-                                              i === index ? { ...f, editValue: e.target.value } : f
-                                            ),
-                                          },
-                                        }));
-                                      }}
-                                      className="h-8 w-[200px]"
-                                    />
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      className="h-8 w-8"
-                                      onClick={() => saveEditFact(theme.id, index, fact.editValue || fact.valor)}
-                                    >
-                                      <Check className="h-4 w-4 text-green-600" />
-                                    </Button>
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      className="h-8 w-8"
-                                      onClick={() => cancelEditFact(theme.id, index)}
-                                    >
-                                      <X className="h-4 w-4 text-destructive" />
-                                    </Button>
+                          {results[theme.id].facts.map((fact, index) => {
+                            const issues = getFactIssues(theme.id, fact.key);
+                            const rejected = isFactRejected(theme.id, fact.key);
+                            
+                            return (
+                              <TableRow 
+                                key={index}
+                                className={rejected ? "bg-destructive/5" : fact.conflict ? "bg-yellow-50" : ""}
+                              >
+                                <TableCell>
+                                  <div className="space-y-1">
+                                    <code className="text-sm bg-muted px-1.5 py-0.5 rounded">
+                                      {fact.key}
+                                    </code>
+                                    {fact.label && fact.label !== fact.key && (
+                                      <p className="text-xs text-muted-foreground">{fact.label}</p>
+                                    )}
+                                    {fact.conflict && (
+                                      <Badge variant="outline" className="text-yellow-600 border-yellow-300 text-xs">
+                                        Conflito
+                                      </Badge>
+                                    )}
+                                    {issues.length > 0 && (
+                                      <div className="space-y-1">
+                                        {issues.map((issue, i) => (
+                                          <Badge 
+                                            key={i}
+                                            variant="outline" 
+                                            className={
+                                              issue.severity === "error" 
+                                                ? "text-destructive border-destructive/30 text-xs" 
+                                                : "text-yellow-600 border-yellow-300 text-xs"
+                                            }
+                                          >
+                                            {issue.description}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
-                                ) : (
-                                  <span className="font-medium">{fact.valor}</span>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <Badge
-                                  variant="outline"
-                                  className={
-                                    fact.confidence >= 0.9 ? "text-green-600 border-green-200 bg-green-50" :
-                                    fact.confidence >= 0.7 ? "text-yellow-600 border-yellow-200 bg-yellow-50" :
-                                    "text-destructive border-destructive/20 bg-destructive/5"
-                                  }
-                                >
-                                  {Math.round(fact.confidence * 100)}%
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <div className="flex items-center gap-2 cursor-pointer hover:text-primary">
-                                      <Quote className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                      <span className="text-sm text-muted-foreground truncate max-w-[200px]">
-                                        {fact.quote}
-                                      </span>
-                                      {fact.page_number && (
-                                        <Badge variant="outline" className="text-xs flex-shrink-0">
-                                          p.{fact.page_number}
-                                        </Badge>
-                                      )}
+                                </TableCell>
+                                <TableCell>
+                                  {fact.isEditing ? (
+                                    <div className="flex gap-2">
+                                      <Input
+                                        value={fact.editValue || String(fact.value)}
+                                        onChange={(e) => {
+                                          setResults(prev => ({
+                                            ...prev,
+                                            [theme.id]: {
+                                              ...prev[theme.id],
+                                              facts: prev[theme.id].facts.map((f, i) => 
+                                                i === index ? { ...f, editValue: e.target.value } : f
+                                              ),
+                                            },
+                                          }));
+                                        }}
+                                        className="h-8 w-[200px]"
+                                      />
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-8 w-8"
+                                        onClick={() => saveEditFact(theme.id, index, fact.editValue || String(fact.value))}
+                                      >
+                                        <Check className="h-4 w-4 text-green-600" />
+                                      </Button>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-8 w-8"
+                                        onClick={() => cancelEditFact(theme.id, index)}
+                                      >
+                                        <X className="h-4 w-4 text-destructive" />
+                                      </Button>
                                     </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="bottom" className="max-w-[400px]">
-                                    <p className="text-sm">{fact.quote}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex justify-end gap-1">
-                                  {!fact.isEditing && (
+                                  ) : (
+                                    <span className="font-medium">{String(fact.value)}</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <Badge variant="outline" className="text-xs">
+                                    {fact.value_type}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <Badge
+                                    variant="outline"
+                                    className={
+                                      fact.confidence >= 0.9 ? "text-green-600 border-green-200 bg-green-50" :
+                                      fact.confidence >= 0.7 ? "text-yellow-600 border-yellow-200 bg-yellow-50" :
+                                      "text-destructive border-destructive/20 bg-destructive/5"
+                                    }
+                                  >
+                                    {Math.round(fact.confidence * 100)}%
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  {fact.sources.length > 0 ? (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <div className="flex items-center gap-2 cursor-pointer hover:text-primary">
+                                          <Quote className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                          <span className="text-sm text-muted-foreground truncate max-w-[200px]">
+                                            {fact.sources[0].quote}
+                                          </span>
+                                          <div className="flex gap-1">
+                                            {fact.sources[0].page_number && (
+                                              <Badge variant="outline" className="text-xs flex-shrink-0">
+                                                p.{fact.sources[0].page_number}
+                                              </Badge>
+                                            )}
+                                            {fact.sources.length > 1 && (
+                                              <Badge variant="secondary" className="text-xs flex-shrink-0">
+                                                +{fact.sources.length - 1}
+                                              </Badge>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="bottom" className="max-w-[400px]">
+                                        <div className="space-y-2">
+                                          {fact.sources.map((source, si) => (
+                                            <div key={si} className="text-sm">
+                                              <p className="font-medium">Página {source.page_number}</p>
+                                              <p className="text-muted-foreground">{source.quote}</p>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  ) : (
+                                    <span className="text-sm text-muted-foreground">Sem citação</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex justify-end gap-1">
+                                    {!fact.isEditing && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => startEditFact(theme.id, index)}
+                                          >
+                                            <Edit className="h-4 w-4" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Editar valor</TooltipContent>
+                                      </Tooltip>
+                                    )}
                                     <Tooltip>
                                       <TooltipTrigger asChild>
                                         <Button
                                           variant="ghost"
                                           size="icon"
-                                          className="h-8 w-8"
-                                          onClick={() => startEditFact(theme.id, index)}
+                                          className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                          onClick={() => confirmFact(theme.id, fact)}
+                                          disabled={rejected}
                                         >
-                                          <Edit className="h-4 w-4" />
+                                          <Check className="h-4 w-4" />
                                         </Button>
                                       </TooltipTrigger>
-                                      <TooltipContent>Editar valor</TooltipContent>
+                                      <TooltipContent>Confirmar</TooltipContent>
                                     </Tooltip>
-                                  )}
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
-                                        onClick={() => confirmFact(theme.id, fact)}
-                                      >
-                                        <Check className="h-4 w-4" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>Confirmar</TooltipContent>
-                                  </Tooltip>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                        onClick={() => rejectFact(theme.id, index)}
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>Rejeitar</TooltipContent>
-                                  </Tooltip>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                          onClick={() => rejectFact(theme.id, index)}
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>Rejeitar</TooltipContent>
+                                    </Tooltip>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
                         </TableBody>
                       </Table>
                     </CardContent>
