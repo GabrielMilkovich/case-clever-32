@@ -804,30 +804,36 @@ export type Database = {
       petition_templates: {
         Row: {
           ativo: boolean | null
+          content_markdown: string | null
           created_at: string
           descricao: string | null
           estrutura: Json
           id: string
+          is_default: boolean | null
           nome: string
           tipo: string
           variaveis: Json | null
         }
         Insert: {
           ativo?: boolean | null
+          content_markdown?: string | null
           created_at?: string
           descricao?: string | null
           estrutura?: Json
           id: string
+          is_default?: boolean | null
           nome: string
           tipo: string
           variaveis?: Json | null
         }
         Update: {
           ativo?: boolean | null
+          content_markdown?: string | null
           created_at?: string
           descricao?: string | null
           estrutura?: Json
           id?: string
+          is_default?: boolean | null
           nome?: string
           tipo?: string
           variaveis?: Json | null
