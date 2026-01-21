@@ -209,7 +209,9 @@ export function ExtractionWizard({ caseId, onFactsExtracted }: ExtractionWizardP
       const { data: session } = await supabase.auth.getSession();
       if (!session?.session?.user) throw new Error("Não autenticado");
 
-      // Criar tarefa de extração
+      // Criar tarefa de extração com configurações de performance
+      // top_k limitado entre 20-40 para balance custo/precisão
+      // doc_types filtrado para reduzir volume de chunks
       const { data: task, error: taskError } = await supabase
         .from("extraction_tasks")
         .insert({
@@ -218,7 +220,8 @@ export function ExtractionWizard({ caseId, onFactsExtracted }: ExtractionWizardP
           task_type: themeId,
           query: theme.query,
           filters: { doc_types: theme.doc_types },
-          top_k: 25,
+          top_k: 30, // Balance entre precisão e custo
+          similarity_threshold: 0.7,
           status: "pending",
         })
         .select()

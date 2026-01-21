@@ -80,10 +80,19 @@ interface Document {
   storage_path?: string;
   uploaded_em: string;
   status?: string;
+  processing_status?: string;
   page_count?: number;
   ocr_confidence?: number;
   error_message?: string;
-  metadata?: Record<string, unknown>;
+  retry_count?: number;
+  metadata?: {
+    processing_progress?: number;
+    processing_message?: string;
+    chunks_total?: number;
+    chunks_processed?: number;
+    chunks_created?: number;
+    [key: string]: unknown;
+  };
 }
 
 interface DocumentsManagerProps {
@@ -106,14 +115,21 @@ const docTypeOptions = [
 ];
 
 const statusConfig: Record<string, { label: string; icon: typeof Loader2; color: string; bgColor: string }> = {
+  pending: { label: "Pendente", icon: Clock, color: "text-muted-foreground", bgColor: "bg-muted" },
+  queued: { label: "Na fila", icon: Clock, color: "text-blue-500", bgColor: "bg-blue-50" },
   uploaded: { label: "Enviado", icon: Clock, color: "text-muted-foreground", bgColor: "bg-muted" },
+  downloading: { label: "Baixando", icon: Loader2, color: "text-blue-600", bgColor: "bg-blue-100" },
   ocr_pending: { label: "Aguardando OCR", icon: AlertTriangle, color: "text-yellow-600", bgColor: "bg-yellow-100" },
+  ocr: { label: "OCR em andamento", icon: Loader2, color: "text-blue-600", bgColor: "bg-blue-100" },
   ocr_running: { label: "OCR em andamento", icon: Loader2, color: "text-blue-600", bgColor: "bg-blue-100" },
   ocr_done: { label: "OCR concluído", icon: CheckCircle, color: "text-green-600", bgColor: "bg-green-100" },
+  chunking: { label: "Dividindo em chunks", icon: Loader2, color: "text-purple-600", bgColor: "bg-purple-100" },
   chunk_pending: { label: "Aguardando indexação", icon: Database, color: "text-purple-600", bgColor: "bg-purple-100" },
+  embedding: { label: "Gerando embeddings", icon: Loader2, color: "text-indigo-600", bgColor: "bg-indigo-100" },
   embedded: { label: "Indexado", icon: CheckCircle, color: "text-green-600", bgColor: "bg-green-100" },
   embedded_partial: { label: "Parcialmente indexado", icon: AlertTriangle, color: "text-yellow-600", bgColor: "bg-yellow-100" },
   failed: { label: "Erro", icon: XCircle, color: "text-destructive", bgColor: "bg-destructive/10" },
+  retrying: { label: "Tentando novamente", icon: Loader2, color: "text-orange-600", bgColor: "bg-orange-100" },
   processing: { label: "Processando", icon: Loader2, color: "text-blue-600", bgColor: "bg-blue-100" },
   completed: { label: "Concluído", icon: CheckCircle, color: "text-green-600", bgColor: "bg-green-100" },
 };
@@ -275,7 +291,7 @@ export function DocumentsManager({
     }
   }, [onDocumentsChange]);
 
-  // Processar todos os pendentes
+  // Processar todos os pendentes - modo assíncrono em fila
   const processAllPending = useCallback(async () => {
     const pendingDocs = documents.filter(d => 
       !d.status || d.status === "uploaded" || d.status === "failed"
@@ -286,14 +302,30 @@ export function DocumentsManager({
       return;
     }
 
-    toast.info(`Processando ${pendingDocs.length} documento(s)...`);
+    toast.info(`Enfileirando ${pendingDocs.length} documento(s) para processamento assíncrono...`);
 
-    for (const doc of pendingDocs) {
-      await processDocument(doc.id);
+    try {
+      // Usar nova edge function de processamento assíncrono em lote
+      const { data, error } = await supabase.functions.invoke("process-document-async", {
+        body: { case_id: caseId, mode: "queue" },
+      });
+
+      if (error) throw error;
+
+      toast.success(`${data?.queued || pendingDocs.length} documento(s) enfileirados! O processamento continua em background.`);
+      
+      // Atualizar a lista para mostrar status
+      onDocumentsChange();
+    } catch (err) {
+      console.error("Queue error:", err);
+      // Fallback: processar sequencialmente
+      toast.warning("Processando sequencialmente...");
+      for (const doc of pendingDocs) {
+        await processDocument(doc.id);
+      }
+      toast.success("Processamento concluído!");
     }
-
-    toast.success("Processamento concluído!");
-  }, [documents, processDocument]);
+  }, [documents, processDocument, caseId, onDocumentsChange]);
 
   // Atualizar tipo de documento
   const updateDocType = useCallback(async (documentId: string, newType: string) => {

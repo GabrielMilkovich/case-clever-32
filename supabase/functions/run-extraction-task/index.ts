@@ -351,21 +351,29 @@ serve(async (req) => {
       })
       .eq("id", task_id);
 
+    const startTime = Date.now();
+    
     try {
+      // Configurações de performance
+      const topK = Math.min(Math.max(task.top_k || 25, 10), 40); // Limitar entre 10-40
+      const docTypes = task.filters?.doc_types || null;
+      const similarityThreshold = task.similarity_threshold || 0.7;
+      
+      console.log(`[EXTRACTION] Config: top_k=${topK}, threshold=${similarityThreshold}, doc_types=${JSON.stringify(docTypes)}`);
+      
       // 1. Gerar embedding da query
       const queryEmbedding = await generateEmbedding(task.query, LOVABLE_API_KEY);
       console.log(`Generated query embedding for query: "${task.query.substring(0, 50)}..."`);
 
       // 2. Buscar chunks relevantes usando a função de match
-      const docTypes = task.filters?.doc_types || null;
-      
+      // IMPORTANTE: Limitar top_k para performance (20-40)
       const { data: chunks, error: searchError } = await supabase.rpc(
         "match_document_chunks",
         {
           p_case_id: task.case_id,
           p_query_embedding: `[${queryEmbedding.join(',')}]`,
-          p_top_k: task.top_k || 20,
-          p_doc_types: docTypes,
+          p_top_k: topK,
+          p_doc_types: docTypes, // Filtro por tipo de documento para precisão
         }
       );
 
@@ -435,7 +443,10 @@ serve(async (req) => {
         console.log(`⚠️ Found ${conflictFacts.length} facts with conflicts:`, conflictFacts.map(f => f.key));
       }
 
-      // 4. Salvar resultado na tarefa
+      // 4. Calcular tempo de processamento
+      const processingTime = Date.now() - startTime;
+      
+      // 5. Salvar resultado na tarefa com métricas
       await supabase
         .from("extraction_tasks")
         .update({
@@ -445,6 +456,8 @@ serve(async (req) => {
             chunks_searched: chunks.length,
             extracted_at: new Date().toISOString(),
           },
+          processing_time_ms: processingTime,
+          chunks_analyzed: chunks.length,
           updated_at: new Date().toISOString(),
         })
         .eq("id", task_id);

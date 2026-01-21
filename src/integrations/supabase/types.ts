@@ -136,6 +136,13 @@ export type Database = {
             foreignKeyName: "calculation_runs_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "calculation_runs_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -341,11 +348,82 @@ export type Database = {
             foreignKeyName: "document_chunks_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "document_chunks_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "document_chunks_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_queue: {
+        Row: {
+          case_id: string
+          completed_at: string | null
+          created_at: string | null
+          document_id: string
+          error_message: string | null
+          id: string
+          metadata: Json | null
+          priority: number | null
+          retry_count: number | null
+          started_at: string | null
+          status: string | null
+        }
+        Insert: {
+          case_id: string
+          completed_at?: string | null
+          created_at?: string | null
+          document_id: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          priority?: number | null
+          retry_count?: number | null
+          started_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          case_id?: string
+          completed_at?: string | null
+          created_at?: string | null
+          document_id?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          priority?: number | null
+          retry_count?: number | null
+          started_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_queue_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "document_queue_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_queue_document_id_fkey"
             columns: ["document_id"]
             isOneToOne: false
             referencedRelation: "documents"
@@ -361,10 +439,16 @@ export type Database = {
           file_name: string | null
           hash: string | null
           id: string
+          max_retries: number | null
           mime_type: string | null
           ocr_confidence: number | null
           owner_user_id: string | null
           page_count: number | null
+          processing_completed_at: string | null
+          processing_started_at: string | null
+          queue_priority: number | null
+          queued_at: string | null
+          retry_count: number | null
           status: string
           storage_path: string | null
           tipo: Database["public"]["Enums"]["doc_type"] | null
@@ -378,10 +462,16 @@ export type Database = {
           file_name?: string | null
           hash?: string | null
           id?: string
+          max_retries?: number | null
           mime_type?: string | null
           ocr_confidence?: number | null
           owner_user_id?: string | null
           page_count?: number | null
+          processing_completed_at?: string | null
+          processing_started_at?: string | null
+          queue_priority?: number | null
+          queued_at?: string | null
+          retry_count?: number | null
           status?: string
           storage_path?: string | null
           tipo?: Database["public"]["Enums"]["doc_type"] | null
@@ -395,10 +485,16 @@ export type Database = {
           file_name?: string | null
           hash?: string | null
           id?: string
+          max_retries?: number | null
           mime_type?: string | null
           ocr_confidence?: number | null
           owner_user_id?: string | null
           page_count?: number | null
+          processing_completed_at?: string | null
+          processing_started_at?: string | null
+          queue_priority?: number | null
+          queued_at?: string | null
+          retry_count?: number | null
           status?: string
           storage_path?: string | null
           tipo?: Database["public"]["Enums"]["doc_type"] | null
@@ -406,6 +502,13 @@ export type Database = {
           uploaded_em?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "documents_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
           {
             foreignKeyName: "documents_case_id_fkey"
             columns: ["case_id"]
@@ -418,13 +521,16 @@ export type Database = {
       extraction_tasks: {
         Row: {
           case_id: string
+          chunks_analyzed: number | null
           created_at: string
           error_message: string | null
           filters: Json
           id: string
           owner_user_id: string
+          processing_time_ms: number | null
           query: string
           result_json: Json | null
+          similarity_threshold: number | null
           status: string
           task_type: string
           top_k: number
@@ -432,13 +538,16 @@ export type Database = {
         }
         Insert: {
           case_id: string
+          chunks_analyzed?: number | null
           created_at?: string
           error_message?: string | null
           filters?: Json
           id?: string
           owner_user_id: string
+          processing_time_ms?: number | null
           query: string
           result_json?: Json | null
+          similarity_threshold?: number | null
           status?: string
           task_type: string
           top_k?: number
@@ -446,19 +555,29 @@ export type Database = {
         }
         Update: {
           case_id?: string
+          chunks_analyzed?: number | null
           created_at?: string
           error_message?: string | null
           filters?: Json
           id?: string
           owner_user_id?: string
+          processing_time_ms?: number | null
           query?: string
           result_json?: Json | null
+          similarity_threshold?: number | null
           status?: string
           task_type?: string
           top_k?: number
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "extraction_tasks_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
           {
             foreignKeyName: "extraction_tasks_case_id_fkey"
             columns: ["case_id"]
@@ -503,6 +622,13 @@ export type Database = {
           quote?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fact_evidences_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
           {
             foreignKeyName: "fact_evidences_case_id_fkey"
             columns: ["case_id"]
@@ -626,6 +752,13 @@ export type Database = {
             foreignKeyName: "facts_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "facts_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -730,9 +863,31 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      case_processing_stats: {
+        Row: {
+          case_id: string | null
+          failed_documents: number | null
+          indexed_documents: number | null
+          last_processed_at: string | null
+          owner_id: string | null
+          pending_documents: number | null
+          processing_documents: number | null
+          total_chunks: number | null
+          total_documents: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      get_next_queued_document: {
+        Args: never
+        Returns: {
+          case_id: string
+          document_id: string
+          priority: number
+          queue_id: string
+        }[]
+      }
       match_document_chunks: {
         Args: {
           p_case_id: string
@@ -749,6 +904,10 @@ export type Database = {
           similarity: number
         }[]
       }
+      queue_case_documents: {
+        Args: { p_case_id: string; p_priority?: number }
+        Returns: number
+      }
     }
     Enums: {
       case_status: "rascunho" | "em_analise" | "calculado" | "revisado"
@@ -761,6 +920,15 @@ export type Database = {
         | "outro"
       fact_origem: "ia_extracao" | "usuario" | "documento"
       fact_type: "data" | "moeda" | "numero" | "texto" | "boolean"
+      processing_status:
+        | "pending"
+        | "queued"
+        | "processing"
+        | "chunking"
+        | "embedding"
+        | "completed"
+        | "failed"
+        | "retrying"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -899,6 +1067,16 @@ export const Constants = {
       ],
       fact_origem: ["ia_extracao", "usuario", "documento"],
       fact_type: ["data", "moeda", "numero", "texto", "boolean"],
+      processing_status: [
+        "pending",
+        "queued",
+        "processing",
+        "chunking",
+        "embedding",
+        "completed",
+        "failed",
+        "retrying",
+      ],
     },
   },
 } as const
