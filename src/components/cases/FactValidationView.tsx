@@ -52,6 +52,7 @@ import {
   Unlock,
   ExternalLink,
   Download,
+  Loader2,
 } from "lucide-react";
 
 // =====================================================
@@ -74,6 +75,8 @@ interface Document {
   id: string;
   tipo: string;
   arquivo_url: string | null;
+  storage_path?: string | null;
+  file_name?: string | null;
   uploaded_em: string;
 }
 
@@ -143,6 +146,7 @@ export function FactValidationView({
 }: FactValidationViewProps) {
   const queryClient = useQueryClient();
   const [selectedFact, setSelectedFact] = useState<Fact | null>(null);
+  const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [selectedDocUrl, setSelectedDocUrl] = useState<string | null>(null);
   const [tryEmbedPreview, setTryEmbedPreview] = useState(false);
   const [editingFact, setEditingFact] = useState<Fact | null>(null);
@@ -287,6 +291,24 @@ export function FactValidationView({
   // HELPERS
   // =====================================================
 
+  const signedUrlMutation = useMutation({
+    mutationFn: async (documentId: string) => {
+      const { data, error } = await supabase.functions.invoke(
+        "get-signed-document-url",
+        {
+          body: {
+            document_id: documentId,
+            expires_in: 3600,
+          },
+        }
+      );
+
+      if (error) throw error;
+      if (!data?.signedUrl) throw new Error("URL assinada não retornada");
+      return data as { signedUrl: string };
+    },
+  });
+
   const getConfidenceConfig = (confianca: number | null) => {
     if (!confianca || confianca === 0)
       return {
@@ -326,11 +348,31 @@ export function FactValidationView({
   const handleViewDocument = (fact: Fact) => {
     setSelectedFact(fact);
     setTryEmbedPreview(false);
+    setSelectedDoc(null);
+    setSelectedDocUrl(null);
     // Por enquanto, abre o primeiro documento disponível
     // Futuramente, linkar com fact_sources para abrir o documento específico
-    if (documents.length > 0 && documents[0].arquivo_url) {
-      setSelectedDocUrl(documents[0].arquivo_url);
-    }
+    if (documents.length === 0) return;
+
+    const doc = documents[0];
+    setSelectedDoc(doc);
+
+    // Preferir URL assinada fresca (evita links expirados)
+    signedUrlMutation.mutate(doc.id, {
+      onSuccess: (res) => setSelectedDocUrl(res.signedUrl),
+      onError: (e) => {
+        console.error(e);
+        // Fallback: usa a URL já armazenada (pode estar expirada, mas evita bloquear o usuário)
+        if (doc.arquivo_url) {
+          setSelectedDocUrl(doc.arquivo_url);
+          toast.warning(
+            "Não foi possível gerar um link novo. Usando o link atual (pode estar expirado)."
+          );
+          return;
+        }
+        toast.error("Não foi possível abrir o documento.");
+      },
+    });
   };
 
   const handleEdit = (fact: Fact) => {
@@ -676,6 +718,9 @@ export function FactValidationView({
                     ) : (
                       <span>Documento selecionado</span>
                     )}
+                    {selectedDoc?.file_name ? (
+                      <span className="ml-2">• {selectedDoc.file_name}</span>
+                    ) : null}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button
@@ -683,6 +728,7 @@ export function FactValidationView({
                       variant="outline"
                       size="sm"
                       className="gap-2"
+                      disabled={signedUrlMutation.isPending}
                     >
                       <a href={selectedDocUrl} target="_blank" rel="noreferrer">
                         <ExternalLink className="h-4 w-4" />
@@ -694,6 +740,7 @@ export function FactValidationView({
                       variant="outline"
                       size="sm"
                       className="gap-2"
+                      disabled={signedUrlMutation.isPending}
                     >
                       <a href={selectedDocUrl} download rel="noreferrer">
                         <Download className="h-4 w-4" />
@@ -704,9 +751,19 @@ export function FactValidationView({
                       type="button"
                       variant="ghost"
                       size="sm"
+                      disabled={signedUrlMutation.isPending}
                       onClick={() => setTryEmbedPreview((v) => !v)}
                     >
-                      {tryEmbedPreview ? "Ocultar prévia" : "Tentar prévia aqui"}
+                      {signedUrlMutation.isPending ? (
+                        <span className="inline-flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Gerando link…
+                        </span>
+                      ) : tryEmbedPreview ? (
+                        "Ocultar prévia"
+                      ) : (
+                        "Tentar prévia aqui"
+                      )}
                     </Button>
                   </div>
                 </div>
