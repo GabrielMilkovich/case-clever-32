@@ -14,6 +14,92 @@ export type Database = {
   }
   public: {
     Tables: {
+      calculator_versions: {
+        Row: {
+          ativo: boolean | null
+          calculator_id: string
+          changelog: string | null
+          codigo_ref: string | null
+          criado_em: string | null
+          criado_por: string | null
+          id: string
+          regras: Json | null
+          versao: string
+          vigencia_fim: string | null
+          vigencia_inicio: string
+        }
+        Insert: {
+          ativo?: boolean | null
+          calculator_id: string
+          changelog?: string | null
+          codigo_ref?: string | null
+          criado_em?: string | null
+          criado_por?: string | null
+          id?: string
+          regras?: Json | null
+          versao: string
+          vigencia_fim?: string | null
+          vigencia_inicio: string
+        }
+        Update: {
+          ativo?: boolean | null
+          calculator_id?: string
+          changelog?: string | null
+          codigo_ref?: string | null
+          criado_em?: string | null
+          criado_por?: string | null
+          id?: string
+          regras?: Json | null
+          versao?: string
+          vigencia_fim?: string | null
+          vigencia_inicio?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calculator_versions_calculator_id_fkey"
+            columns: ["calculator_id"]
+            isOneToOne: false
+            referencedRelation: "calculators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calculators: {
+        Row: {
+          ativo: boolean | null
+          categoria: string
+          criado_em: string | null
+          descricao: string | null
+          id: string
+          inputs_esperados: Json | null
+          nome: string
+          outputs: Json | null
+          tags: string[] | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          categoria: string
+          criado_em?: string | null
+          descricao?: string | null
+          id?: string
+          inputs_esperados?: Json | null
+          nome: string
+          outputs?: Json | null
+          tags?: string[] | null
+        }
+        Update: {
+          ativo?: boolean | null
+          categoria?: string
+          criado_em?: string | null
+          descricao?: string | null
+          id?: string
+          inputs_esperados?: Json | null
+          nome?: string
+          outputs?: Json | null
+          tags?: string[] | null
+        }
+        Relationships: []
+      }
       cases: {
         Row: {
           atualizado_em: string | null
