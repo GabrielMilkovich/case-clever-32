@@ -801,6 +801,136 @@ export type Database = {
         }
         Relationships: []
       }
+      petition_templates: {
+        Row: {
+          ativo: boolean | null
+          created_at: string
+          descricao: string | null
+          estrutura: Json
+          id: string
+          nome: string
+          tipo: string
+          variaveis: Json | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string
+          descricao?: string | null
+          estrutura?: Json
+          id: string
+          nome: string
+          tipo: string
+          variaveis?: Json | null
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string
+          descricao?: string | null
+          estrutura?: Json
+          id?: string
+          nome?: string
+          tipo?: string
+          variaveis?: Json | null
+        }
+        Relationships: []
+      }
+      petitions: {
+        Row: {
+          ai_model_used: string | null
+          calculation_run_id: string | null
+          case_id: string
+          conteudo_completo: string | null
+          created_at: string
+          created_by: string | null
+          facts_snapshot: Json | null
+          fundamentacao_juridica: string | null
+          generation_config: Json | null
+          generation_time_ms: number | null
+          id: string
+          last_edited_by: string | null
+          memoria_calculo_html: string | null
+          narrativa_fatos: string | null
+          pedidos: Json | null
+          ressalvas: string | null
+          status: string
+          template_id: string | null
+          theses_used: Json | null
+          tipo: string
+          titulo: string | null
+          updated_at: string
+        }
+        Insert: {
+          ai_model_used?: string | null
+          calculation_run_id?: string | null
+          case_id: string
+          conteudo_completo?: string | null
+          created_at?: string
+          created_by?: string | null
+          facts_snapshot?: Json | null
+          fundamentacao_juridica?: string | null
+          generation_config?: Json | null
+          generation_time_ms?: number | null
+          id?: string
+          last_edited_by?: string | null
+          memoria_calculo_html?: string | null
+          narrativa_fatos?: string | null
+          pedidos?: Json | null
+          ressalvas?: string | null
+          status?: string
+          template_id?: string | null
+          theses_used?: Json | null
+          tipo?: string
+          titulo?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ai_model_used?: string | null
+          calculation_run_id?: string | null
+          case_id?: string
+          conteudo_completo?: string | null
+          created_at?: string
+          created_by?: string | null
+          facts_snapshot?: Json | null
+          fundamentacao_juridica?: string | null
+          generation_config?: Json | null
+          generation_time_ms?: number | null
+          id?: string
+          last_edited_by?: string | null
+          memoria_calculo_html?: string | null
+          narrativa_fatos?: string | null
+          pedidos?: Json | null
+          ressalvas?: string | null
+          status?: string
+          template_id?: string | null
+          theses_used?: Json | null
+          tipo?: string
+          titulo?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "petitions_calculation_run_id_fkey"
+            columns: ["calculation_run_id"]
+            isOneToOne: false
+            referencedRelation: "calculation_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "petitions_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "petitions_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profile_calculators: {
         Row: {
           calculator_version_id: string
