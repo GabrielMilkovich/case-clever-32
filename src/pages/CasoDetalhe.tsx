@@ -264,6 +264,17 @@ export default function CasoDetalhe() {
   const confirmedFacts = facts.filter((f) => f.confirmado);
   const pendingFacts = facts.filter((f) => !f.confirmado);
 
+  const CRITICAL_FACTS: string[] = [
+    "data_admissao",
+    "data_demissao",
+    "salario_base",
+    "salario_mensal",
+    "jornada_contratual",
+  ];
+
+  const criticalFactsInCase = facts.filter((f) => CRITICAL_FACTS.includes(f.chave));
+  const canCalculate = criticalFactsInCase.length > 0 && criticalFactsInCase.every((f) => f.confirmado);
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -312,7 +323,7 @@ export default function CasoDetalhe() {
               {[
                 { step: 1, label: "Documentos", icon: Upload, done: documents.length > 0 },
                 { step: 2, label: "Fatos Extraídos", icon: Sparkles, done: facts.length > 0 },
-                { step: 3, label: "Fatos Confirmados", icon: Check, done: confirmedFacts.length > 0 },
+                  { step: 3, label: "Fatos Confirmados", icon: Check, done: canCalculate },
                 { step: 4, label: "Cálculo", icon: Calculator, done: runs.length > 0 },
                 { step: 5, label: "Exportar", icon: Download, done: caseData.status === "revisado" },
               ].map((item, idx) => (
@@ -421,7 +432,7 @@ export default function CasoDetalhe() {
                   <div className="flex items-end">
                     <Button
                       size="lg"
-                      disabled={!selectedProfile || confirmedFacts.length === 0}
+                      disabled={!selectedProfile || !canCalculate}
                       className="gap-2"
                     >
                       <Play className="h-5 w-5" />
@@ -430,10 +441,21 @@ export default function CasoDetalhe() {
                   </div>
                 </div>
 
-                {confirmedFacts.length === 0 && (
-                  <div className="flex items-center gap-2 text-yellow-600 bg-yellow-50 p-3 rounded-lg">
-                    <AlertTriangle className="h-5 w-5" />
-                    <span>Confirme pelo menos um fato antes de calcular.</span>
+                {!canCalculate && (
+                  <div className="flex items-center justify-between gap-3 p-3 rounded-lg border bg-card">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <AlertTriangle className="h-5 w-5" />
+                      <span>Confirme os fatos críticos na aba Validação para liberar o cálculo.</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        const validacaoTab = document.querySelector('[value="validacao"]') as HTMLButtonElement;
+                        validacaoTab?.click();
+                      }}
+                    >
+                      Ir para Validação
+                    </Button>
                   </div>
                 )}
               </CardContent>
