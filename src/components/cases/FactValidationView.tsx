@@ -145,6 +145,9 @@ export function FactValidationView({
   const [editingFact, setEditingFact] = useState<Fact | null>(null);
   const [editForm, setEditForm] = useState({ valor: "", tipo: "" });
 
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({ chave: "", valor: "", tipo: "texto" });
+
   // Separar fatos por status
   const pendingFacts = facts.filter((f) => !f.confirmado);
   const confirmedFacts = facts.filter((f) => f.confirmado);
@@ -154,6 +157,11 @@ export function FactValidationView({
     return facts.filter(
       (f) => CRITICAL_FACTS.includes(f.chave) && !f.confirmado
     );
+  }, [facts]);
+
+  const missingCriticalKeys = useMemo(() => {
+    const keysInCase = new Set(facts.map((f) => f.chave));
+    return CRITICAL_FACTS.filter((k) => !keysInCase.has(k));
   }, [facts]);
 
   // Verificar se pode calcular (todos críticos confirmados)
@@ -234,6 +242,43 @@ export function FactValidationView({
       onFactsChange?.();
     },
   });
+
+  const createCriticalFactMutation = useMutation({
+    mutationFn: async ({ chave, valor, tipo }: { chave: string; valor: string; tipo: string }) => {
+      const { data: session } = await supabase.auth.getSession();
+      const userId = session?.session?.user?.id;
+
+      const { error } = await supabase.from("facts").insert({
+        case_id: caseId,
+        chave,
+        valor,
+        tipo: tipo as "data" | "moeda" | "numero" | "texto" | "boolean",
+        origem: "usuario",
+        // Como é inserção manual do usuário, já nasce confirmado.
+        confirmado: true,
+        confirmado_por: userId ?? null,
+        confirmado_em: new Date().toISOString(),
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["facts", caseId] });
+      toast.success("Fato crítico adicionado e confirmado!");
+      setCreateOpen(false);
+      setCreateForm({ chave: "", valor: "", tipo: "texto" });
+      onFactsChange?.();
+    },
+    onError: (e) => {
+      console.error(e);
+      toast.error("Não foi possível adicionar o fato.");
+    },
+  });
+
+  const openCreateForFirstMissing = () => {
+    const nextKey = missingCriticalKeys[0] || "";
+    setCreateForm((prev) => ({ ...prev, chave: prev.chave || nextKey }));
+    setCreateOpen(true);
+  };
 
   // =====================================================
   // HELPERS
@@ -494,17 +539,26 @@ export function FactValidationView({
                     ? "Todos os fatos críticos foram confirmados"
                     : "Confirme os fatos marcados como 'Crítico' para liberar o cálculo"}
                 </p>
+
+                {!canCalculate && missingCriticalKeys.length > 0 && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Faltando no caso: {missingCriticalKeys.map((k) => chaveLabels[k] || k).join(", ")}
+                  </p>
+                )}
               </div>
             </div>
 
-            <Button
-              disabled={!canCalculate}
-              onClick={onValidationComplete}
-              className="gap-2"
-            >
-              <Calculator className="h-4 w-4" />
-              {canCalculate ? "Prosseguir para Cálculo" : "Bloqueado"}
-            </Button>
+            <div className="flex items-center gap-2">
+              {!canCalculate && missingCriticalKeys.length > 0 && (
+                <Button variant="outline" onClick={openCreateForFirstMissing}>
+                  Adicionar fato crítico
+                </Button>
+              )}
+              <Button disabled={!canCalculate} onClick={onValidationComplete} className="gap-2">
+                <Calculator className="h-4 w-4" />
+                {canCalculate ? "Prosseguir para Cálculo" : "Bloqueado"}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -683,6 +737,80 @@ export function FactValidationView({
             </Button>
             <Button onClick={handleSaveEdit} disabled={editMutation.isPending}>
               Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Critical Fact Dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adicionar fato crítico</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Chave</Label>
+              <Select
+                value={createForm.chave}
+                onValueChange={(value) => setCreateForm((p) => ({ ...p, chave: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CRITICAL_FACTS.map((k) => (
+                    <SelectItem key={k} value={k}>
+                      {chaveLabels[k] || k}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Valor</Label>
+              <Input
+                value={createForm.valor}
+                onChange={(e) => setCreateForm((p) => ({ ...p, valor: e.target.value }))}
+                placeholder="Ex.: 01/02/2024, R$ 2.500,00"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Tipo</Label>
+              <Select
+                value={createForm.tipo}
+                onValueChange={(value) => setCreateForm((p) => ({ ...p, tipo: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(tipoLabels).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() =>
+                createCriticalFactMutation.mutate({
+                  chave: createForm.chave,
+                  valor: createForm.valor,
+                  tipo: createForm.tipo,
+                })
+              }
+              disabled={!createForm.chave || !createForm.valor || createCriticalFactMutation.isPending}
+            >
+              Adicionar e confirmar
             </Button>
           </DialogFooter>
         </DialogContent>
