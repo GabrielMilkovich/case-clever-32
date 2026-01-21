@@ -11,3 +11,12 @@ verify_jwt = false
 
 [functions.explain-result]
 verify_jwt = false
+
+[functions.process-document]
+verify_jwt = false
+
+[functions.semantic-search]
+verify_jwt = false
+
+[functions.extract-facts-rag]
+verify_jwt = false

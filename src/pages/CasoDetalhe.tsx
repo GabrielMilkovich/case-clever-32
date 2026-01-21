@@ -38,6 +38,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FactValidationView } from "@/components/cases/FactValidationView";
 import { CalculatorSuggestions } from "@/components/cases/CalculatorSuggestions";
+import { DocumentProcessor } from "@/components/cases/DocumentProcessor";
 
 // Types
 interface CaseData {
@@ -53,6 +54,10 @@ interface Document {
   tipo: string;
   arquivo_url: string | null;
   uploaded_em: string;
+  processing_status?: string;
+  processing_error?: string;
+  chunk_count?: number;
+  page_count?: number;
 }
 
 interface Fact {
@@ -377,101 +382,13 @@ export default function CasoDetalhe() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Documents Tab */}
+          {/* Documents Tab - New Document Processor */}
           <TabsContent value="documentos" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>Upload de Documentos</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-3 gap-4">
-                  {Object.entries(docTypeLabels).map(([tipo, label]) => (
-                    <div key={tipo} className="space-y-2">
-                      <Label>{label}</Label>
-                      <Input
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                        multiple
-                        onChange={(e) => e.target.files && handleFileUpload(e.target.files, tipo)}
-                        disabled={isUploading}
-                      />
-                    </div>
-                  ))}
-                </div>
-                {isUploading && (
-                  <div className="space-y-2">
-                    <Progress value={uploadProgress} />
-                    <p className="text-sm text-muted-foreground text-center">
-                      Enviando... {Math.round(uploadProgress)}%
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {documents.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Documentos Anexados</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="divide-y">
-                    {documents.map((doc) => (
-                      <div key={doc.id} className="flex items-center justify-between py-3">
-                        <div className="flex items-center gap-3">
-                          <FileText className="h-5 w-5 text-muted-foreground" />
-                          <div>
-                            <p className="font-medium">{docTypeLabels[doc.tipo] || doc.tipo}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {new Date(doc.uploaded_em).toLocaleDateString("pt-BR")}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          {doc.arquivo_url && (
-                            <Button variant="outline" size="sm" asChild>
-                              <a href={doc.arquivo_url} target="_blank" rel="noopener noreferrer">
-                                Ver
-                              </a>
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {documents.length > 0 && (
-              <div className="flex justify-center">
-                <Button 
-                  size="lg" 
-                  className="gap-2"
-                  onClick={async () => {
-                    toast.info("Extração de fatos iniciada...");
-                    try {
-                      const { data, error } = await supabase.functions.invoke("extract-facts", {
-                        body: { 
-                          case_id: id, 
-                          document_texts: documents.map(d => `Documento ${d.tipo}: ${d.arquivo_url}`)
-                        },
-                      });
-                      if (error) throw error;
-                      queryClient.invalidateQueries({ queryKey: ["facts", id] });
-                      toast.success(`${data.facts_extracted} fato(s) extraído(s)!`);
-                    } catch (err) {
-                      toast.error("Erro na extração: " + (err as Error).message);
-                    }
-                  }}
-                >
-                  <Sparkles className="h-5 w-5" />
-                  Extrair Fatos com IA
-                </Button>
-              </div>
-            )}
+            <DocumentProcessor
+              caseId={id!}
+              documents={documents}
+              onDocumentsChange={() => queryClient.invalidateQueries({ queryKey: ["documents", id] })}
+            />
           </TabsContent>
 
           {/* Validation Tab - New Split View */}
