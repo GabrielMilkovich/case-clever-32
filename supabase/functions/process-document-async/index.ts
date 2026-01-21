@@ -398,13 +398,19 @@ async function processDocumentInternal(
   try {
     // Determinar tipo MIME
     const fileUrl = document.arquivo_url;
-    const extension = fileUrl.split(".").pop()?.toLowerCase() || "";
-
-    let mimeType = "application/octet-stream";
-    if (extension === "pdf") mimeType = "application/pdf";
-    else if (["jpg", "jpeg"].includes(extension)) mimeType = "image/jpeg";
-    else if (extension === "png") mimeType = "image/png";
-    else if (extension === "webp") mimeType = "image/webp";
+    const mimeType = document.mime_type || (() => {
+      try {
+        const pathname = new URL(fileUrl).pathname;
+        const ext = pathname.split(".").pop()?.toLowerCase() || "";
+        if (ext === "pdf") return "application/pdf";
+        if (["jpg", "jpeg"].includes(ext)) return "image/jpeg";
+        if (ext === "png") return "image/png";
+        if (ext === "webp") return "image/webp";
+      } catch {
+        // ignore
+      }
+      return "application/octet-stream";
+    })();
 
     // Atualizar status: OCR
     await updateDocumentStatus(supabase, documentId, {
