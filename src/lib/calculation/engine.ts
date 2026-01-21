@@ -62,6 +62,22 @@ export function createCalculator(
   return factory(rules);
 }
 
+// Interface de resumo final (inspirado no motor simplificado)
+export interface FinalResult {
+  resumo: {
+    bruto: number;
+    liquido: number;
+    descontos_totais: number;
+    quantidade_verbas: number;
+    quantidade_competencias: number;
+  };
+  por_verba: ConsolidatedResult['por_verba'];
+  por_competencia: { [competencia: string]: number };
+  memoria_calculo: AuditLine[];
+  warnings: Warning[];
+  calculadoras_utilizadas: CalculatorUsed[];
+}
+
 // Classe principal do motor de cálculo
 export class CalculationEngine {
   private profile: CalculationProfile;
@@ -72,6 +88,8 @@ export class CalculationEngine {
   private calculators: Map<string, Calculator> = new Map();
   private allAuditLines: AuditLine[] = [];
   private allWarnings: Warning[] = [];
+  private totalBruto: number = 0;
+  private totalLiquido: number = 0;
 
   constructor(
     profile: CalculationProfile,
@@ -115,6 +133,44 @@ export class CalculationEngine {
     };
   }
 
+  // Estimar INSS para uma competência específica (usado em cálculos intermediários)
+  estimateINSS(valorBruto: number, competencia: string | Date): number {
+    const compDate = typeof competencia === 'string' 
+      ? new Date(competencia + '-01') 
+      : competencia;
+    
+    const tabela = getTaxTable(this.taxTables, 'inss', compDate);
+    if (!tabela) {
+      this.allWarnings.push({
+        tipo: 'atencao',
+        codigo: 'TABELA_INSS_NAO_ENCONTRADA',
+        mensagem: `Tabela INSS não encontrada para ${competencia}`,
+        sugestao: 'Usando alíquota padrão de 9%',
+      });
+      return arredondarMoeda(valorBruto * 0.09);
+    }
+    
+    const { valor } = calcularImposto(valorBruto, tabela);
+    return valor;
+  }
+
+  // Estimar IRRF para uma competência específica
+  estimateIRRF(valorBruto: number, competencia: string | Date, descontoINSS: number = 0): number {
+    const compDate = typeof competencia === 'string' 
+      ? new Date(competencia + '-01') 
+      : competencia;
+    
+    const baseIRRF = valorBruto - descontoINSS;
+    const tabela = getTaxTable(this.taxTables, 'irrf', compDate);
+    
+    if (!tabela) {
+      return 0; // IRRF é opcional se não tiver tabela
+    }
+    
+    const { valor } = calcularImposto(baseIRRF, tabela);
+    return valor;
+  }
+
   // Executar uma calculadora específica
   executeCalculator(nome: string, inputs?: CalculatorInputs): CalcResult | null {
     const calculator = this.calculators.get(nome);
@@ -139,6 +195,10 @@ export class CalculationEngine {
     this.allAuditLines.push(...result.auditLines);
     this.allWarnings.push(...result.warnings);
 
+    // Acumular totais
+    this.totalBruto += result.outputs.total_bruto;
+    this.totalLiquido += result.outputs.total_liquido ?? result.outputs.total_bruto;
+
     return result;
   }
 
@@ -156,6 +216,10 @@ export class CalculationEngine {
       'inss',
       'atualizacao_monetaria',
     ];
+
+    // Reset totais
+    this.totalBruto = 0;
+    this.totalLiquido = 0;
 
     // Executar na ordem
     for (const nome of executionOrder) {
@@ -194,6 +258,39 @@ export class CalculationEngine {
       auditLines: this.allAuditLines,
       warnings: this.allWarnings,
       executado_em: new Date(),
+    };
+  }
+
+  /**
+   * Retorna o resultado final consolidado (API simplificada)
+   * Inspirado no motor simplificado do usuário
+   */
+  getFinalResult(): FinalResult {
+    const resultado = this.executeAll();
+    const competencias = new Set<string>();
+    
+    // Contar competências únicas
+    for (const line of this.allAuditLines) {
+      if (line.competencia) {
+        competencias.add(line.competencia);
+      }
+    }
+
+    return {
+      resumo: {
+        bruto: arredondarMoeda(resultado.resultado_bruto.total),
+        liquido: arredondarMoeda(resultado.resultado_liquido.total),
+        descontos_totais: arredondarMoeda(
+          resultado.resultado_bruto.total - resultado.resultado_liquido.total
+        ),
+        quantidade_verbas: Object.keys(resultado.resultado_bruto.por_verba).length,
+        quantidade_competencias: competencias.size,
+      },
+      por_verba: resultado.resultado_bruto.por_verba,
+      por_competencia: resultado.resultado_bruto.por_competencia || {},
+      memoria_calculo: this.allAuditLines,
+      warnings: this.allWarnings,
+      calculadoras_utilizadas: resultado.calculators_used,
     };
   }
 
@@ -239,6 +336,18 @@ export class CalculationEngine {
 
   getWarnings(): Warning[] {
     return this.allWarnings;
+  }
+
+  getTotalBruto(): number {
+    return arredondarMoeda(this.totalBruto);
+  }
+
+  getTotalLiquido(): number {
+    return arredondarMoeda(this.totalLiquido);
+  }
+
+  getDescontosTotais(): number {
+    return arredondarMoeda(this.totalBruto - this.totalLiquido);
   }
 }
 
