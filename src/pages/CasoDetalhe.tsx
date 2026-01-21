@@ -130,6 +130,8 @@ export default function CasoDetalhe() {
   const [selectedProfile, setSelectedProfile] = useState<string>("");
   const [isExtractingFacts, setIsExtractingFacts] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [createCriticalKeyRequest, setCreateCriticalKeyRequest] = useState<string | null>(null);
+  const [createCriticalNonce, setCreateCriticalNonce] = useState(0);
 
   // Fetch case data
   const { data: caseData, isLoading: caseLoading } = useQuery({
@@ -318,6 +320,33 @@ export default function CasoDetalhe() {
 
   const criticalFactsInCase = facts.filter((f) => CRITICAL_FACTS.includes(f.chave));
   const canCalculate = criticalFactsInCase.length > 0 && criticalFactsInCase.every((f) => f.confirmado);
+
+  const missingCriticalKeys = CRITICAL_FACTS.filter(
+    (k) => !facts.some((f) => f.chave === k)
+  );
+
+  const unconfirmedCriticalFacts = facts.filter(
+    (f) => CRITICAL_FACTS.includes(f.chave) && !f.confirmado
+  );
+
+  const criticalLabels: Record<string, string> = {
+    data_admissao: "Data de Admissão",
+    data_demissao: "Data de Demissão",
+    salario_base: "Salário Base",
+    salario_mensal: "Salário Mensal",
+    jornada_contratual: "Jornada Contratual",
+  };
+
+  const goToValidation = () => {
+    const validacaoTab = document.querySelector('[value="validacao"]') as HTMLButtonElement;
+    validacaoTab?.click();
+  };
+
+  const requestCreateCritical = (key: string) => {
+    setCreateCriticalKeyRequest(key);
+    setCreateCriticalNonce((n) => n + 1);
+    goToValidation();
+  };
 
   const mapFactsToEngine = (allFacts: Fact[]): FactMap => {
     const out: FactMap = {};
@@ -766,6 +795,8 @@ export default function CasoDetalhe() {
                 const calculoTab = document.querySelector('[value="calculo"]') as HTMLButtonElement;
                 calculoTab?.click();
               }}
+              createCriticalKeyRequest={createCriticalKeyRequest}
+              createCriticalNonce={createCriticalNonce}
             />
           </TabsContent>
 
@@ -781,6 +812,52 @@ export default function CasoDetalhe() {
 
           {/* Calculation Tab */}
           <TabsContent value="calculo" className="space-y-4">
+            {!canCalculate && (
+              <Card className="border-dashed">
+                <CardHeader>
+                  <CardTitle>Validação pendente</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Para liberar o cálculo, os fatos críticos precisam existir no caso e estar confirmados.
+                  </p>
+
+                  {missingCriticalKeys.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">Faltando no caso</div>
+                      <div className="flex flex-wrap gap-2">
+                        {missingCriticalKeys.map((k) => (
+                          <Button
+                            key={k}
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => requestCreateCritical(k)}
+                          >
+                            Adicionar: {criticalLabels[k] || k}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {unconfirmedCriticalFacts.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">Ainda não confirmados</div>
+                      <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+                        {unconfirmedCriticalFacts.map((f) => (
+                          <li key={f.id}>{criticalLabels[f.chave] || f.chave}</li>
+                        ))}
+                      </ul>
+                      <Button type="button" variant="outline" onClick={goToValidation}>
+                        Ir confirmar agora
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader>
                 <CardTitle>Executar Novo Cálculo</CardTitle>
@@ -827,10 +904,7 @@ export default function CasoDetalhe() {
                     </div>
                     <Button
                       variant="outline"
-                      onClick={() => {
-                        const validacaoTab = document.querySelector('[value="validacao"]') as HTMLButtonElement;
-                        validacaoTab?.click();
-                      }}
+                      onClick={goToValidation}
                     >
                       Ir para Validação
                     </Button>

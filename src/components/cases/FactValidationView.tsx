@@ -3,7 +3,7 @@
 // Visualização lado-a-lado: Formulário | Documento
 // =====================================================
 
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -94,6 +94,9 @@ interface FactValidationViewProps {
   documents: Document[];
   onFactsChange?: () => void;
   onValidationComplete?: () => void;
+  /** Trigger externo para abrir o modal de criação de fato crítico (atalho vindo da aba Cálculo) */
+  createCriticalKeyRequest?: string | null;
+  createCriticalNonce?: number;
 }
 
 // Fatos críticos que DEVEM ser confirmados antes do cálculo
@@ -151,6 +154,8 @@ export function FactValidationView({
   documents,
   onFactsChange,
   onValidationComplete,
+  createCriticalKeyRequest,
+  createCriticalNonce,
 }: FactValidationViewProps) {
   const queryClient = useQueryClient();
   const [selectedFact, setSelectedFact] = useState<Fact | null>(null);
@@ -163,6 +168,15 @@ export function FactValidationView({
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState({ chave: "", valor: "", tipo: "texto" });
+
+  // Atalho externo: abre o modal já com a chave solicitada
+  useEffect(() => {
+    if (!createCriticalNonce) return;
+    if (!createCriticalKeyRequest) return;
+    setCreateForm((p) => ({ ...p, chave: createCriticalKeyRequest }));
+    setCreateOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createCriticalNonce]);
 
   // Separar fatos por status
   const pendingFacts = facts.filter((f) => !f.confirmado);
