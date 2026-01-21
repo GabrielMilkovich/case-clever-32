@@ -224,11 +224,33 @@ serve(async (req) => {
       );
     }
 
+    // If arquivo_url is missing but storage_path exists, create a signed URL on demand.
     if (!document.arquivo_url) {
-      return new Response(
-        JSON.stringify({ error: "Document has no file URL" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (!document.storage_path) {
+        return new Response(
+          JSON.stringify({ error: "Document has no file URL" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { data: signedUrlData, error: signedErr } = await supabase.storage
+        .from("juriscalculo-documents")
+        .createSignedUrl(document.storage_path, 3600);
+
+      if (signedErr || !signedUrlData?.signedUrl) {
+        console.error("Could not create signed URL:", signedErr);
+        return new Response(
+          JSON.stringify({ error: "Could not generate signed URL for file" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      await supabase
+        .from("documents")
+        .update({ arquivo_url: signedUrlData.signedUrl, updated_at: new Date().toISOString() })
+        .eq("id", document_id);
+
+      document.arquivo_url = signedUrlData.signedUrl;
     }
 
     console.log(`Processing document ${document_id}: ${document.arquivo_url}`);

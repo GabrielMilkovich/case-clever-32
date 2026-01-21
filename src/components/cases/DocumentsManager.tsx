@@ -190,64 +190,37 @@ export function DocumentsManager({
     setUploadProgress(0);
 
     try {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.user) {
-        throw new Error("Usuário não autenticado");
-      }
-
-      const userId = session.session.user.id;
       let successCount = 0;
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const fileExt = file.name.split(".").pop()?.toLowerCase();
-        
+
         // Validar tipo de arquivo
-        const validExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'heic', 'doc', 'docx'];
-        if (!validExtensions.includes(fileExt || '')) {
+        const validExtensions = ["pdf", "jpg", "jpeg", "png", "webp", "heic", "doc", "docx"];
+        if (!validExtensions.includes(fileExt || "")) {
           toast.error(`Tipo não suportado: ${file.name}`);
           continue;
         }
 
-        // Caminho no storage: user_id/case_id/timestamp_filename
-        const timestamp = Date.now();
-        const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
-        const storagePath = `${userId}/${caseId}/${timestamp}_${sanitizedName}`;
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("case_id", caseId);
+        formData.append("doc_type", selectedType);
 
-        // Upload para Storage privado
-        const { error: uploadError } = await supabase.storage
-          .from("juriscalculo-documents")
-          .upload(storagePath, file, { contentType: file.type });
+        // Use backend upload function (handles ownership checks + storage + DB insert + signed URL)
+        const { data, error } = await supabase.functions.invoke("upload-document", {
+          body: formData,
+        });
 
-        if (uploadError) {
-          console.error("Upload error:", uploadError);
-          toast.error(`Erro no upload: ${file.name}`);
+        if (error) {
+          console.error("Upload function error:", error);
+          toast.error(`Erro ao enviar: ${file.name}`);
           continue;
         }
 
-        // Criar registro do documento
-        const { error: dbError } = await supabase
-          .from("documents")
-          .insert([{
-            case_id: caseId,
-            owner_user_id: userId,
-            file_name: file.name,
-            mime_type: file.type,
-            storage_path: storagePath,
-            tipo: selectedType as any,
-            status: "uploaded",
-            metadata: {
-              original_name: file.name,
-              size: file.size,
-              uploaded_at: new Date().toISOString(),
-            },
-          }]);
-
-        if (dbError) {
-          console.error("DB error:", dbError);
-          // Tentar deletar o arquivo do storage
-          await supabase.storage.from("juriscalculo-documents").remove([storagePath]);
-          toast.error(`Erro ao salvar: ${file.name}`);
+        if (!data?.success) {
+          toast.error(`Erro ao enviar: ${file.name}`);
           continue;
         }
 
