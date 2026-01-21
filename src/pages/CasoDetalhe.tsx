@@ -211,7 +211,9 @@ export default function CasoDetalhe() {
     queryFn: async () => {
       const { count, error } = await supabase
         .from("document_chunks")
-        .select("id", { count: "exact", head: true })
+        // Avoid `head: true` because some environments return `count=null`.
+        // Limit payload while still getting an accurate count.
+        .select("id", { count: "exact" })
         .eq("case_id", id);
       if (error) throw error;
       return typeof count === "number" ? count : 0;
