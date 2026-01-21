@@ -363,8 +363,27 @@ async function processDocumentInternal(
     throw new Error("Document not found");
   }
 
+  // If arquivo_url is missing but storage_path exists, create a signed URL on demand.
   if (!document.arquivo_url) {
-    throw new Error("Document has no file URL");
+    if (!document.storage_path) {
+      throw new Error("Document has no file URL");
+    }
+
+    const { data: signedUrlData, error: signedErr } = await supabase.storage
+      .from("juriscalculo-documents")
+      .createSignedUrl(document.storage_path, 3600);
+
+    if (signedErr || !signedUrlData?.signedUrl) {
+      console.error("[PROCESS] Could not create signed URL:", signedErr);
+      throw new Error("Could not generate signed URL for file");
+    }
+
+    await supabase
+      .from("documents")
+      .update({ arquivo_url: signedUrlData.signedUrl, updated_at: new Date().toISOString() })
+      .eq("id", documentId);
+
+    document.arquivo_url = signedUrlData.signedUrl;
   }
 
   console.log(`[PROCESS] Starting ${documentId}: ${document.arquivo_url}`);
