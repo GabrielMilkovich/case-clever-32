@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
   DialogContent,
@@ -188,6 +189,17 @@ export function FactValidationView({
       (f) => CRITICAL_FACTS.includes(f.chave) && !f.confirmado
     );
   }, [facts]);
+
+  const confirmedCriticalCount = useMemo(() => {
+    return facts.filter((f) => CRITICAL_FACTS.includes(f.chave) && f.confirmado)
+      .length;
+  }, [facts]);
+
+  const criticalProgress = useMemo(() => {
+    const total = CRITICAL_FACTS.length;
+    if (!total) return 0;
+    return Math.round((confirmedCriticalCount / total) * 100);
+  }, [confirmedCriticalCount]);
 
   const missingCriticalKeys = useMemo(() => {
     const keysInCase = new Set(facts.map((f) => f.chave));
@@ -721,6 +733,80 @@ export function FactValidationView({
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {/* Seção fixa (topo) - Fatos críticos */}
+            <div className="mb-4 rounded-lg border bg-card p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-medium text-foreground">Fatos críticos</div>
+                  <div className="text-xs text-muted-foreground">
+                    {confirmedCriticalCount}/{CRITICAL_FACTS.length} confirmados
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {missingCriticalKeys.length > 0 && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={openCreateForFirstMissing}
+                    >
+                      Adicionar crítico
+                    </Button>
+                  )}
+                  {unconfirmedCriticalFacts.length > 0 && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const first = unconfirmedCriticalFacts[0];
+                        if (first) void handleViewDocument(first);
+                      }}
+                    >
+                      Revisar pendentes
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <Progress value={criticalProgress} />
+              </div>
+
+              {(missingCriticalKeys.length > 0 || unconfirmedCriticalFacts.length > 0) && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {missingCriticalKeys.map((k) => (
+                    <Button
+                      key={k}
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setCreateForm((p) => ({ ...p, chave: k }));
+                        setCreateOpen(true);
+                      }}
+                      title="Adicionar e confirmar este fato crítico"
+                    >
+                      + {chaveLabels[k] || k}
+                    </Button>
+                  ))}
+
+                  {unconfirmedCriticalFacts.map((f) => (
+                    <Button
+                      key={f.id}
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => void handleViewDocument(f)}
+                      title="Abrir evidência e confirmar"
+                    >
+                      {chaveLabels[f.chave] || f.chave}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <ScrollArea className="h-[600px] pr-4">
               <div className="space-y-4">
                 {/* Critical Facts First */}
