@@ -3,7 +3,7 @@
 // Visualização lado-a-lado: Formulário | Documento
 // =====================================================
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -159,6 +159,7 @@ export function FactValidationView({
   createCriticalNonce,
 }: FactValidationViewProps) {
   const queryClient = useQueryClient();
+  const highlightTimeoutRef = useRef<number | null>(null);
   const [selectedFact, setSelectedFact] = useState<Fact | null>(null);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [selectedDocUrl, setSelectedDocUrl] = useState<string | null>(null);
@@ -169,6 +170,10 @@ export function FactValidationView({
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState({ chave: "", valor: "", tipo: "texto" });
+
+  // Feedback visual após confirmar fatos críticos
+  const [highlightFactId, setHighlightFactId] = useState<string | null>(null);
+  const [criticalCounterPulseNonce, setCriticalCounterPulseNonce] = useState(0);
 
   // Atalho externo: abre o modal já com a chave solicitada
   useEffect(() => {
@@ -240,11 +245,41 @@ export function FactValidationView({
         .eq("id", factId);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["facts", caseId] });
       onFactsChange?.();
+
+      // Se confirmou um fato crítico, anima contador e destaca o item temporariamente
+      if (variables.confirmed) {
+        const wasCritical = facts.some(
+          (f) => f.id === variables.factId && CRITICAL_FACTS.includes(f.chave)
+        );
+
+        if (wasCritical) {
+          setCriticalCounterPulseNonce((n) => n + 1);
+          setHighlightFactId(variables.factId);
+        }
+      }
     },
   });
+
+  // Limpa destaque temporário
+  useEffect(() => {
+    if (!highlightFactId) return;
+
+    if (highlightTimeoutRef.current) window.clearTimeout(highlightTimeoutRef.current);
+    highlightTimeoutRef.current = window.setTimeout(() => {
+      setHighlightFactId(null);
+      highlightTimeoutRef.current = null;
+    }, 1200);
+
+    return () => {
+      if (highlightTimeoutRef.current) {
+        window.clearTimeout(highlightTimeoutRef.current);
+        highlightTimeoutRef.current = null;
+      }
+    };
+  }, [highlightFactId]);
 
   const editMutation = useMutation({
     mutationFn: async ({
@@ -477,12 +512,17 @@ export function FactValidationView({
     const confidence = getConfidenceConfig(fact.confianca);
     const critical = isCritical(fact.chave);
     const ConfidenceIcon = confidence.icon;
+    const isHighlighted = highlightFactId === fact.id;
 
     return (
       <div
         key={fact.id}
         className={`p-4 rounded-lg border-2 transition-all ${confidence.bgColor} ${confidence.borderColor} ${
           critical ? "ring-2 ring-primary/20" : ""
+        } ${
+          isHighlighted
+            ? "ring-2 ring-primary/40 shadow-sm animate-enter"
+            : ""
         }`}
       >
         <div className="flex items-start justify-between gap-4">
@@ -739,7 +779,17 @@ export function FactValidationView({
                 <div>
                   <div className="text-sm font-medium text-foreground">Fatos críticos</div>
                   <div className="text-xs text-muted-foreground">
-                    {confirmedCriticalCount}/{CRITICAL_FACTS.length} confirmados
+                    <span
+                      key={criticalCounterPulseNonce}
+                      className="inline-flex items-baseline gap-1 animate-enter"
+                    >
+                      <span className="font-medium text-foreground">
+                        {confirmedCriticalCount}
+                      </span>
+                      <span>/</span>
+                      <span>{CRITICAL_FACTS.length}</span>
+                      <span>confirmados</span>
+                    </span>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
