@@ -86,12 +86,12 @@ export default function Calculadoras() {
         versao: data.versao,
         vigencia_inicio: data.vigencia_inicio,
         vigencia_fim: data.vigencia_fim || null,
-        regras: data.regras as Record<string, unknown>,
+        regras: data.regras,
         changelog: data.changelog || null,
         codigo_ref: data.codigo_ref || null,
         ativo: data.ativo,
         criado_por: session?.session?.user.id,
-      }]);
+      }] as any);
 
       if (error) throw error;
     },

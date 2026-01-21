@@ -109,10 +109,10 @@ export default function Perfis() {
       const { error } = await supabase.from("calculation_profiles").insert([{
         nome: data.nome,
         descricao: data.descricao || null,
-        config: data.config as Record<string, unknown>,
+        config: data.config,
         calculadoras_incluidas: data.calculadoras_incluidas,
         criado_por: session?.session?.user.id,
-      }]);
+      }] as any);
 
       if (error) throw error;
     },
@@ -144,9 +144,9 @@ export default function Perfis() {
         .update({
           nome: data.nome,
           descricao: data.descricao || null,
-          config: data.config as Record<string, unknown>,
+          config: data.config,
           calculadoras_incluidas: data.calculadoras_incluidas,
-        })
+        } as any)
         .eq("id", id);
 
       if (error) throw error;
