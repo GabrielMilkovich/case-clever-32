@@ -6,23 +6,38 @@ import {
   Search, 
   Settings, 
   LogOut,
-  Scale
+  Scale,
+  Calculator,
+  Settings2,
+  TrendingUp,
+  ChevronDown,
+  ChevronRight
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useState } from "react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
-const navItems = [
+const mainNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
   { icon: Briefcase, label: "Casos", path: "/casos" },
   { icon: FileText, label: "Documentos", path: "/documentos" },
   { icon: Search, label: "Busca Semântica", path: "/busca" },
-  { icon: Settings, label: "Configurações", path: "/configuracoes" },
+];
+
+const adminNavItems = [
+  { icon: Calculator, label: "Calculadoras", path: "/admin/calculadoras" },
+  { icon: Settings2, label: "Perfis de Cálculo", path: "/admin/perfis" },
+  { icon: TrendingUp, label: "Índices e Tabelas", path: "/admin/indices" },
 ];
 
 export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [adminOpen, setAdminOpen] = useState(
+    location.pathname.startsWith("/admin")
+  );
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -49,8 +64,9 @@ export function Sidebar() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-1 px-3 py-4">
-          {navItems.map((item) => {
+        <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
+          {/* Main nav */}
+          {mainNavItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
               <Link
@@ -63,6 +79,45 @@ export function Sidebar() {
               </Link>
             );
           })}
+
+          {/* Admin section */}
+          <Collapsible open={adminOpen} onOpenChange={setAdminOpen} className="mt-6">
+            <CollapsibleTrigger className="sidebar-nav-item w-full justify-between text-sidebar-foreground/70 hover:text-sidebar-foreground">
+              <div className="flex items-center gap-3">
+                <Settings className="h-5 w-5" />
+                <span>Administração</span>
+              </div>
+              {adminOpen ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pl-4 mt-1 space-y-1">
+              {adminNavItems.map((item) => {
+                const isActive = location.pathname === item.path;
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`sidebar-nav-item ${isActive ? "active" : ""}`}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* Settings */}
+          <Link
+            to="/configuracoes"
+            className={`sidebar-nav-item mt-4 ${location.pathname === "/configuracoes" ? "active" : ""}`}
+          >
+            <Settings className="h-5 w-5" />
+            <span>Configurações</span>
+          </Link>
         </nav>
 
         {/* Logout */}
