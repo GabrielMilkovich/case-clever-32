@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -38,7 +38,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FactValidationView } from "@/components/cases/FactValidationView";
 import { CalculatorSuggestions } from "@/components/cases/CalculatorSuggestions";
-import { DocumentProcessor } from "@/components/cases/DocumentProcessor";
+import { DocumentsManager } from "@/components/cases/DocumentsManager";
 
 // Types
 interface CaseData {
@@ -108,8 +108,6 @@ export default function CasoDetalhe() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedProfile, setSelectedProfile] = useState<string>("");
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Fetch case data
   const { data: caseData, isLoading: caseLoading } = useQuery({
@@ -179,55 +177,6 @@ export default function CasoDetalhe() {
       return data as unknown as CalculationRun[];
     },
   });
-
-  // Upload document
-  const handleFileUpload = useCallback(async (files: FileList, tipo: string) => {
-    if (!id || files.length === 0) return;
-
-    setIsUploading(true);
-    setUploadProgress(0);
-
-    try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const fileExt = file.name.split(".").pop();
-        const fileName = `${id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-        // Upload to storage
-        const { error: uploadError } = await supabase.storage
-          .from("case-documents")
-          .upload(fileName, file);
-
-        if (uploadError) throw uploadError;
-
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from("case-documents")
-          .getPublicUrl(fileName);
-
-        // Create document record
-        const { error: dbError } = await supabase
-          .from("documents")
-          .insert([{
-            case_id: id,
-            tipo: tipo as "peticao" | "trct" | "holerite" | "cartao_ponto" | "sentenca" | "outro",
-            arquivo_url: publicUrl,
-          }]);
-
-        if (dbError) throw dbError;
-
-        setUploadProgress(((i + 1) / files.length) * 100);
-      }
-
-      queryClient.invalidateQueries({ queryKey: ["documents", id] });
-      toast.success(`${files.length} documento(s) enviado(s)!`);
-    } catch (error) {
-      toast.error("Erro ao enviar documento: " + (error as Error).message);
-    } finally {
-      setIsUploading(false);
-      setUploadProgress(0);
-    }
-  }, [id, queryClient]);
 
   // Confirm fact
   const confirmFactMutation = useMutation({
@@ -384,9 +333,9 @@ export default function CasoDetalhe() {
 
           {/* Documents Tab - New Document Processor */}
           <TabsContent value="documentos" className="space-y-4">
-            <DocumentProcessor
+            <DocumentsManager
               caseId={id!}
-              documents={documents}
+              documents={documents as any}
               onDocumentsChange={() => queryClient.invalidateQueries({ queryKey: ["documents", id] })}
             />
           </TabsContent>
