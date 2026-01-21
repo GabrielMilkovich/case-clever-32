@@ -77,8 +77,16 @@ interface Document {
   arquivo_url: string | null;
   storage_path?: string | null;
   file_name?: string | null;
+  mime_type?: string | null;
   uploaded_em: string;
 }
+
+type FactEvidence = {
+  document_id: string;
+  page_number: number | null;
+  quote: string;
+  confidence: number | null;
+};
 
 interface FactValidationViewProps {
   caseId: string;
@@ -148,6 +156,7 @@ export function FactValidationView({
   const [selectedFact, setSelectedFact] = useState<Fact | null>(null);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [selectedDocUrl, setSelectedDocUrl] = useState<string | null>(null);
+  const [selectedPageNumber, setSelectedPageNumber] = useState<number | null>(null);
   const [tryEmbedPreview, setTryEmbedPreview] = useState(false);
   const [editingFact, setEditingFact] = useState<Fact | null>(null);
   const [editForm, setEditForm] = useState({ valor: "", tipo: "" });
@@ -305,7 +314,7 @@ export function FactValidationView({
 
       if (error) throw error;
       if (!data?.signedUrl) throw new Error("URL assinada não retornada");
-      return data as { signedUrl: string };
+      return data as { signedUrl: string; fileName?: string | null; mimeType?: string | null };
     },
   });
 
@@ -345,26 +354,70 @@ export function FactValidationView({
 
   const isCritical = (chave: string) => CRITICAL_FACTS.includes(chave);
 
-  const handleViewDocument = (fact: Fact) => {
+  const buildPreviewUrl = (signedUrl: string, mimeType?: string | null, pageNumber?: number | null) => {
+    // Para PDFs, o fragment #page=N geralmente funciona no viewer do navegador
+    if (mimeType?.includes("pdf") && pageNumber && pageNumber > 0) {
+      return `${signedUrl}#page=${pageNumber}`;
+    }
+    return signedUrl;
+  };
+
+  const handleViewDocument = async (fact: Fact) => {
     setSelectedFact(fact);
     setTryEmbedPreview(false);
     setSelectedDoc(null);
     setSelectedDocUrl(null);
-    // Por enquanto, abre o primeiro documento disponível
-    // Futuramente, linkar com fact_sources para abrir o documento específico
-    if (documents.length === 0) return;
+    setSelectedPageNumber(null);
 
-    const doc = documents[0];
-    setSelectedDoc(doc);
+    // 1) Tentar encontrar evidência (documento + página) para este fato
+    let evidence: FactEvidence | null = null;
+    try {
+      const { data, error } = await supabase
+        .from("fact_evidences")
+        .select("document_id,page_number,quote,confidence")
+        .eq("case_id", caseId)
+        .eq("fact_id", fact.id)
+        .order("confidence", { ascending: false, nullsFirst: false })
+        .limit(1);
 
-    // Preferir URL assinada fresca (evita links expirados)
-    signedUrlMutation.mutate(doc.id, {
-      onSuccess: (res) => setSelectedDocUrl(res.signedUrl),
+      if (!error && data && data.length > 0) {
+        evidence = data[0] as FactEvidence;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
+    const documentId = evidence?.document_id ?? documents[0]?.id;
+    if (!documentId) {
+      toast.error("Nenhum documento disponível para visualização.");
+      return;
+    }
+
+    setSelectedPageNumber(evidence?.page_number ?? null);
+
+    // 2) Gerar URL assinada fresca
+    signedUrlMutation.mutate(documentId, {
+      onSuccess: (res) => {
+        const previewUrl = buildPreviewUrl(res.signedUrl, res.mimeType ?? null, evidence?.page_number ?? null);
+        setSelectedDocUrl(previewUrl);
+        setSelectedDoc((prev) => ({
+          // Preenche o que for possível (para exibição)
+          id: documentId,
+          tipo: prev?.tipo ?? "outro",
+          arquivo_url: res.signedUrl,
+          uploaded_em: prev?.uploaded_em ?? new Date().toISOString(),
+          file_name: res.fileName ?? prev?.file_name ?? null,
+          mime_type: res.mimeType ?? prev?.mime_type ?? null,
+        }));
+      },
       onError: (e) => {
         console.error(e);
-        // Fallback: usa a URL já armazenada (pode estar expirada, mas evita bloquear o usuário)
-        if (doc.arquivo_url) {
-          setSelectedDocUrl(doc.arquivo_url);
+
+        // Fallback: se existir arquivo_url no array de documents, tenta usar (pode estar expirado)
+        const fallbackDoc = documents.find((d) => d.id === documentId) ?? documents[0];
+        if (fallbackDoc?.arquivo_url) {
+          setSelectedDoc(fallbackDoc);
+          setSelectedDocUrl(buildPreviewUrl(fallbackDoc.arquivo_url, fallbackDoc.mime_type ?? null, evidence?.page_number ?? null));
           toast.warning(
             "Não foi possível gerar um link novo. Usando o link atual (pode estar expirado)."
           );
@@ -720,6 +773,9 @@ export function FactValidationView({
                     )}
                     {selectedDoc?.file_name ? (
                       <span className="ml-2">• {selectedDoc.file_name}</span>
+                    ) : null}
+                    {selectedPageNumber ? (
+                      <span className="ml-2">• Página {selectedPageNumber}</span>
                     ) : null}
                   </div>
                   <div className="flex flex-wrap gap-2">
