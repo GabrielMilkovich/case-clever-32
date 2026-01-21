@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      calculation_profiles: {
+        Row: {
+          ativo: boolean | null
+          calculadoras_incluidas: string[] | null
+          config: Json | null
+          criado_em: string | null
+          criado_por: string | null
+          descricao: string | null
+          id: string
+          nome: string
+        }
+        Insert: {
+          ativo?: boolean | null
+          calculadoras_incluidas?: string[] | null
+          config?: Json | null
+          criado_em?: string | null
+          criado_por?: string | null
+          descricao?: string | null
+          id?: string
+          nome: string
+        }
+        Update: {
+          ativo?: boolean | null
+          calculadoras_incluidas?: string[] | null
+          config?: Json | null
+          criado_em?: string | null
+          criado_por?: string | null
+          descricao?: string | null
+          id?: string
+          nome?: string
+        }
+        Relationships: []
+      }
       calculator_versions: {
         Row: {
           ativo: boolean | null
