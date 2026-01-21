@@ -119,6 +119,7 @@ export default function CasoDetalhe() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedProfile, setSelectedProfile] = useState<string>("");
+  const [isExtractingFacts, setIsExtractingFacts] = useState(false);
 
   // Fetch case data
   const { data: caseData, isLoading: caseLoading } = useQuery({
@@ -275,6 +276,29 @@ export default function CasoDetalhe() {
   const criticalFactsInCase = facts.filter((f) => CRITICAL_FACTS.includes(f.chave));
   const canCalculate = criticalFactsInCase.length > 0 && criticalFactsInCase.every((f) => f.confirmado);
 
+  const chunksCount = processingStats?.total_chunks ?? null;
+
+  const runFactExtraction = async () => {
+    if (!id) return;
+    setIsExtractingFacts(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("extract-facts-rag", {
+        body: { case_id: id },
+      });
+      if (error) throw error;
+
+      await queryClient.invalidateQueries({ queryKey: ["facts", id] });
+      toast.success(
+        `Extração concluída: ${data?.facts_valid ?? 0} fato(s) válido(s) (analisados ${data?.chunks_analyzed ?? "—"} chunks)`
+      );
+    } catch (e) {
+      console.error(e);
+      toast.error("Falha ao extrair fatos: " + (e as Error).message);
+    } finally {
+      setIsExtractingFacts(false);
+    }
+  };
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -383,6 +407,44 @@ export default function CasoDetalhe() {
 
           {/* Validation Tab - New Split View */}
           <TabsContent value="validacao" className="space-y-4">
+            {facts.length === 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Extração de fatos (IA)</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Seus documentos estão indexados, mas ainda não há fatos para validar.
+                    A validação só aparece depois que a extração de fatos é executada.
+                  </p>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={runFactExtraction}
+                      disabled={isExtractingFacts || !chunksCount || chunksCount === 0}
+                      className="gap-2"
+                    >
+                      {isExtractingFacts ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-4 w-4" />
+                      )}
+                      Rodar extração agora
+                    </Button>
+                    <Badge variant="outline">
+                      {typeof chunksCount === "number" ? `${chunksCount} chunks` : "chunks: —"}
+                    </Badge>
+                  </div>
+
+                  {(!chunksCount || chunksCount === 0) && (
+                    <div className="text-sm text-muted-foreground">
+                      Ainda não existe texto indexado (chunks = 0). Se o monitor mostra 100% mas chunks = 0,
+                      houve falha silenciosa na geração de texto.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
             <FactValidationView
               caseId={id!}
               facts={facts}
