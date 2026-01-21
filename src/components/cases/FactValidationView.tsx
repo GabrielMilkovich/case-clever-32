@@ -54,7 +54,17 @@ import {
   ExternalLink,
   Download,
   Loader2,
+  TrendingUp,
+  DollarSign,
+  ChevronDown,
+  ChevronUp,
+  Info,
 } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 // =====================================================
 // TYPES
@@ -144,6 +154,127 @@ const chaveLabels: Record<string, string> = {
   ferias_vencidas: "Férias Vencidas",
   fgts_depositado: "FGTS Depositado",
 };
+
+// =====================================================
+// COMPONENTE: DETALHES DO CÁLCULO DE SALÁRIO VIA FGTS
+// =====================================================
+
+function FGTSSalaryCalculationDetails({ citacao }: { citacao: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  // Parse the citation to extract deposit details
+  // Format: "Calculado automaticamente a partir de X depósitos FGTS (8% do salário). Depósitos: 2024-01: R$ 160.00 → R$ 2000.00; ..."
+  const parseDeposits = useMemo(() => {
+    const depositsMatch = citacao.match(/Depósitos:\s*(.+)$/);
+    if (!depositsMatch) return [];
+    
+    const depositsStr = depositsMatch[1];
+    const depositEntries = depositsStr.split(";").map(entry => entry.trim()).filter(Boolean);
+    
+    return depositEntries.map(entry => {
+      // Format: "2024-01: R$ 160.00 → R$ 2000.00"
+      const match = entry.match(/([^:]+):\s*R\$\s*([\d.,]+)\s*→\s*R\$\s*([\d.,]+)/);
+      if (match) {
+        return {
+          competencia: match[1].trim(),
+          deposito: parseFloat(match[2].replace(".", "").replace(",", ".")),
+          salario: parseFloat(match[3].replace(".", "").replace(",", ".")),
+        };
+      }
+      return null;
+    }).filter(Boolean) as Array<{ competencia: string; deposito: number; salario: number }>;
+  }, [citacao]);
+
+  const countMatch = citacao.match(/(\d+)\s+depósitos FGTS/);
+  const depositCount = countMatch ? parseInt(countMatch[1]) : parseDeposits.length;
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="mt-2">
+      <div className="p-3 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg border border-primary/20">
+        <CollapsibleTrigger asChild>
+          <button className="w-full flex items-center justify-between text-left group">
+            <div className="flex items-center gap-2">
+              <Calculator className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium text-foreground">
+                Calculado via Extrato FGTS
+              </span>
+              <Badge variant="secondary" className="text-xs">
+                {depositCount} depósitos
+              </Badge>
+            </div>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <span className="text-xs group-hover:text-foreground transition-colors">
+                {isOpen ? "Ocultar" : "Ver detalhes"}
+              </span>
+              {isOpen ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
+            </div>
+          </button>
+        </CollapsibleTrigger>
+
+        <CollapsibleContent className="mt-3 space-y-3">
+          {/* Formula Explanation */}
+          <div className="p-2 bg-background/60 rounded border border-border">
+            <div className="flex items-start gap-2">
+              <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-muted-foreground">
+                <strong>Fórmula:</strong> Depósito FGTS ÷ 0.08 = Salário Bruto
+                <br />
+                <span className="italic">O FGTS corresponde a 8% do salário mensal bruto.</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Deposits Table */}
+          {parseDeposits.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">Depósitos utilizados:</p>
+              <div className="max-h-40 overflow-y-auto space-y-1">
+                {parseDeposits.map((dep, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-2 bg-background/40 rounded text-xs"
+                  >
+                    <span className="text-muted-foreground font-mono">
+                      {dep.competencia}
+                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-muted-foreground">
+                        <DollarSign className="h-3 w-3 inline mr-0.5" />
+                        {dep.deposito.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      </span>
+                      <TrendingUp className="h-3 w-3 text-muted-foreground" />
+                      <span className="font-medium text-foreground">
+                        R$ {dep.salario.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Average Calculation */}
+          {parseDeposits.length > 0 && (
+            <div className="p-2 bg-primary/10 rounded border border-primary/20">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-foreground">
+                  Média calculada:
+                </span>
+                <span className="text-sm font-bold text-primary">
+                  R$ {(parseDeposits.reduce((sum, d) => sum + d.salario, 0) / parseDeposits.length).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+          )}
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  );
+}
 
 // =====================================================
 // COMPONENTE PRINCIPAL
@@ -551,10 +682,20 @@ export function FactValidationView({
               </Badge>
             </div>
 
-            <div className="text-lg font-bold text-foreground">{fact.valor}</div>
+            <div className="text-lg font-bold text-foreground">
+              {fact.chave === "salario_mensal" && fact.tipo === "moeda" 
+                ? `R$ ${parseFloat(fact.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+                : fact.valor
+              }
+            </div>
 
-            {/* Citation Display */}
-            {fact.citacao && (
+            {/* Special: FGTS Salary Calculation Details */}
+            {fact.chave === "salario_mensal" && fact.citacao?.includes("depósitos FGTS") && (
+              <FGTSSalaryCalculationDetails citacao={fact.citacao} />
+            )}
+
+            {/* Regular Citation Display (skip for FGTS calculated salary) */}
+            {fact.citacao && !(fact.chave === "salario_mensal" && fact.citacao?.includes("depósitos FGTS")) && (
               <div className="mt-2 p-3 bg-muted/50 rounded-md border border-muted">
                 <div className="flex items-start gap-2">
                   <FileText className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
