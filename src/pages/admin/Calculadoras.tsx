@@ -227,41 +227,79 @@ export default function Calculadoras() {
                           <AccordionTrigger className="text-sm py-2 hover:no-underline">
                             <span className="flex items-center gap-2">
                               <History className="h-4 w-4" />
-                              {calc.calculator_versions.length} versão(ões)
+                              {calc.calculator_versions.length} versão(ões) • Histórico de Regras
                             </span>
                           </AccordionTrigger>
                           <AccordionContent>
-                            <div className="space-y-2 pt-2">
+                            <div className="space-y-3 pt-2">
                               {calc.calculator_versions
                                 .sort((a, b) => 
                                   new Date(b.vigencia_inicio).getTime() - new Date(a.vigencia_inicio).getTime()
                                 )
-                                .map((version) => (
-                                  <div
-                                    key={version.id}
-                                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
-                                  >
-                                    <div className="flex items-center gap-3">
-                                      {version.ativo && !version.vigencia_fim ? (
-                                        <Check className="h-4 w-4 text-green-500" />
-                                      ) : (
-                                        <Clock className="h-4 w-4 text-muted-foreground" />
-                                      )}
-                                      <div>
-                                        <span className="font-medium">v{version.versao}</span>
-                                        <span className="text-sm text-muted-foreground ml-2">
-                                          {version.vigencia_inicio}
-                                          {version.vigencia_fim && ` → ${version.vigencia_fim}`}
-                                        </span>
+                                .map((version) => {
+                                  const regras = version.regras as Record<string, unknown>;
+                                  return (
+                                    <div
+                                      key={version.id}
+                                      className={`p-4 rounded-lg border ${
+                                        version.ativo && !version.vigencia_fim 
+                                          ? "bg-green-50/50 border-green-200" 
+                                          : "bg-muted/50"
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-3">
+                                          {version.ativo && !version.vigencia_fim ? (
+                                            <Check className="h-4 w-4 text-green-500" />
+                                          ) : (
+                                            <Clock className="h-4 w-4 text-muted-foreground" />
+                                          )}
+                                          <span className="font-semibold">v{version.versao}</span>
+                                          <Badge variant={version.ativo && !version.vigencia_fim ? "default" : "secondary"}>
+                                            {version.vigencia_inicio}
+                                            {version.vigencia_fim && ` → ${version.vigencia_fim}`}
+                                          </Badge>
+                                        </div>
                                       </div>
+                                      
+                                      {/* Resumo das regras */}
+                                      {regras && (
+                                        <div className="grid grid-cols-4 gap-2 text-xs mt-3">
+                                          {regras.divisor && (
+                                            <div className="p-2 rounded bg-background">
+                                              <span className="text-muted-foreground">Divisor:</span>
+                                              <span className="font-medium ml-1">{String(regras.divisor)}h</span>
+                                            </div>
+                                          )}
+                                          {regras.adicional_50 && (
+                                            <div className="p-2 rounded bg-background">
+                                              <span className="text-muted-foreground">HE 50%:</span>
+                                              <span className="font-medium ml-1">{String(regras.adicional_50)}x</span>
+                                            </div>
+                                          )}
+                                          {typeof regras.incide_inss === 'boolean' && (
+                                            <div className="p-2 rounded bg-background">
+                                              <span className="text-muted-foreground">INSS:</span>
+                                              <span className="font-medium ml-1">{regras.incide_inss ? "Sim" : "Não"}</span>
+                                            </div>
+                                          )}
+                                          {typeof regras.incide_irrf === 'boolean' && (
+                                            <div className="p-2 rounded bg-background">
+                                              <span className="text-muted-foreground">IRRF:</span>
+                                              <span className="font-medium ml-1">{regras.incide_irrf ? "Sim" : "Não"}</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                      
+                                      {version.changelog && (
+                                        <p className="text-xs text-muted-foreground mt-2 italic">
+                                          📝 {version.changelog}
+                                        </p>
+                                      )}
                                     </div>
-                                    {version.changelog && (
-                                      <span className="text-xs text-muted-foreground max-w-[300px] truncate">
-                                        {version.changelog}
-                                      </span>
-                                    )}
-                                  </div>
-                                ))}
+                                  );
+                                })}
                             </div>
                           </AccordionContent>
                         </AccordionItem>
