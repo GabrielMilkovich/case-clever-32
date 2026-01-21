@@ -153,7 +153,8 @@ export function DocumentsManager({
   // Filtrar documentos
   const filteredDocuments = documents.filter(doc => {
     if (filterType !== "all" && doc.tipo !== filterType) return false;
-    if (filterStatus !== "all" && (doc.status || "uploaded") !== filterStatus) return false;
+    const effectiveStatus = (doc.processing_status || doc.status || "uploaded") as string;
+    if (filterStatus !== "all" && effectiveStatus !== filterStatus) return false;
     if (searchQuery && !doc.file_name?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   });
@@ -343,10 +344,22 @@ export function DocumentsManager({
   // Estatísticas
   const stats = {
     total: documents.length,
-    pending: documents.filter(d => !d.status || d.status === "uploaded").length,
-    processing: documents.filter(d => d.status === "ocr_running" || d.status === "processing").length,
-    indexed: documents.filter(d => d.status === "embedded" || d.status === "completed").length,
-    failed: documents.filter(d => d.status === "failed").length,
+    pending: documents.filter(d => {
+      const s = (d.processing_status || d.status || "uploaded") as string;
+      return s === "uploaded" || s === "pending" || s === "queued";
+    }).length,
+    processing: documents.filter(d => {
+      const s = (d.processing_status || d.status || "uploaded") as string;
+      return ["downloading", "ocr", "chunking", "embedding", "processing"].includes(s);
+    }).length,
+    indexed: documents.filter(d => {
+      const s = (d.processing_status || d.status || "uploaded") as string;
+      return s === "completed" || s === "embedded";
+    }).length,
+    failed: documents.filter(d => {
+      const s = (d.processing_status || d.status || "uploaded") as string;
+      return s === "failed" || s === "error";
+    }).length,
   };
 
   return (
@@ -511,7 +524,8 @@ export function DocumentsManager({
               </TableHeader>
               <TableBody>
                 {filteredDocuments.map((doc) => {
-                  const status = statusConfig[doc.status || "uploaded"] || statusConfig.uploaded;
+                  const effectiveStatus = (doc.processing_status || doc.status || "uploaded") as string;
+                  const status = statusConfig[effectiveStatus] || statusConfig.uploaded;
                   const StatusIcon = status.icon;
                   const isProcessing = processingDocId === doc.id;
                   const docType = docTypeOptions.find(o => o.value === doc.tipo);
@@ -564,6 +578,16 @@ export function DocumentsManager({
                           )}
                           {isProcessing ? "Processando..." : status.label}
                         </Badge>
+                        {doc.metadata?.processing_message && (
+                          <p className="text-xs text-muted-foreground mt-1 truncate max-w-[200px]" title={doc.metadata.processing_message}>
+                            {doc.metadata.processing_message}
+                          </p>
+                        )}
+                        {typeof doc.metadata?.processing_progress === "number" && doc.metadata.processing_progress > 0 && doc.metadata.processing_progress < 100 && (
+                          <div className="mt-2 max-w-[220px]">
+                            <Progress value={doc.metadata.processing_progress} />
+                          </div>
+                        )}
                         {doc.error_message && (
                           <p className="text-xs text-destructive mt-1 truncate max-w-[150px]" title={doc.error_message}>
                             {doc.error_message}
@@ -607,7 +631,7 @@ export function DocumentsManager({
                             </Tooltip>
                           )}
                           
-                          {(!doc.status || doc.status === "uploaded" || doc.status === "failed") && (
+                          {(["uploaded", "failed", "error"].includes(effectiveStatus) || !doc.status) && (
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button 
