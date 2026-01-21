@@ -64,6 +64,8 @@ interface Fact {
   origem: string;
   confianca: number | null;
   confirmado: boolean;
+  citacao?: string | null;
+  pagina?: number | null;
 }
 
 interface Document {
@@ -340,6 +342,26 @@ export function FactValidationView({
             </div>
 
             <div className="text-lg font-bold text-foreground">{fact.valor}</div>
+
+            {/* Citation Display */}
+            {fact.citacao && (
+              <div className="mt-2 p-3 bg-muted/50 rounded-md border border-muted">
+                <div className="flex items-start gap-2">
+                  <FileText className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">
+                      Citação Original
+                      {fact.pagina && (
+                        <span className="ml-2 text-primary">(Página {fact.pagina})</span>
+                      )}
+                    </p>
+                    <p className="text-sm italic text-foreground/80">
+                      "{fact.citacao}"
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center gap-3 text-sm">
               <Badge className={confidence.color}>

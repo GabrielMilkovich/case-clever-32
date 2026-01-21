@@ -374,6 +374,7 @@ export type Database = {
         Row: {
           case_id: string
           chave: string
+          citacao: string | null
           confianca: number | null
           confirmado: boolean | null
           confirmado_em: string | null
@@ -381,12 +382,14 @@ export type Database = {
           criado_em: string | null
           id: string
           origem: Database["public"]["Enums"]["fact_origem"]
+          pagina: number | null
           tipo: Database["public"]["Enums"]["fact_type"]
           valor: string
         }
         Insert: {
           case_id: string
           chave: string
+          citacao?: string | null
           confianca?: number | null
           confirmado?: boolean | null
           confirmado_em?: string | null
@@ -394,12 +397,14 @@ export type Database = {
           criado_em?: string | null
           id?: string
           origem?: Database["public"]["Enums"]["fact_origem"]
+          pagina?: number | null
           tipo?: Database["public"]["Enums"]["fact_type"]
           valor: string
         }
         Update: {
           case_id?: string
           chave?: string
+          citacao?: string | null
           confianca?: number | null
           confirmado?: boolean | null
           confirmado_em?: string | null
@@ -407,6 +412,7 @@ export type Database = {
           criado_em?: string | null
           id?: string
           origem?: Database["public"]["Enums"]["fact_origem"]
+          pagina?: number | null
           tipo?: Database["public"]["Enums"]["fact_type"]
           valor?: string
         }

@@ -257,7 +257,7 @@ Retorne os fatos usando a função extract_facts com citação obrigatória para
 
     console.log(`Extracted ${facts.length} facts, ${validFacts.length} valid, ${serverValidations.length} warnings`);
 
-    // Insert valid facts into database
+    // Insert valid facts into database with citation
     if (validFacts.length > 0) {
       const factsToInsert = validFacts.map((fact) => ({
         case_id,
@@ -267,39 +267,17 @@ Retorne os fatos usando a função extract_facts com citação obrigatória para
         origem: "ia_extracao",
         confianca: fact.confianca || 0.8,
         confirmado: false,
+        citacao: fact.citacao_original || null,
+        pagina: fact.pagina || null,
       }));
 
-      const { data: insertedFacts, error: insertError } = await supabase
+      const { error: insertError } = await supabase
         .from("facts")
-        .insert(factsToInsert)
-        .select("id, chave");
+        .insert(factsToInsert);
 
       if (insertError) {
         console.error("Error inserting facts:", insertError);
         throw insertError;
-      }
-
-      // Insert fact sources (citations) if we have inserted facts
-      if (insertedFacts && insertedFacts.length > 0) {
-        const factSourcesData = [];
-        
-        for (const insertedFact of insertedFacts) {
-          const originalFact = validFacts.find(f => f.chave === insertedFact.chave);
-          if (originalFact?.citacao_original) {
-            factSourcesData.push({
-              fact_id: insertedFact.id,
-              document_id: null, // We don't have document_id in this flow yet
-              trecho: originalFact.citacao_original,
-              pagina: originalFact.pagina || null,
-            });
-          }
-        }
-
-        if (factSourcesData.length > 0) {
-          // Note: fact_sources requires document_id, so we'll store citation in a different way
-          // For now, we'll log the citations - in a full implementation, we'd link to specific documents
-          console.log(`Would insert ${factSourcesData.length} fact sources with citations`);
-        }
       }
     }
 
