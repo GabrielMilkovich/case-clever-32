@@ -205,6 +205,20 @@ export default function CasoDetalhe() {
     enabled: !!id,
   });
 
+  // Fallback: count chunks directly from table when the stats view is empty
+  const { data: chunksCountDirect = null } = useQuery({
+    queryKey: ["document_chunks_count", id],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("document_chunks")
+        .select("id", { count: "exact", head: true })
+        .eq("case_id", id);
+      if (error) throw error;
+      return typeof count === "number" ? count : 0;
+    },
+    enabled: !!id,
+  });
+
   // Confirm fact
   const confirmFactMutation = useMutation({
     mutationFn: async ({ factId, confirmed }: { factId: string; confirmed: boolean }) => {
@@ -276,7 +290,12 @@ export default function CasoDetalhe() {
   const criticalFactsInCase = facts.filter((f) => CRITICAL_FACTS.includes(f.chave));
   const canCalculate = criticalFactsInCase.length > 0 && criticalFactsInCase.every((f) => f.confirmado);
 
-  const chunksCount = processingStats?.total_chunks ?? null;
+  const chunksCount =
+    typeof processingStats?.total_chunks === "number"
+      ? processingStats.total_chunks
+      : typeof chunksCountDirect === "number"
+        ? chunksCountDirect
+        : null;
 
   const runFactExtraction = async () => {
     if (!id) return;
@@ -397,6 +416,7 @@ export default function CasoDetalhe() {
             <ProcessingMonitorPanel
               documents={documents as any}
               stats={processingStats as any}
+              totalChunks={typeof chunksCount === "number" ? chunksCount : undefined}
             />
             <DocumentsManager
               caseId={id!}
