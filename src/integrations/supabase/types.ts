@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_lines: {
+        Row: {
+          calculadora: string
+          competencia: string | null
+          descricao: string | null
+          formula: string | null
+          id: string
+          linha: number
+          metadata: Json | null
+          run_id: string
+          valor_bruto: number | null
+          valor_liquido: number | null
+        }
+        Insert: {
+          calculadora: string
+          competencia?: string | null
+          descricao?: string | null
+          formula?: string | null
+          id?: string
+          linha: number
+          metadata?: Json | null
+          run_id: string
+          valor_bruto?: number | null
+          valor_liquido?: number | null
+        }
+        Update: {
+          calculadora?: string
+          competencia?: string | null
+          descricao?: string | null
+          formula?: string | null
+          id?: string
+          linha?: number
+          metadata?: Json | null
+          run_id?: string
+          valor_bruto?: number | null
+          valor_liquido?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_lines_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "calculation_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calculation_profiles: {
         Row: {
           ativo: boolean | null
@@ -46,6 +93,60 @@ export type Database = {
           nome?: string
         }
         Relationships: []
+      }
+      calculation_runs: {
+        Row: {
+          calculators_used: Json | null
+          case_id: string
+          executado_em: string | null
+          executado_por: string | null
+          facts_snapshot: Json | null
+          id: string
+          profile_id: string | null
+          resultado_bruto: Json | null
+          resultado_liquido: Json | null
+          warnings: Json | null
+        }
+        Insert: {
+          calculators_used?: Json | null
+          case_id: string
+          executado_em?: string | null
+          executado_por?: string | null
+          facts_snapshot?: Json | null
+          id?: string
+          profile_id?: string | null
+          resultado_bruto?: Json | null
+          resultado_liquido?: Json | null
+          warnings?: Json | null
+        }
+        Update: {
+          calculators_used?: Json | null
+          case_id?: string
+          executado_em?: string | null
+          executado_por?: string | null
+          facts_snapshot?: Json | null
+          id?: string
+          profile_id?: string | null
+          resultado_bruto?: Json | null
+          resultado_liquido?: Json | null
+          warnings?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calculation_runs_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calculation_runs_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "calculation_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       calculator_versions: {
         Row: {
