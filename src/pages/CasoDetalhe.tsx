@@ -63,6 +63,8 @@ interface Fact {
   origem: string;
   confianca: number | null;
   confirmado: boolean;
+  citacao?: string | null;
+  pagina?: number | null;
 }
 
 interface CalculationProfile {
