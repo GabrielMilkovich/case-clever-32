@@ -153,6 +153,21 @@ async function extractTextWithVision(
   return { text: extractedText, pageCount };
 }
 
+function guessMimeTypeFromUrl(fileUrl: string): string {
+  try {
+    const pathname = new URL(fileUrl).pathname;
+    const ext = pathname.split(".").pop()?.toLowerCase() || "";
+    if (ext === "pdf") return "application/pdf";
+    if (["jpg", "jpeg"].includes(ext)) return "image/jpeg";
+    if (ext === "png") return "image/png";
+    if (ext === "webp") return "image/webp";
+    if (["doc", "docx"].includes(ext)) return "application/msword";
+  } catch {
+    // ignore
+  }
+  return "application/octet-stream";
+}
+
 // Função para gerar embeddings
 async function generateEmbedding(text: string, apiKey: string): Promise<number[]> {
   const response = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
@@ -264,14 +279,7 @@ serve(async (req) => {
     try {
       // Determinar tipo de arquivo
       const fileUrl = document.arquivo_url;
-      const extension = fileUrl.split('.').pop()?.toLowerCase() || '';
-      
-      let mimeType = 'application/octet-stream';
-      if (extension === 'pdf') mimeType = 'application/pdf';
-      else if (['jpg', 'jpeg'].includes(extension)) mimeType = 'image/jpeg';
-      else if (extension === 'png') mimeType = 'image/png';
-      else if (extension === 'webp') mimeType = 'image/webp';
-      else if (['doc', 'docx'].includes(extension)) mimeType = 'application/msword';
+      const mimeType = document.mime_type || guessMimeTypeFromUrl(fileUrl);
 
       // Extrair texto usando Vision AI
       const { text: extractedText, pageCount } = await extractTextWithVision(
