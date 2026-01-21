@@ -340,6 +340,42 @@ export default function CasoDetalhe() {
     }
   };
 
+  const restartFactExtraction = async () => {
+    if (!id) return;
+    if (!chunksCount || chunksCount === 0) {
+      toast.error("Não há chunks para extrair. Rode a indexação/OCR primeiro.");
+      return;
+    }
+
+    const ok = window.confirm(
+      "Isso vai APAGAR todos os fatos deste caso e reexecutar a extração. Deseja continuar?"
+    );
+    if (!ok) return;
+
+    setIsExtractingFacts(true);
+    try {
+      const { error: delErr } = await supabase.from("facts").delete().eq("case_id", id);
+      if (delErr) throw delErr;
+
+      await queryClient.invalidateQueries({ queryKey: ["facts", id] });
+
+      const { data, error } = await supabase.functions.invoke("extract-facts-rag", {
+        body: { case_id: id },
+      });
+      if (error) throw error;
+
+      await queryClient.invalidateQueries({ queryKey: ["facts", id] });
+      toast.success(
+        `Processo reiniciado: ${data?.facts_valid ?? 0} fato(s) válido(s) (analisados ${data?.chunks_analyzed ?? "—"} chunks)`
+      );
+    } catch (e) {
+      console.error(e);
+      toast.error("Falha ao reiniciar extração: " + (e as Error).message);
+    } finally {
+      setIsExtractingFacts(false);
+    }
+  };
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -449,6 +485,38 @@ export default function CasoDetalhe() {
 
           {/* Validation Tab - New Split View */}
           <TabsContent value="validacao" className="space-y-4">
+            {facts.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Extração de fatos (IA)</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Se você reenviou documentos ou quer recomeçar do zero, você pode reiniciar o processo.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={restartFactExtraction}
+                      disabled={isExtractingFacts || !chunksCount || chunksCount === 0}
+                      className="gap-2"
+                      title="Apaga todos os fatos do caso e reexecuta a extração"
+                    >
+                      {isExtractingFacts ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                      Reiniciar extração
+                    </Button>
+                    <Badge variant="outline">
+                      {typeof chunksCount === "number" ? `${chunksCount} chunks` : "chunks: —"}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             {facts.length === 0 && (
               <Card>
                 <CardHeader>
