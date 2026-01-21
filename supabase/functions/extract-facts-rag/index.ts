@@ -138,7 +138,10 @@ serve(async (req) => {
 
     console.log(`Starting RAG extraction for case ${case_id}`);
 
-    // 1) Garantir que o caso tem documentos
+    // 1) Buscar documentos do caso (se existirem)
+    // Observação: há cenários onde `document_chunks` existe (chunks gerados)
+    // mas a tabela `documents` está vazia/inconsistente para o case_id.
+    // Como a extração depende dos chunks, NÃO vamos bloquear a execução por isso.
     // (Nota: a tabela `documents` não possui coluna `processing_status`; usa `status`.)
     const { data: caseDocuments, error: docsErr } = await supabase
       .from("documents")
@@ -154,25 +157,15 @@ serve(async (req) => {
     }
 
     if (!caseDocuments || caseDocuments.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "No documents found for this case" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      console.warn(
+        `No rows in documents for case ${case_id}. Proceeding using document_chunks only.`
       );
     }
 
     // Considerar como "processado" quando já foi indexado (status embedded/completed)
-    const processedDocs = caseDocuments.filter((d: any) =>
+    const processedDocs = (caseDocuments ?? []).filter((d: any) =>
       ["embedded", "completed", "embedded_partial"].includes(String(d.status ?? ""))
     );
-    if (processedDocs.length === 0) {
-      return new Response(
-        JSON.stringify({ 
-          error: "No indexed documents found. Please run OCR/indexação primeiro.",
-          pending_documents: caseDocuments.filter((d: any) => !["embedded", "completed", "embedded_partial"].includes(String(d.status ?? ""))).length,
-        }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
 
     // 2) Buscar chunks diretamente (fallback robusto)
     // Motivo: em alguns ambientes, o endpoint de embeddings pode falhar/intermitir.
@@ -389,7 +382,7 @@ Liste inconsistências em "alertas".`;
       }
     }
 
-    return new Response(
+     return new Response(
       JSON.stringify({
         success: true,
         extraction_method: "RAG",
