@@ -420,6 +420,63 @@ export type Database = {
           },
         ]
       }
+      index_series: {
+        Row: {
+          competencia: string
+          criado_em: string | null
+          fonte: string | null
+          id: string
+          nome: string
+          valor: number
+          versao: number | null
+        }
+        Insert: {
+          competencia: string
+          criado_em?: string | null
+          fonte?: string | null
+          id?: string
+          nome: string
+          valor: number
+          versao?: number | null
+        }
+        Update: {
+          competencia?: string
+          criado_em?: string | null
+          fonte?: string | null
+          id?: string
+          nome?: string
+          valor?: number
+          versao?: number | null
+        }
+        Relationships: []
+      }
+      tax_tables: {
+        Row: {
+          criado_em: string | null
+          faixas: Json
+          id: string
+          tipo: string
+          vigencia_fim: string | null
+          vigencia_inicio: string
+        }
+        Insert: {
+          criado_em?: string | null
+          faixas?: Json
+          id?: string
+          tipo: string
+          vigencia_fim?: string | null
+          vigencia_inicio: string
+        }
+        Update: {
+          criado_em?: string | null
+          faixas?: Json
+          id?: string
+          tipo?: string
+          vigencia_fim?: string | null
+          vigencia_inicio?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
