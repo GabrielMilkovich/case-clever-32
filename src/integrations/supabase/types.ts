@@ -296,29 +296,113 @@ export type Database = {
           },
         ]
       }
+      document_chunks: {
+        Row: {
+          case_id: string
+          chunk_index: number
+          content: string
+          content_hash: string | null
+          created_at: string
+          doc_type: string | null
+          document_id: string
+          embedding: string | null
+          id: string
+          metadata: Json
+          page_number: number | null
+        }
+        Insert: {
+          case_id: string
+          chunk_index?: number
+          content: string
+          content_hash?: string | null
+          created_at?: string
+          doc_type?: string | null
+          document_id: string
+          embedding?: string | null
+          id?: string
+          metadata?: Json
+          page_number?: number | null
+        }
+        Update: {
+          case_id?: string
+          chunk_index?: number
+          content?: string
+          content_hash?: string | null
+          created_at?: string
+          doc_type?: string | null
+          document_id?: string
+          embedding?: string | null
+          id?: string
+          metadata?: Json
+          page_number?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_chunks_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_chunks_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           arquivo_url: string | null
           case_id: string
+          error_message: string | null
+          file_name: string | null
           hash: string | null
           id: string
+          mime_type: string | null
+          ocr_confidence: number | null
+          owner_user_id: string | null
+          page_count: number | null
+          status: string
+          storage_path: string | null
           tipo: Database["public"]["Enums"]["doc_type"] | null
+          updated_at: string | null
           uploaded_em: string | null
         }
         Insert: {
           arquivo_url?: string | null
           case_id: string
+          error_message?: string | null
+          file_name?: string | null
           hash?: string | null
           id?: string
+          mime_type?: string | null
+          ocr_confidence?: number | null
+          owner_user_id?: string | null
+          page_count?: number | null
+          status?: string
+          storage_path?: string | null
           tipo?: Database["public"]["Enums"]["doc_type"] | null
+          updated_at?: string | null
           uploaded_em?: string | null
         }
         Update: {
           arquivo_url?: string | null
           case_id?: string
+          error_message?: string | null
+          file_name?: string | null
           hash?: string | null
           id?: string
+          mime_type?: string | null
+          ocr_confidence?: number | null
+          owner_user_id?: string | null
+          page_count?: number | null
+          status?: string
+          storage_path?: string | null
           tipo?: Database["public"]["Enums"]["doc_type"] | null
+          updated_at?: string | null
           uploaded_em?: string | null
         }
         Relationships: [
@@ -327,6 +411,124 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      extraction_tasks: {
+        Row: {
+          case_id: string
+          created_at: string
+          error_message: string | null
+          filters: Json
+          id: string
+          owner_user_id: string
+          query: string
+          result_json: Json | null
+          status: string
+          task_type: string
+          top_k: number
+          updated_at: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          error_message?: string | null
+          filters?: Json
+          id?: string
+          owner_user_id: string
+          query: string
+          result_json?: Json | null
+          status?: string
+          task_type: string
+          top_k?: number
+          updated_at?: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          error_message?: string | null
+          filters?: Json
+          id?: string
+          owner_user_id?: string
+          query?: string
+          result_json?: Json | null
+          status?: string
+          task_type?: string
+          top_k?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extraction_tasks_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fact_evidences: {
+        Row: {
+          case_id: string
+          chunk_id: string
+          confidence: number | null
+          created_at: string
+          document_id: string
+          fact_id: string
+          id: string
+          page_number: number | null
+          quote: string
+        }
+        Insert: {
+          case_id: string
+          chunk_id: string
+          confidence?: number | null
+          created_at?: string
+          document_id: string
+          fact_id: string
+          id?: string
+          page_number?: number | null
+          quote: string
+        }
+        Update: {
+          case_id?: string
+          chunk_id?: string
+          confidence?: number | null
+          created_at?: string
+          document_id?: string
+          fact_id?: string
+          id?: string
+          page_number?: number | null
+          quote?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fact_evidences_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fact_evidences_chunk_id_fkey"
+            columns: ["chunk_id"]
+            isOneToOne: false
+            referencedRelation: "document_chunks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fact_evidences_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fact_evidences_fact_id_fkey"
+            columns: ["fact_id"]
+            isOneToOne: false
+            referencedRelation: "facts"
             referencedColumns: ["id"]
           },
         ]
@@ -531,7 +733,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      match_document_chunks: {
+        Args: {
+          filter_case_id?: string
+          filter_doc_type?: string
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          case_id: string
+          chunk_index: number
+          content: string
+          doc_type: string
+          document_id: string
+          id: string
+          metadata: Json
+          page_number: number
+          similarity: number
+        }[]
+      }
     }
     Enums: {
       case_status: "rascunho" | "em_analise" | "calculado" | "revisado"
