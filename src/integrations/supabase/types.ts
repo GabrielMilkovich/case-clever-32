@@ -735,20 +735,16 @@ export type Database = {
     Functions: {
       match_document_chunks: {
         Args: {
-          filter_case_id?: string
-          filter_doc_type?: string
-          match_count?: number
-          match_threshold?: number
-          query_embedding: string
+          p_case_id: string
+          p_doc_types?: string[]
+          p_query_embedding: string
+          p_top_k: number
         }
         Returns: {
-          case_id: string
-          chunk_index: number
+          chunk_id: string
           content: string
           doc_type: string
           document_id: string
-          id: string
-          metadata: Json
           page_number: number
           similarity: number
         }[]
