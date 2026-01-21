@@ -310,12 +310,14 @@ export default function CasoDetalhe() {
   const criticalFactsInCase = facts.filter((f) => CRITICAL_FACTS.includes(f.chave));
   const canCalculate = criticalFactsInCase.length > 0 && criticalFactsInCase.every((f) => f.confirmado);
 
-  const chunksCount =
-    typeof processingStats?.total_chunks === "number"
-      ? processingStats.total_chunks
-      : typeof chunksCountDirect === "number"
-        ? chunksCountDirect
-        : null;
+  // Some environments keep the stats view stale (often `0`) even when chunks exist.
+  // Prefer the most permissive/accurate number so users can proceed.
+  const chunksCount = (() => {
+    const fromStats = typeof processingStats?.total_chunks === "number" ? processingStats.total_chunks : null;
+    const fromDirect = typeof chunksCountDirect === "number" ? chunksCountDirect : null;
+    if (fromStats === null && fromDirect === null) return null;
+    return Math.max(fromStats ?? 0, fromDirect ?? 0);
+  })();
 
   const runFactExtraction = async () => {
     if (!id) return;
