@@ -39,6 +39,7 @@ import { Label } from "@/components/ui/label";
 import { FactValidationView } from "@/components/cases/FactValidationView";
 import { CalculatorSuggestions } from "@/components/cases/CalculatorSuggestions";
 import { DocumentsManager } from "@/components/cases/DocumentsManager";
+import { ProcessingMonitorPanel } from "@/components/cases/ProcessingMonitorPanel";
 
 // Types
 interface CaseData {
@@ -85,6 +86,16 @@ interface CalculationRun {
   resultado_liquido: object;
   warnings: unknown[];
   executado_em: string;
+}
+
+interface CaseProcessingStats {
+  total_documents: number | null;
+  indexed_documents: number | null;
+  pending_documents: number | null;
+  processing_documents: number | null;
+  failed_documents: number | null;
+  total_chunks: number | null;
+  last_processed_at: string | null;
 }
 
 const statusConfig = {
@@ -176,6 +187,21 @@ export default function CasoDetalhe() {
       if (error) throw error;
       return data as unknown as CalculationRun[];
     },
+  });
+
+  // Fetch case processing stats (OCR/chunks/indexing)
+  const { data: processingStats = null } = useQuery({
+    queryKey: ["case_processing_stats", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("case_processing_stats")
+        .select("*")
+        .eq("case_id", id)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as CaseProcessingStats) ?? null;
+    },
+    enabled: !!id,
   });
 
   // Confirm fact
@@ -333,6 +359,10 @@ export default function CasoDetalhe() {
 
           {/* Documents Tab - New Document Processor */}
           <TabsContent value="documentos" className="space-y-4">
+            <ProcessingMonitorPanel
+              documents={documents as any}
+              stats={processingStats as any}
+            />
             <DocumentsManager
               caseId={id!}
               documents={documents as any}
