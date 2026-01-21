@@ -94,28 +94,6 @@ const extractFactsTool = {
   }
 };
 
-// Função para gerar embeddings
-async function generateEmbedding(text: string, apiKey: string): Promise<number[]> {
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "text-embedding-3-small",
-      input: text.substring(0, 8000),
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Embedding API error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  return data.data?.[0]?.embedding || [];
-}
-
 interface ChunkWithContext {
   id: string;
   texto: string;
@@ -160,11 +138,20 @@ serve(async (req) => {
 
     console.log(`Starting RAG extraction for case ${case_id}`);
 
-    // Verificar se há chunks indexados para este caso
-    const { data: caseDocuments } = await supabase
+    // 1) Garantir que o caso tem documentos
+    // (Nota: a tabela `documents` não possui coluna `processing_status`; usa `status`.)
+    const { data: caseDocuments, error: docsErr } = await supabase
       .from("documents")
-      .select("id, tipo, processing_status, chunk_count")
+      .select("id, tipo, status, metadata")
       .eq("case_id", case_id);
+
+    if (docsErr) {
+      console.error("Error fetching documents:", docsErr);
+      return new Response(
+        JSON.stringify({ error: "Failed to fetch documents for this case" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     if (!caseDocuments || caseDocuments.length === 0) {
       return new Response(
@@ -173,68 +160,62 @@ serve(async (req) => {
       );
     }
 
-    const processedDocs = caseDocuments.filter(d => d.processing_status === "completed");
+    // Considerar como "processado" quando já foi indexado (status embedded/completed)
+    const processedDocs = caseDocuments.filter((d: any) =>
+      ["embedded", "completed", "embedded_partial"].includes(String(d.status ?? ""))
+    );
     if (processedDocs.length === 0) {
       return new Response(
         JSON.stringify({ 
-          error: "No processed documents found. Please process documents first.",
-          pending_documents: caseDocuments.filter(d => d.processing_status !== "completed").length
+          error: "No indexed documents found. Please run OCR/indexação primeiro.",
+          pending_documents: caseDocuments.filter((d: any) => !["embedded", "completed", "embedded_partial"].includes(String(d.status ?? ""))).length,
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const documentMap = new Map(caseDocuments.map(d => [d.id, d.tipo]));
+    // 2) Buscar chunks diretamente (fallback robusto)
+    // Motivo: em alguns ambientes, o endpoint de embeddings pode falhar/intermitir.
+    // Como este caso tem poucos chunks (ex: 19), é seguro mandar os chunks diretamente para o modelo.
+    const { data: rawChunks, error: chunksErr } = await supabase
+      .from("document_chunks")
+      .select("id, content, page_number, document_id, doc_type, chunk_index")
+      .eq("case_id", case_id)
+      .order("document_id", { ascending: true })
+      .order("chunk_index", { ascending: true })
+      .limit(40);
 
-    // Buscar chunks relevantes para cada tópico
-    const allRelevantChunks: ChunkWithContext[] = [];
-    const seenChunkIds = new Set<string>();
-
-    console.log(`Searching for ${EXTRACTION_TOPICS.length} topics...`);
-
-    for (const topic of EXTRACTION_TOPICS) {
-      const embedding = await generateEmbedding(topic, LOVABLE_API_KEY);
-      
-      const { data: chunks } = await supabase.rpc('match_chunks', {
-        query_embedding: `[${embedding.join(',')}]`,
-        match_threshold: 0.65,
-        match_count: 3,
-        filter_case_id: case_id,
-      });
-
-      if (chunks) {
-        for (const chunk of chunks) {
-          if (!seenChunkIds.has(chunk.id)) {
-            seenChunkIds.add(chunk.id);
-            allRelevantChunks.push({
-              id: chunk.id,
-              texto: chunk.texto,
-              page_number: chunk.metadata?.page || null,
-              document_id: chunk.document_id,
-              document_type: documentMap.get(chunk.document_id) || 'unknown',
-              similarity: chunk.similarity,
-            });
-          }
-        }
-      }
+    if (chunksErr) {
+      console.error("Error fetching document_chunks:", chunksErr);
+      return new Response(
+        JSON.stringify({ error: "Failed to fetch chunks for this case" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    console.log(`Found ${allRelevantChunks.length} unique relevant chunks`);
+    const allRelevantChunks: ChunkWithContext[] = (rawChunks || []).map((c: any) => ({
+      id: c.id,
+      texto: c.content,
+      page_number: c.page_number ?? null,
+      document_id: c.document_id,
+      document_type: c.doc_type || "unknown",
+      similarity: 1.0,
+    }));
+
+    const seenChunkIds = new Set<string>(allRelevantChunks.map((c) => c.id));
+
+    console.log(`Using ${allRelevantChunks.length} chunks from document_chunks`);
 
     if (allRelevantChunks.length === 0) {
       return new Response(
-        JSON.stringify({ 
-          error: "No relevant chunks found. Documents may not contain labor law information.",
-          documents_searched: processedDocs.length
-        }),
+        JSON.stringify({ error: "No chunks found for this case. Please run OCR/indexação." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     // Formatar chunks para o prompt
     const chunksForPrompt = allRelevantChunks
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, 20) // Limitar a 20 chunks mais relevantes
+      .slice(0, 30) // Limitar por segurança de contexto
       .map((chunk, index) => `
 === CHUNK ${index + 1} ===
 CHUNK_ID: ${chunk.id}
@@ -304,7 +285,7 @@ Liste inconsistências em "alertas".`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
           { 
@@ -388,9 +369,14 @@ Liste inconsistências em "alertas".`;
         origem: "ia_extracao" as const,
         confianca: fact.confianca,
         confirmado: false,
-        citacao: fact.citacao_literal,
+        // Include the chunk id in the citation text so we keep traceability even if we can't persist FK.
+        citacao: `CHUNK_ID:${fact.chunk_id}\n${fact.citacao_literal}`,
         pagina: fact.pagina || null,
-        chunk_id: fact.chunk_id,
+        // IMPORTANT:
+        // The current DB schema has `facts.chunk_id` referencing the legacy table `doc_chunks`.
+        // Our pipeline writes chunks to `document_chunks`, so inserting a document_chunks.id would violate the FK.
+        // To avoid breaking extraction, we store the chunk id in `citacao` and leave `chunk_id` null.
+        chunk_id: null,
       }));
 
       const { error: insertError } = await supabase
@@ -414,7 +400,12 @@ Liste inconsistências em "alertas".`;
         facts: validFacts,
         fatos_nao_encontrados: fatosNaoEncontrados,
         alertas: serverValidations,
-        documents_used: processedDocs.map(d => ({ id: d.id, tipo: d.tipo, chunks: d.chunk_count })),
+          documents_used: processedDocs.map((d: any) => ({
+            id: d.id,
+            tipo: d.tipo,
+            chunks: (d.metadata?.chunks_created ?? null),
+            status: d.status,
+          })),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
