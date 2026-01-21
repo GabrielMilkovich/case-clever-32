@@ -111,6 +111,95 @@ export type Database = {
           },
         ]
       }
+      fact_sources: {
+        Row: {
+          document_id: string
+          fact_id: string
+          id: string
+          pagina: number | null
+          trecho: string | null
+        }
+        Insert: {
+          document_id: string
+          fact_id: string
+          id?: string
+          pagina?: number | null
+          trecho?: string | null
+        }
+        Update: {
+          document_id?: string
+          fact_id?: string
+          id?: string
+          pagina?: number | null
+          trecho?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fact_sources_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fact_sources_fact_id_fkey"
+            columns: ["fact_id"]
+            isOneToOne: false
+            referencedRelation: "facts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      facts: {
+        Row: {
+          case_id: string
+          chave: string
+          confianca: number | null
+          confirmado: boolean | null
+          confirmado_em: string | null
+          confirmado_por: string | null
+          criado_em: string | null
+          id: string
+          origem: Database["public"]["Enums"]["fact_origem"]
+          tipo: Database["public"]["Enums"]["fact_type"]
+          valor: string
+        }
+        Insert: {
+          case_id: string
+          chave: string
+          confianca?: number | null
+          confirmado?: boolean | null
+          confirmado_em?: string | null
+          confirmado_por?: string | null
+          criado_em?: string | null
+          id?: string
+          origem?: Database["public"]["Enums"]["fact_origem"]
+          tipo?: Database["public"]["Enums"]["fact_type"]
+          valor: string
+        }
+        Update: {
+          case_id?: string
+          chave?: string
+          confianca?: number | null
+          confirmado?: boolean | null
+          confirmado_em?: string | null
+          confirmado_por?: string | null
+          criado_em?: string | null
+          id?: string
+          origem?: Database["public"]["Enums"]["fact_origem"]
+          tipo?: Database["public"]["Enums"]["fact_type"]
+          valor?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facts_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -127,6 +216,8 @@ export type Database = {
         | "cartao_ponto"
         | "sentenca"
         | "outro"
+      fact_origem: "ia_extracao" | "usuario" | "documento"
+      fact_type: "data" | "moeda" | "numero" | "texto" | "boolean"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -263,6 +354,8 @@ export const Constants = {
         "sentenca",
         "outro",
       ],
+      fact_origem: ["ia_extracao", "usuario", "documento"],
+      fact_type: ["data", "moeda", "numero", "texto", "boolean"],
     },
   },
 } as const
