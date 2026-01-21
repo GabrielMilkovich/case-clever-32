@@ -60,9 +60,11 @@ function estimateMinutesForDoc(doc: ProcessingMonitorDocument): number {
 export function ProcessingMonitorPanel({
   documents,
   stats,
+  totalChunks,
 }: {
   documents: ProcessingMonitorDocument[];
   stats?: CaseProcessingStats | null;
+  totalChunks?: number;
 }) {
   const derived = useMemo(() => {
     const effective = documents.map((d) => ({ doc: d, status: getEffectiveStatus(d) }));
@@ -112,8 +114,9 @@ export function ProcessingMonitorPanel({
   }, [documents]);
 
   const totalDocs = stats?.total_documents ?? documents.length;
-  const totalChunks = stats?.total_chunks ?? null;
-  const doneChunks = totalChunks ??
+  const totalChunksFromStats = stats?.total_chunks ?? null;
+  const doneChunks =
+    (typeof totalChunks === "number" ? totalChunks : totalChunksFromStats) ??
     documents.reduce((sum, d) => sum + (d.metadata?.chunks_created ?? 0), 0);
 
   const pctDone = totalDocs > 0 ? Math.round((derived.doneCount / totalDocs) * 100) : 0;
