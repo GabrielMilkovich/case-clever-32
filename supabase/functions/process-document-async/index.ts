@@ -262,11 +262,12 @@ serve(async (req) => {
       // Buscar documentos pendentes do caso
       const { data: pendingDocs, error: pendingError } = await supabase
         .from("documents")
-        .select("id, arquivo_url, tipo")
+        .select("id, arquivo_url, storage_path, mime_type, tipo, uploaded_em")
         .eq("case_id", case_id)
         .in("status", ["uploaded", "pending", "failed"])
         .order("queue_priority", { ascending: false })
-        .order("created_at", { ascending: true });
+        // documents table does not have created_at; use uploaded_em as stable ordering
+        .order("uploaded_em", { ascending: true });
 
       if (pendingError) throw pendingError;
 
@@ -284,9 +285,9 @@ serve(async (req) => {
         let processed = 0;
         let failed = 0;
 
-        for (const doc of pendingDocs) {
+         for (const doc of pendingDocs) {
           try {
-            await processDocumentInternal(supabase, doc.id, LOVABLE_API_KEY);
+             await processDocumentInternal(supabase, doc.id, LOVABLE_API_KEY);
             processed++;
           } catch (error) {
             console.error(`[QUEUE] Failed to process ${doc.id}:`, error);
