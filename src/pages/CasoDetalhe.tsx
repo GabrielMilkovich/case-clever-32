@@ -41,6 +41,13 @@ import { FactValidationView } from "@/components/cases/FactValidationView";
 import { CalculatorSuggestions } from "@/components/cases/CalculatorSuggestions";
 import { DocumentsManager } from "@/components/cases/DocumentsManager";
 import { ProcessingMonitorPanel } from "@/components/cases/ProcessingMonitorPanel";
+import {
+  CalculationEngine,
+  type CalculatorRules,
+  type FactMap,
+  type IndexSeries,
+  type TaxTable,
+} from "@/lib/calculation";
 
 // Types
 interface CaseData {
@@ -78,7 +85,8 @@ interface CalculationProfile {
   id: string;
   nome: string;
   descricao: string | null;
-  config: object;
+  config: any;
+  calculadoras_incluidas?: string[] | null;
 }
 
 interface CalculationRun {
@@ -121,6 +129,7 @@ export default function CasoDetalhe() {
   const queryClient = useQueryClient();
   const [selectedProfile, setSelectedProfile] = useState<string>("");
   const [isExtractingFacts, setIsExtractingFacts] = useState(false);
+  const [isCalculating, setIsCalculating] = useState(false);
 
   // Fetch case data
   const { data: caseData, isLoading: caseLoading } = useQuery({
@@ -309,6 +318,187 @@ export default function CasoDetalhe() {
 
   const criticalFactsInCase = facts.filter((f) => CRITICAL_FACTS.includes(f.chave));
   const canCalculate = criticalFactsInCase.length > 0 && criticalFactsInCase.every((f) => f.confirmado);
+
+  const mapFactsToEngine = (allFacts: Fact[]): FactMap => {
+    const out: FactMap = {};
+    for (const f of allFacts) {
+      const tipo = ((): FactMap[string]["tipo"] => {
+        if (f.tipo === "boolean") return "booleano";
+        if (f.tipo === "numero") return "numero";
+        if (f.tipo === "data") return "data";
+        if (f.tipo === "moeda") return "moeda";
+        return "texto";
+      })();
+
+      out[f.chave] = {
+        valor: f.valor,
+        tipo,
+        confianca: f.confianca ?? undefined,
+        confirmado: !!f.confirmado,
+      };
+    }
+    return out;
+  };
+
+  const executeCalculation = async () => {
+    if (!id) return;
+    if (!selectedProfile) {
+      toast.error("Selecione um perfil de cálculo.");
+      return;
+    }
+    if (!canCalculate) {
+      toast.error("Confirme os fatos críticos antes de prosseguir com o cálculo.");
+      return;
+    }
+
+    setIsCalculating(true);
+    try {
+      // 1) Carregar perfil
+      const { data: profile, error: profileErr } = await supabase
+        .from("calculation_profiles")
+        .select("*")
+        .eq("id", selectedProfile)
+        .single();
+      if (profileErr || !profile) throw profileErr || new Error("Perfil não encontrado");
+
+      // 2) Carregar calculadoras vinculadas ao perfil (profile_calculators -> calculator_versions -> calculators)
+      const { data: profileCalcs, error: pcErr } = await supabase
+        .from("profile_calculators")
+        .select(
+          `
+          calculator_version_id,
+          calculator_versions:calculator_version_id (
+            id,
+            versao,
+            vigencia_inicio,
+            vigencia_fim,
+            regras,
+            calculators:calculator_id ( id, nome )
+          )
+        `
+        )
+        .eq("profile_id", selectedProfile);
+      if (pcErr) throw pcErr;
+
+      const calculatorsWithRules = (profileCalcs || [])
+        .map((row: any) => {
+          const cv = row.calculator_versions;
+          const calc = cv?.calculators;
+          if (!cv || !calc?.nome) return null;
+          const rules: CalculatorRules = {
+            versao: cv.versao,
+            vigencia_inicio: cv.vigencia_inicio,
+            vigencia_fim: cv.vigencia_fim ?? undefined,
+            regras: (cv.regras?.regras ?? cv.regras ?? {}) as any,
+            formula: cv.regras?.formula ?? undefined,
+          };
+          return { nome: String(calc.nome), rules };
+        })
+        .filter(Boolean) as { nome: string; rules: CalculatorRules }[];
+
+      // 3) Carregar índices e tabelas
+      const adm = facts.find((f) => f.chave === "data_admissao")?.valor;
+      const dem = facts.find((f) => f.chave === "data_demissao")?.valor;
+      const start = adm ? new Date(adm) : null;
+      const end = dem ? new Date(dem) : null;
+
+      const { data: indexRows, error: idxErr } = await supabase
+        .from("index_series")
+        .select("nome, competencia, valor, fonte")
+        .order("competencia", { ascending: true })
+        .gte("competencia", start && !isNaN(start.getTime()) ? start.toISOString().slice(0, 10) : "1900-01-01")
+        .lte("competencia", end && !isNaN(end.getTime()) ? end.toISOString().slice(0, 10) : "2100-01-01");
+      if (idxErr) throw idxErr;
+
+      const indices: IndexSeries[] = (indexRows || []).map((r: any) => ({
+        nome: r.nome,
+        competencia: new Date(r.competencia),
+        valor: Number(r.valor),
+        fonte: r.fonte ?? undefined,
+      }));
+
+      const { data: taxRows, error: taxErr } = await supabase
+        .from("tax_tables")
+        .select("id, tipo, vigencia_inicio, vigencia_fim, faixas")
+        .order("vigencia_inicio", { ascending: true });
+      if (taxErr) throw taxErr;
+
+      const taxTables: TaxTable[] = (taxRows || []).map((t: any) => ({
+        id: t.id,
+        tipo: t.tipo,
+        vigencia_inicio: new Date(t.vigencia_inicio),
+        vigencia_fim: t.vigencia_fim ? new Date(t.vigencia_fim) : undefined,
+        faixas: Array.isArray(t.faixas) ? t.faixas : [],
+      }));
+
+      // 4) Executar engine
+      const factsSnapshot = mapFactsToEngine(facts);
+      const engineProfile = {
+        id: profile.id,
+        nome: profile.nome,
+        config: (profile.config ?? {}) as any,
+        calculadoras_incluidas: (profile.calculadoras_incluidas ?? []) as any,
+      } as any;
+
+      const engine = new CalculationEngine(
+        engineProfile,
+        indices,
+        taxTables,
+        factsSnapshot
+      );
+      engine.loadCalculators(calculatorsWithRules);
+      const result = engine.executeAll();
+
+      // 5) Persistir run
+      const { data: session } = await supabase.auth.getSession();
+      const userId = session?.session?.user?.id ?? null;
+      const { data: insertedRun, error: runErr } = await supabase
+        .from("calculation_runs")
+        .insert({
+          case_id: id,
+          profile_id: selectedProfile,
+          executado_por: userId,
+          facts_snapshot: result.facts_snapshot as any,
+          calculators_used: result.calculators_used as any,
+          resultado_bruto: result.resultado_bruto as any,
+          resultado_liquido: result.resultado_liquido as any,
+          warnings: result.warnings as any,
+        })
+        .select("id")
+        .single();
+      if (runErr || !insertedRun?.id) throw runErr || new Error("Falha ao salvar cálculo");
+
+      // 6) Persistir memória (audit_lines)
+      if (Array.isArray(result.auditLines) && result.auditLines.length > 0) {
+        const payload = result.auditLines.map((l) => ({
+          run_id: insertedRun.id,
+          linha: l.linha,
+          calculadora: l.calculadora,
+          competencia: l.competencia ?? null,
+          descricao: l.descricao,
+          formula: l.formula ?? null,
+          valor_bruto: l.valor_bruto ?? null,
+          valor_liquido: l.valor_liquido ?? null,
+          metadata: (l.metadata ?? null) as any,
+        }));
+
+        const { error: auditErr } = await supabase.from("audit_lines").insert(payload as any);
+        if (auditErr) throw auditErr;
+      }
+
+      // 7) Atualizar UI
+      await queryClient.invalidateQueries({ queryKey: ["calculation_runs", id] });
+      toast.success("Cálculo executado com sucesso!");
+
+      // Opcional: marcar status como calculado
+      updateStatusMutation.mutate("calculado");
+    } catch (e) {
+      console.error(e);
+      toast.error("Falha ao executar cálculo: " + (e as Error).message);
+    } finally {
+      setIsCalculating(false);
+    }
+  };
 
   // Some environments keep the stats view stale (often `0`) even when chunks exist.
   // Prefer the most permissive/accurate number so users can proceed.
@@ -617,9 +807,14 @@ export default function CasoDetalhe() {
                       size="lg"
                       disabled={!selectedProfile || !canCalculate}
                       className="gap-2"
+                      onClick={executeCalculation}
                     >
-                      <Play className="h-5 w-5" />
-                      Executar Cálculo
+                      {isCalculating ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <Play className="h-5 w-5" />
+                      )}
+                      {isCalculating ? "Calculando…" : "Executar Cálculo"}
                     </Button>
                   </div>
                 </div>
