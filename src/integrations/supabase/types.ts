@@ -440,6 +440,7 @@ export type Database = {
           hash: string | null
           id: string
           max_retries: number | null
+          metadata: Json
           mime_type: string | null
           ocr_confidence: number | null
           owner_user_id: string | null
@@ -463,6 +464,7 @@ export type Database = {
           hash?: string | null
           id?: string
           max_retries?: number | null
+          metadata?: Json
           mime_type?: string | null
           ocr_confidence?: number | null
           owner_user_id?: string | null
@@ -486,6 +488,7 @@ export type Database = {
           hash?: string | null
           id?: string
           max_retries?: number | null
+          metadata?: Json
           mime_type?: string | null
           ocr_confidence?: number | null
           owner_user_id?: string | null
