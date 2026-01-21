@@ -374,6 +374,7 @@ export type Database = {
         Row: {
           case_id: string
           chave: string
+          chunk_id: string | null
           citacao: string | null
           confianca: number | null
           confirmado: boolean | null
@@ -389,6 +390,7 @@ export type Database = {
         Insert: {
           case_id: string
           chave: string
+          chunk_id?: string | null
           citacao?: string | null
           confianca?: number | null
           confirmado?: boolean | null
@@ -404,6 +406,7 @@ export type Database = {
         Update: {
           case_id?: string
           chave?: string
+          chunk_id?: string | null
           citacao?: string | null
           confianca?: number | null
           confirmado?: boolean | null
@@ -422,6 +425,13 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facts_chunk_id_fkey"
+            columns: ["chunk_id"]
+            isOneToOne: false
+            referencedRelation: "doc_chunks"
             referencedColumns: ["id"]
           },
         ]
