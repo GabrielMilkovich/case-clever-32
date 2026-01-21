@@ -1,9 +1,61 @@
+// =====================================================
+// AGENTE 1: EXTRATOR DE FATOS JURÍDICOS
+// =====================================================
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+// Tool schema para extração estruturada
+const extractFactsTool = {
+  type: "function",
+  function: {
+    name: "extract_facts",
+    description: "Extrai fatos jurídicos de documentos trabalhistas e retorna em formato estruturado",
+    parameters: {
+      type: "object",
+      properties: {
+        facts: {
+          type: "array",
+          description: "Lista de fatos extraídos do documento",
+          items: {
+            type: "object",
+            properties: {
+              chave: {
+                type: "string",
+                description: "Identificador do fato (ex: data_admissao, salario_base, jornada_contratual)"
+              },
+              valor: {
+                type: "string",
+                description: "Valor extraído como string (datas em YYYY-MM-DD, valores monetários sem R$)"
+              },
+              tipo: {
+                type: "string",
+                enum: ["data", "moeda", "numero", "texto", "booleano"],
+                description: "Tipo do valor extraído"
+              },
+              confianca: {
+                type: "number",
+                description: "Confiança na extração de 0.0 a 1.0"
+              },
+              contexto: {
+                type: "string",
+                description: "Trecho do documento onde o fato foi encontrado (opcional)"
+              }
+            },
+            required: ["chave", "valor", "tipo", "confianca"],
+            additionalProperties: false
+          }
+        }
+      },
+      required: ["facts"],
+      additionalProperties: false
+    }
+  }
 };
 
 serve(async (req) => {
@@ -37,31 +89,32 @@ serve(async (req) => {
       );
     }
 
-    // Create Supabase client with user's auth
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
-    // Combine document texts
     const combinedText = document_texts.join("\n\n---DOCUMENTO---\n\n");
 
-    const systemPrompt = `Você é um especialista em direito trabalhista brasileiro. Sua tarefa é analisar documentos de um caso trabalhista e extrair fatos estruturados.
+    const systemPrompt = `Você é um assistente de extração de fatos jurídicos trabalhistas.
 
-Para cada fato encontrado, retorne um objeto JSON com:
-- chave: identificador do fato (ex: "data_admissao", "salario_base", "jornada_contratual")
-- valor: valor extraído como string (datas em ISO, números com vírgula, textos simples)
-- tipo: "data" | "moeda" | "numero" | "texto" | "boolean"
-- confianca: número de 0.0 a 1.0 indicando sua confiança na extração
+Leia o documento e extraia APENAS:
+- Datas (admissão, demissão, eventos como férias, afastamentos)
+- Valores monetários (salários, adicionais, gratificações)
+- Jornadas (contratual, alegada, intervalos)
+- Eventos (afastamentos, promoções, acidentes)
 
-Fatos típicos a extrair:
-- Datas: admissão, demissão, início de férias, término de férias
-- Valores: salário base, salário mensal, adicionais (insalubridade, periculosidade), horas extras
-- Jornadas: jornada contratual, jornada alegada, intervalo intrajornada
-- Eventos: promoções, afastamentos, acidentes
+Chaves padrão a utilizar:
+- data_admissao, data_demissao
+- salario_base, salario_mensal
+- adicional_insalubridade, adicional_periculosidade
+- jornada_contratual, jornada_alegada
+- intervalo_intrajornada
+- horas_extras_mensais (média estimada)
+- cargo, funcao
+- data_ferias_inicio, data_ferias_fim
+- motivo_demissao (justa_causa, sem_justa_causa, pedido)
 
-Responda APENAS com um array JSON, sem texto adicional.`;
+Formate datas como YYYY-MM-DD, valores monetários apenas números (ex: 3200.00).
+Atribua confiança alta (>0.8) para dados explícitos, baixa (<0.5) para inferidos.`;
 
-    const userPrompt = `Analise os seguintes documentos trabalhistas e extraia todos os fatos relevantes:\n\n${combinedText.substring(0, 50000)}`;
-
-    console.log("Calling Lovable AI for fact extraction...");
+    console.log("Calling Lovable AI for fact extraction with tool calling...");
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -73,9 +126,11 @@ Responda APENAS com um array JSON, sem texto adicional.`;
         model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
+          { role: "user", content: `Analise os seguintes documentos trabalhistas e extraia todos os fatos relevantes:\n\n${combinedText.substring(0, 50000)}` },
         ],
-        temperature: 0.2,
+        tools: [extractFactsTool],
+        tool_choice: { type: "function", function: { name: "extract_facts" } },
+        temperature: 0.1,
       }),
     });
 
@@ -98,27 +153,38 @@ Responda APENAS com um array JSON, sem texto adicional.`;
     }
 
     const aiData = await aiResponse.json();
-    const content = aiData.choices?.[0]?.message?.content || "[]";
+    console.log("AI response received");
 
-    console.log("AI response received:", content.substring(0, 500));
-
-    // Parse the JSON response
+    // Extract facts from tool call response
     let facts: Array<{
       chave: string;
       valor: string;
       tipo: string;
       confianca: number;
+      contexto?: string;
     }> = [];
 
-    try {
-      // Try to extract JSON from the response
-      const jsonMatch = content.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        facts = JSON.parse(jsonMatch[0]);
+    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+    if (toolCall?.function?.arguments) {
+      try {
+        const parsed = JSON.parse(toolCall.function.arguments);
+        facts = parsed.facts || [];
+      } catch (parseError) {
+        console.error("Failed to parse tool call arguments:", parseError);
       }
-    } catch (parseError) {
-      console.error("Failed to parse AI response:", parseError);
-      facts = [];
+    }
+
+    // Fallback: try parsing content directly
+    if (facts.length === 0) {
+      const content = aiData.choices?.[0]?.message?.content || "";
+      try {
+        const jsonMatch = content.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          facts = JSON.parse(jsonMatch[0]);
+        }
+      } catch (parseError) {
+        console.error("Failed to parse content as JSON:", parseError);
+      }
     }
 
     console.log(`Extracted ${facts.length} facts`);

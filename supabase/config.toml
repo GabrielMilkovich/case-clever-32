@@ -2,3 +2,12 @@ project_id = "guozwjosshsmcgzstroe"
 
 [functions.extract-facts]
 verify_jwt = false
+
+[functions.plan-calculation]
+verify_jwt = false
+
+[functions.review-calculation]
+verify_jwt = false
+
+[functions.explain-result]
+verify_jwt = false
