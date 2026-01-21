@@ -279,13 +279,18 @@ serve(async (req) => {
 
       console.log(`Created ${allChunks.length} chunks`);
 
-      // Remover chunks antigos deste documento
+      // Remover chunks antigos deste documento (ambas as tabelas para compatibilidade)
+      await supabase
+        .from("document_chunks")
+        .delete()
+        .eq("document_id", document_id);
+
       await supabase
         .from("doc_chunks")
         .delete()
         .eq("document_id", document_id);
 
-      // Inserir novos chunks com embeddings
+      // Inserir novos chunks com embeddings na nova tabela document_chunks
       let insertedChunks = 0;
       const batchSize = 5;
 
@@ -297,30 +302,34 @@ serve(async (req) => {
             try {
               const embedding = await generateEmbedding(chunk.text, LOVABLE_API_KEY);
               return {
+                case_id: document.case_id,
                 document_id,
-                texto: chunk.text,
+                content: chunk.text,
                 page_number: chunk.pageNumber,
                 chunk_index: chunk.chunkIndex,
-                token_count: chunk.tokenCount,
+                doc_type: document.tipo || "outro",
                 metadata: {
                   page: chunk.pageNumber,
                   index: chunk.chunkIndex,
                   char_count: chunk.text.length,
+                  token_count: chunk.tokenCount,
                 },
                 embedding: `[${embedding.join(',')}]`,
               };
             } catch (embeddingError) {
               console.error(`Error generating embedding for chunk ${chunk.chunkIndex}:`, embeddingError);
               return {
+                case_id: document.case_id,
                 document_id,
-                texto: chunk.text,
+                content: chunk.text,
                 page_number: chunk.pageNumber,
                 chunk_index: chunk.chunkIndex,
-                token_count: chunk.tokenCount,
+                doc_type: document.tipo || "outro",
                 metadata: {
                   page: chunk.pageNumber,
                   index: chunk.chunkIndex,
                   char_count: chunk.text.length,
+                  token_count: chunk.tokenCount,
                   embedding_error: true,
                 },
                 embedding: null,
@@ -330,7 +339,7 @@ serve(async (req) => {
         );
 
         const { error: insertError } = await supabase
-          .from("doc_chunks")
+          .from("document_chunks")
           .insert(chunksWithEmbeddings);
 
         if (insertError) {
@@ -346,10 +355,14 @@ serve(async (req) => {
       await supabase
         .from("documents")
         .update({
-          processing_status: "completed",
-          extracted_text: extractedText.substring(0, 50000), // Limitar tamanho
-          chunk_count: insertedChunks,
+          status: "embedded",
           page_count: pageCount,
+          updated_at: new Date().toISOString(),
+          metadata: {
+            chunks_created: insertedChunks,
+            text_length: extractedText.length,
+            processing_completed_at: new Date().toISOString(),
+          },
         })
         .eq("id", document_id);
 

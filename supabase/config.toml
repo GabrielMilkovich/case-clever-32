@@ -20,3 +20,18 @@ verify_jwt = false
 
 [functions.extract-facts-rag]
 verify_jwt = false
+
+[functions.upload-document]
+verify_jwt = false
+
+[functions.process-document-start]
+verify_jwt = false
+
+[functions.ocr-document]
+verify_jwt = false
+
+[functions.chunk-and-embed]
+verify_jwt = false
+
+[functions.run-extraction-task]
+verify_jwt = false
