@@ -4,7 +4,8 @@
 // =====================================================
 
 import { useEffect, useRef, useState, useMemo } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -159,8 +160,40 @@ const chaveLabels: Record<string, string> = {
 // COMPONENTE: DETALHES DO CÁLCULO DE SALÁRIO VIA FGTS
 // =====================================================
 
-function FGTSSalaryCalculationDetails({ citacao }: { citacao: string }) {
+function FGTSSalaryCalculationDetails({ citacao, caseId }: { citacao: string; caseId: string }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [showDocument, setShowDocument] = useState(false);
+  
+  // Extract chunk_id from citation (format: "CHUNK_ID:xxx\n...")
+  const chunkIdMatch = citacao.match(/CHUNK_ID:\s*([a-f0-9-]+)/i);
+  const chunkId = chunkIdMatch ? chunkIdMatch[1] : null;
+
+  // Fetch the original document chunk content
+  const { data: chunkData } = useQuery({
+    queryKey: ["fgts-chunk", chunkId],
+    queryFn: async () => {
+      if (!chunkId) return null;
+      const { data, error } = await supabase
+        .from("document_chunks")
+        .select(`
+          id,
+          content,
+          page_number,
+          document_id,
+          documents (
+            id,
+            arquivo_url,
+            tipo
+          )
+        `)
+        .eq("id", chunkId)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!chunkId,
+  });
 
   // Parse the citation to extract deposit details
   // Format: "Calculado automaticamente a partir de X depósitos FGTS (8% do salário). Depósitos: 2024-01: R$ 160.00 → R$ 2000.00; ..."
@@ -187,6 +220,25 @@ function FGTSSalaryCalculationDetails({ citacao }: { citacao: string }) {
 
   const countMatch = citacao.match(/(\d+)\s+depósitos FGTS/);
   const depositCount = countMatch ? parseInt(countMatch[1]) : parseDeposits.length;
+
+  // Highlight deposit lines in the document content
+  const highlightedContent = useMemo(() => {
+    if (!chunkData?.content) return null;
+    const content = chunkData.content;
+    
+    // Split content into lines and highlight deposit lines
+    const lines = content.split("\n");
+    return lines.map((line, idx) => {
+      const isDepositLine = /115-DEPOSITO|DEPOSITO.*\d{4}/i.test(line);
+      const isValueLine = /R\$\s*[\d.,]+/.test(line);
+      return {
+        text: line,
+        isDeposit: isDepositLine,
+        hasValue: isValueLine && !isDepositLine,
+        key: idx,
+      };
+    });
+  }, [chunkData?.content]);
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen} className="mt-2">
@@ -268,6 +320,43 @@ function FGTSSalaryCalculationDetails({ citacao }: { citacao: string }) {
                   R$ {(parseDeposits.reduce((sum, d) => sum + d.salario, 0) / parseDeposits.length).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                 </span>
               </div>
+            </div>
+          )}
+
+          {/* Original Document Content Toggle */}
+          {chunkData && (
+            <div className="pt-2 border-t border-border">
+              <button
+                onClick={() => setShowDocument(!showDocument)}
+                className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                <span>{showDocument ? "Ocultar trecho do documento" : "Ver trecho do documento original"}</span>
+                {chunkData.page_number && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                    Página {chunkData.page_number}
+                  </Badge>
+                )}
+              </button>
+              
+              {showDocument && highlightedContent && (
+                <div className="mt-2 p-3 bg-muted/30 rounded border border-border max-h-60 overflow-y-auto">
+                  <div className="text-xs font-mono whitespace-pre-wrap leading-relaxed">
+                    {highlightedContent.map((line) => (
+                      <div
+                        key={line.key}
+                        className={cn(
+                          "py-0.5",
+                          line.isDeposit && "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 font-medium px-1 rounded",
+                          line.hasValue && !line.isDeposit && "text-muted-foreground"
+                        )}
+                      >
+                        {line.text || "\u00A0"}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </CollapsibleContent>
@@ -691,7 +780,7 @@ export function FactValidationView({
 
             {/* Special: FGTS Salary Calculation Details */}
             {fact.chave === "salario_mensal" && fact.citacao?.includes("depósitos FGTS") && (
-              <FGTSSalaryCalculationDetails citacao={fact.citacao} />
+              <FGTSSalaryCalculationDetails citacao={fact.citacao} caseId={caseId} />
             )}
 
             {/* Regular Citation Display (skip for FGTS calculated salary) */}
