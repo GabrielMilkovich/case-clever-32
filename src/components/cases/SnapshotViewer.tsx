@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Accordion,
   AccordionContent,
@@ -27,6 +28,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   FileText,
   Calculator,
   GitBranch,
@@ -38,9 +46,13 @@ import {
   AlertTriangle,
   CheckCircle,
   Eye,
+  GitCompare,
+  Scale,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { SnapshotDiff } from "./pericial/SnapshotDiff";
+import { ImpugnationPackage } from "./pericial/ImpugnationPackage";
 
 interface Snapshot {
   id: string;
@@ -108,6 +120,8 @@ export function SnapshotViewer({ caseId, onExecuteCalc }: SnapshotViewerProps) {
   const [selectedSnapshot, setSelectedSnapshot] = useState<string | null>(null);
   const [lineageOpen, setLineageOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ResultItem | null>(null);
+  const [compareSnapshot, setCompareSnapshot] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"details" | "diff" | "impugnation">("details");
 
   // Fetch snapshots
   const { data: snapshots = [], isLoading: snapshotsLoading } = useQuery({
@@ -155,6 +169,22 @@ export function SnapshotViewer({ caseId, onExecuteCalc }: SnapshotViewerProps) {
     enabled: !!selectedSnapshot && !!selectedItem,
   });
 
+  // Fetch comparison snapshot items
+  const { data: compareItems = [] } = useQuery({
+    queryKey: ["calc_result_items", compareSnapshot],
+    queryFn: async () => {
+      if (!compareSnapshot) return [];
+      const { data, error } = await supabase
+        .from("calc_result_items")
+        .select("*")
+        .eq("snapshot_id", compareSnapshot)
+        .order("ordem", { ascending: true });
+      if (error) throw error;
+      return data as ResultItem[];
+    },
+    enabled: !!compareSnapshot,
+  });
+
   // Group results by rubrica
   const groupedByRubrica = resultItems.reduce((acc, item) => {
     const key = item.rubrica_codigo;
@@ -172,6 +202,7 @@ export function SnapshotViewer({ caseId, onExecuteCalc }: SnapshotViewerProps) {
   }, {} as Record<string, { codigo: string; nome: string; items: ResultItem[]; total: number }>);
 
   const selectedSnapshotData = snapshots.find((s) => s.id === selectedSnapshot);
+  const compareSnapshotData = snapshots.find((s) => s.id === compareSnapshot);
 
   if (snapshotsLoading) {
     return (
@@ -311,8 +342,51 @@ export function SnapshotViewer({ caseId, onExecuteCalc }: SnapshotViewerProps) {
               </CardContent>
             </Card>
 
-            {/* Results by Rubrica */}
-            <Card>
+            {/* Tabs for Details / Diff / Impugnation */}
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+              <div className="flex items-center justify-between mb-4">
+                <TabsList>
+                  <TabsTrigger value="details" className="gap-2">
+                    <Calculator className="h-4 w-4" />
+                    Memória
+                  </TabsTrigger>
+                  <TabsTrigger value="diff" className="gap-2" disabled={snapshots.length < 2}>
+                    <GitCompare className="h-4 w-4" />
+                    Comparar
+                  </TabsTrigger>
+                  <TabsTrigger value="impugnation" className="gap-2">
+                    <Scale className="h-4 w-4" />
+                    Impugnação
+                  </TabsTrigger>
+                </TabsList>
+
+                {activeTab === "diff" && snapshots.length >= 2 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Comparar com:</span>
+                    <Select
+                      value={compareSnapshot || ""}
+                      onValueChange={setCompareSnapshot}
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {snapshots
+                          .filter((s) => s.id !== selectedSnapshot)
+                          .map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              v{s.versao}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
+              <TabsContent value="details">
+                {/* Results by Rubrica */}
+                <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Calculator className="h-5 w-5" />
@@ -497,6 +571,34 @@ export function SnapshotViewer({ caseId, onExecuteCalc }: SnapshotViewerProps) {
                 )}
               </CardContent>
             </Card>
+              </TabsContent>
+
+              <TabsContent value="diff">
+                {compareSnapshot && compareSnapshotData ? (
+                  <SnapshotDiff
+                    snapshotA={compareSnapshotData as any}
+                    snapshotB={selectedSnapshotData as any}
+                    itemsA={compareItems}
+                    itemsB={resultItems}
+                  />
+                ) : (
+                  <Card>
+                    <CardContent className="py-12 text-center text-muted-foreground">
+                      <GitCompare className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                      <p>Selecione um snapshot para comparar</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+
+              <TabsContent value="impugnation">
+                <ImpugnationPackage
+                  caseId={caseId}
+                  snapshot={selectedSnapshotData as any}
+                  resultItems={resultItems}
+                />
+              </TabsContent>
+            </Tabs>
           </>
         ) : (
           <div className="flex items-center justify-center h-96 text-muted-foreground">

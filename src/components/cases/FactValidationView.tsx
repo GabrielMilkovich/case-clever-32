@@ -60,12 +60,15 @@ import {
   ChevronDown,
   ChevronUp,
   Info,
+  Scale,
+  HelpCircle,
 } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Textarea } from "@/components/ui/textarea";
 
 // =====================================================
 // TYPES
@@ -81,6 +84,9 @@ interface Fact {
   confirmado: boolean;
   citacao?: string | null;
   pagina?: number | null;
+  status_pericial?: "incontroverso" | "controvertido" | null;
+  justificativa_validacao?: string | null;
+  prova_qualidade?: string | null;
 }
 
 interface Document {
@@ -391,6 +397,15 @@ export function FactValidationView({
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState({ chave: "", valor: "", tipo: "texto" });
 
+  // Pericial status modal
+  const [pericialDialogOpen, setPericialDialogOpen] = useState(false);
+  const [pericialFact, setPericialFact] = useState<Fact | null>(null);
+  const [pericialForm, setPericialForm] = useState<{
+    status: "incontroverso" | "controvertido";
+    justificativa: string;
+    prova_qualidade: string;
+  }>({ status: "incontroverso", justificativa: "", prova_qualidade: "forte" });
+
   // Feedback visual após confirmar fatos críticos
   const [highlightFactId, setHighlightFactId] = useState<string | null>(null);
   const [criticalCounterPulseNonce, setCriticalCounterPulseNonce] = useState(0);
@@ -555,6 +570,7 @@ export function FactValidationView({
         confirmado: true,
         confirmado_por: userId ?? null,
         confirmado_em: new Date().toISOString(),
+        status_pericial: "incontroverso",
       });
       if (error) throw error;
     },
@@ -568,6 +584,42 @@ export function FactValidationView({
     onError: (e) => {
       console.error(e);
       toast.error("Não foi possível adicionar o fato.");
+    },
+  });
+
+  // Pericial status update mutation
+  const updatePericialMutation = useMutation({
+    mutationFn: async ({
+      factId,
+      status,
+      justificativa,
+      prova_qualidade,
+    }: {
+      factId: string;
+      status: "incontroverso" | "controvertido";
+      justificativa: string;
+      prova_qualidade: string;
+    }) => {
+      const { error } = await supabase
+        .from("facts")
+        .update({
+          status_pericial: status,
+          justificativa_validacao: justificativa,
+          prova_qualidade,
+        })
+        .eq("id", factId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["facts", caseId] });
+      toast.success("Status pericial atualizado!");
+      setPericialDialogOpen(false);
+      setPericialFact(null);
+      onFactsChange?.();
+    },
+    onError: (e) => {
+      console.error(e);
+      toast.error("Erro ao atualizar status pericial.");
     },
   });
 
@@ -803,7 +855,7 @@ export function FactValidationView({
               </div>
             )}
 
-            <div className="flex items-center gap-3 text-sm">
+            <div className="flex items-center gap-3 text-sm flex-wrap">
               <Badge className={confidence.color}>
                 <ConfidenceIcon className="h-3 w-3 mr-1" />
                 {fact.confianca ? `${Math.round(fact.confianca * 100)}%` : "N/A"}
@@ -817,7 +869,36 @@ export function FactValidationView({
                   Confirmado
                 </Badge>
               )}
+              {/* Pericial Status Badge */}
+              {fact.status_pericial && (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "gap-1",
+                    fact.status_pericial === "incontroverso"
+                      ? "bg-green-100 text-green-800 border-green-300"
+                      : "bg-red-100 text-red-800 border-red-300"
+                  )}
+                >
+                  <Scale className="h-3 w-3" />
+                  {fact.status_pericial === "incontroverso" ? "Incontroverso" : "Controvertido"}
+                </Badge>
+              )}
+              {/* Prova quality badge */}
+              {fact.prova_qualidade && (
+                <Badge variant="outline" className="text-xs">
+                  Prova: {fact.prova_qualidade}
+                </Badge>
+              )}
             </div>
+            {/* Justificativa display if controvertido */}
+            {fact.status_pericial === "controvertido" && fact.justificativa_validacao && (
+              <div className="mt-2 p-2 bg-red-50 dark:bg-red-950/30 rounded border border-red-200 dark:border-red-800">
+                <p className="text-xs text-red-700 dark:text-red-300">
+                  <strong>Justificativa:</strong> {fact.justificativa_validacao}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Right: Actions */}
@@ -849,7 +930,36 @@ export function FactValidationView({
               </Button>
             )}
 
-            <div className="flex gap-1">
+            <div className="flex gap-1 flex-wrap">
+              {/* Pericial Status Button */}
+              {fact.confirmado && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant={fact.status_pericial ? "outline" : "secondary"}
+                        onClick={() => {
+                          setPericialFact(fact);
+                          setPericialForm({
+                            status: fact.status_pericial || "incontroverso",
+                            justificativa: fact.justificativa_validacao || "",
+                            prova_qualidade: fact.prova_qualidade || "forte",
+                          });
+                          setPericialDialogOpen(true);
+                        }}
+                        className="gap-1"
+                      >
+                        <Scale className="h-4 w-4" />
+                        {!fact.status_pericial && "Qualificar"}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Definir status pericial: Incontroverso ou Controvertido</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
               {documents.length > 0 && (
                 <Button
                   size="sm"
@@ -1366,6 +1476,138 @@ export function FactValidationView({
               disabled={!createForm.chave || !createForm.valor || createCriticalFactMutation.isPending}
             >
               Adicionar e confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pericial Status Dialog */}
+      <Dialog open={pericialDialogOpen} onOpenChange={setPericialDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Scale className="h-5 w-5" />
+              Qualificar Fato: {chaveLabels[pericialFact?.chave || ""] || pericialFact?.chave}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-3">
+              <Label>Status Pericial</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPericialForm({ ...pericialForm, status: "incontroverso" })}
+                  className={cn(
+                    "p-4 rounded-lg border-2 text-left transition-all",
+                    pericialForm.status === "incontroverso"
+                      ? "border-green-500 bg-green-50 dark:bg-green-950/30"
+                      : "border-border hover:border-green-300"
+                  )}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span className="font-medium">Incontroverso</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Fato aceito por ambas as partes, não precisa de justificativa detalhada.
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPericialForm({ ...pericialForm, status: "controvertido" })}
+                  className={cn(
+                    "p-4 rounded-lg border-2 text-left transition-all",
+                    pericialForm.status === "controvertido"
+                      ? "border-red-500 bg-red-50 dark:bg-red-950/30"
+                      : "border-border hover:border-red-300"
+                  )}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                    <span className="font-medium">Controvertido</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Fato disputado - requer justificativa obrigatória.
+                  </p>
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Qualidade da Prova</Label>
+              <Select
+                value={pericialForm.prova_qualidade}
+                onValueChange={(v) => setPericialForm({ ...pericialForm, prova_qualidade: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="forte">Forte (documento original)</SelectItem>
+                  <SelectItem value="media">Média (cópia/testemunho)</SelectItem>
+                  <SelectItem value="fraca">Fraca (apenas alegação)</SelectItem>
+                  <SelectItem value="ausente">Ausente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(pericialForm.status === "controvertido" || CRITICAL_FACTS.includes(pericialFact?.chave || "")) && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  Justificativa
+                  {pericialForm.status === "controvertido" && (
+                    <Badge variant="destructive" className="text-xs">Obrigatória</Badge>
+                  )}
+                </Label>
+                <Textarea
+                  value={pericialForm.justificativa}
+                  onChange={(e) => setPericialForm({ ...pericialForm, justificativa: e.target.value })}
+                  placeholder="Descreva a razão da controvérsia ou a base probatória..."
+                  rows={3}
+                />
+                <div className="flex flex-wrap gap-1">
+                  {[
+                    "Valor confirmado pelo TRCT (doc. oficial).",
+                    "Divergência entre holerites e alegação.",
+                    "Adotado por ausência de impugnação.",
+                    "Média aritmética conforme jurisprudência.",
+                  ].map((tpl, i) => (
+                    <Button
+                      key={i}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-6"
+                      onClick={() => setPericialForm({ ...pericialForm, justificativa: tpl })}
+                    >
+                      {tpl.slice(0, 25)}...
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPericialDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (pericialFact) {
+                  updatePericialMutation.mutate({
+                    factId: pericialFact.id,
+                    status: pericialForm.status,
+                    justificativa: pericialForm.justificativa,
+                    prova_qualidade: pericialForm.prova_qualidade,
+                  });
+                }
+              }}
+              disabled={
+                updatePericialMutation.isPending ||
+                (pericialForm.status === "controvertido" && !pericialForm.justificativa)
+              }
+            >
+              {updatePericialMutation.isPending ? "Salvando..." : "Salvar Status"}
             </Button>
           </DialogFooter>
         </DialogContent>
