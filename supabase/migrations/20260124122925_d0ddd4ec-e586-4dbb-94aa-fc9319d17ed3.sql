@@ -1,0 +1,8 @@
+-- Seed calculators matching the registry in engine.ts (using gen_random_uuid for UUIDs)
+INSERT INTO public.calculators (id, nome, categoria, descricao, inputs_esperados, outputs, ativo, tags) VALUES
+  (gen_random_uuid(), 'horas_extras', 'verbas_base', 'Cálculo de horas extras 50% e 100%', '{"horas_50": "number", "horas_100": "number", "salario_hora": "number"}', '{"he_50": "number", "he_100": "number", "total": "number"}', true, ARRAY['hora-extra', 'verba-base']),
+  (gen_random_uuid(), 'reflexos_13', 'reflexos', 'Reflexos sobre 13º salário', '{"base_calculo": "number", "meses": "number"}', '{"reflexo_13": "number"}', true, ARRAY['reflexo', '13-salario']),
+  (gen_random_uuid(), 'reflexos_ferias', 'reflexos', 'Reflexos sobre férias + 1/3', '{"base_calculo": "number", "meses": "number"}', '{"reflexo_ferias": "number"}', true, ARRAY['reflexo', 'ferias']),
+  (gen_random_uuid(), 'fgts', 'encargos', 'Cálculo de FGTS sobre verbas', '{"base_fgts": "number"}', '{"fgts": "number", "multa_40": "number"}', true, ARRAY['fgts', 'encargo']),
+  (gen_random_uuid(), 'inss', 'descontos', 'Cálculo de INSS progressivo', '{"base_inss": "number", "competencia": "string"}', '{"desconto_inss": "number"}', true, ARRAY['inss', 'desconto']),
+  (gen_random_uuid(), 'atualizacao_monetaria', 'atualizacao', 'Atualização monetária e juros', '{"valor_original": "number", "data_base": "string"}', '{"valor_atualizado": "number", "correcao": "number", "juros": "number"}', true, ARRAY['atualizacao', 'juros']);

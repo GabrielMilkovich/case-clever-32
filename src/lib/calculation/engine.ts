@@ -221,11 +221,14 @@ export class CalculationEngine {
     this.totalBruto = 0;
     this.totalLiquido = 0;
 
+    // Acumuladores para passar entre calculadoras
+    let accumulatedInputs: CalculatorInputs = {};
+
     // Executar na ordem
     for (const nome of executionOrder) {
       if (this.calculators.has(nome)) {
         const calculator = this.calculators.get(nome)!;
-        const result = this.executeCalculator(nome);
+        const result = this.executeCalculator(nome, accumulatedInputs);
         if (result) {
           results.push(result);
           calculatorsUsed.push({
@@ -234,6 +237,15 @@ export class CalculationEngine {
             versao: calculator.version,
             vigencia: this.dataReferencia.toISOString().split('T')[0],
           });
+
+          // Acumular totais para próximas calculadoras
+          if (nome === 'horas_extras') {
+            accumulatedInputs.total_horas_extras = result.outputs.total_bruto;
+          } else if (nome === 'reflexos_13') {
+            accumulatedInputs.total_reflexo_13 = result.outputs.total_bruto;
+          } else if (nome === 'reflexos_ferias') {
+            accumulatedInputs.total_reflexo_ferias = result.outputs.total_bruto;
+          }
         }
       }
     }
