@@ -178,13 +178,20 @@
 
   /* Sidebar navigation */
   .sidebar-nav-item {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sidebar-foreground/70 
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl 
            transition-all duration-200 relative overflow-hidden;
+    color: hsl(210 25% 92% / 0.7);
+  }
+
+  .sidebar-nav-item > * {
+    position: relative;
+    z-index: 1;
   }
 
   .sidebar-nav-item::before {
     content: '';
-    @apply absolute inset-0 bg-sidebar-accent opacity-0 transition-opacity duration-200;
+    @apply absolute inset-0 opacity-0 transition-opacity duration-200;
+    background-color: hsl(215 45% 25%);
   }
 
   .sidebar-nav-item:hover::before {
@@ -192,11 +199,12 @@
   }
 
   .sidebar-nav-item:hover {
-    @apply text-sidebar-foreground;
+    color: hsl(210 25% 92%);
   }
 
   .sidebar-nav-item.active {
-    @apply text-sidebar-foreground font-medium;
+    color: hsl(210 25% 92%);
+    font-weight: 500;
   }
 
   .sidebar-nav-item.active::before {
@@ -205,7 +213,9 @@
 
   .sidebar-nav-item.active::after {
     content: '';
-    @apply absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-sidebar-primary rounded-r-full;
+    @apply absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full;
+    background-color: hsl(38 75% 55%);
+    z-index: 2;
   }
 
   /* Fact cards */
