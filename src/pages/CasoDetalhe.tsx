@@ -30,6 +30,7 @@ import {
   RefreshCw,
   ChevronRight,
   Check,
+  Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +43,8 @@ import { ProcessingMonitorPanel } from "@/components/cases/ProcessingMonitorPane
 import { SnapshotViewer } from "@/components/cases/SnapshotViewer";
 import { ProfileSelector } from "@/components/cases/ProfileSelector";
 import { PetitionGenerator } from "@/components/cases/PetitionGenerator";
+import { PremissasEditor } from "@/components/cases/PremissasEditor";
+import { CalendarioTrabalhistaViewer } from "@/components/cases/CalendarioTrabalhistaViewer";
 import {
   CalculationEngine,
   type CalculatorRules,
@@ -629,34 +632,34 @@ export default function CasoDetalhe() {
           <div className="space-y-6">
             {/* Quick Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card className="card-interactive">
+              <Card className="card-interactive bg-card/80 backdrop-blur-sm">
                 <CardContent className="pt-6">
-                  <div className="stat-card-value">{documents.length}</div>
-                  <div className="stat-card-label">Documentos</div>
+                  <div className="text-3xl font-bold text-primary">{documents.length}</div>
+                  <div className="text-sm text-muted-foreground">Documentos</div>
                 </CardContent>
               </Card>
-              <Card className="card-interactive">
+              <Card className="card-interactive bg-card/80 backdrop-blur-sm">
                 <CardContent className="pt-6">
-                  <div className="stat-card-value">{chunksCount}</div>
-                  <div className="stat-card-label">Chunks Indexados</div>
+                  <div className="text-3xl font-bold text-primary">{chunksCount}</div>
+                  <div className="text-sm text-muted-foreground">Chunks Indexados</div>
                 </CardContent>
               </Card>
-              <Card className="card-interactive">
+              <Card className="card-interactive bg-card/80 backdrop-blur-sm">
                 <CardContent className="pt-6">
-                  <div className="stat-card-value">{facts.length}</div>
-                  <div className="stat-card-label">Fatos Extraídos</div>
+                  <div className="text-3xl font-bold text-primary">{facts.length}</div>
+                  <div className="text-sm text-muted-foreground">Fatos Extraídos</div>
                 </CardContent>
               </Card>
-              <Card className="card-interactive">
+              <Card className="card-interactive bg-card/80 backdrop-blur-sm">
                 <CardContent className="pt-6">
-                  <div className="stat-card-value text-green-600">{confirmedFacts.length}</div>
-                  <div className="stat-card-label">Fatos Confirmados</div>
+                  <div className="text-3xl font-bold text-green-600">{confirmedFacts.length}</div>
+                  <div className="text-sm text-muted-foreground">Fatos Confirmados</div>
                 </CardContent>
               </Card>
             </div>
 
             {/* Next Action CTA */}
-            <Card className="border-primary/20 bg-primary/5">
+            <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="text-lg">Próxima Ação Recomendada</CardTitle>
               </CardHeader>
@@ -707,7 +710,7 @@ export default function CasoDetalhe() {
 
             {/* Critical Facts Status */}
             {facts.length > 0 && (
-              <Card>
+              <Card className="bg-card/80 backdrop-blur-sm">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <ShieldCheck className="h-5 w-5" />
