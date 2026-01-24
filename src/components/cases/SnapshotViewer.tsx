@@ -87,6 +87,7 @@ interface Lineage {
 
 interface SnapshotViewerProps {
   caseId: string;
+  onExecuteCalc?: () => void;
 }
 
 const statusLabels = {
@@ -103,7 +104,7 @@ const formatCurrency = (value: number | null) => {
   }).format(value);
 };
 
-export function SnapshotViewer({ caseId }: SnapshotViewerProps) {
+export function SnapshotViewer({ caseId, onExecuteCalc }: SnapshotViewerProps) {
   const [selectedSnapshot, setSelectedSnapshot] = useState<string | null>(null);
   const [lineageOpen, setLineageOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ResultItem | null>(null);
@@ -189,6 +190,12 @@ export function SnapshotViewer({ caseId }: SnapshotViewerProps) {
         <p className="empty-state-description">
           Execute um cálculo para gerar o primeiro snapshot com memória de cálculo auditável.
         </p>
+        {onExecuteCalc && (
+          <Button onClick={onExecuteCalc} className="mt-4" size="lg">
+            <Calculator className="mr-2 h-4 w-4" />
+            Executar Cálculo
+          </Button>
+        )}
       </div>
     );
   }
