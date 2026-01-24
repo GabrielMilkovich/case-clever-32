@@ -73,23 +73,29 @@ export function Topbar({ breadcrumbs = [], title }: TopbarProps) {
 
   return (
     <>
-      <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
+      <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border/60 bg-background/80 backdrop-blur-xl px-6 shadow-sm">
         {/* Left: Breadcrumbs */}
         <div className="flex items-center gap-4">
           <nav className="flex items-center text-sm">
-            <Link to="/" className="breadcrumb-item flex items-center gap-1">
+            <Link 
+              to="/" 
+              className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors duration-200"
+            >
               <Home className="h-4 w-4" />
-              <span className="hidden sm:inline">JurisCálculo</span>
+              <span className="hidden sm:inline font-medium">JurisCálculo</span>
             </Link>
             {breadcrumbs.map((crumb, idx) => (
               <span key={idx} className="flex items-center">
-                <ChevronRight className="breadcrumb-separator h-4 w-4" />
+                <ChevronRight className="h-4 w-4 mx-2 text-muted-foreground/50" />
                 {crumb.href ? (
-                  <Link to={crumb.href} className="breadcrumb-item">
+                  <Link 
+                    to={crumb.href} 
+                    className="text-muted-foreground hover:text-primary transition-colors duration-200 font-medium"
+                  >
                     {crumb.label}
                   </Link>
                 ) : (
-                  <span className="text-sm font-medium text-foreground">
+                  <span className="text-sm font-semibold text-foreground">
                     {crumb.label}
                   </span>
                 )}
@@ -107,54 +113,69 @@ export function Topbar({ breadcrumbs = [], title }: TopbarProps) {
         <div className="hidden md:flex flex-1 max-w-md mx-8">
           <Button
             variant="outline"
-            className="w-full justify-start text-muted-foreground font-normal gap-2"
+            className="w-full justify-start text-muted-foreground font-normal gap-2 h-10 rounded-xl border-border/60 bg-muted/30 hover:bg-muted/50 hover:border-primary/30 transition-all duration-200"
             onClick={() => setCommandOpen(true)}
           >
-            <Search className="h-4 w-4" />
-            <span>Buscar...</span>
-            <kbd className="kbd ml-auto">⌘K</kbd>
+            <Search className="h-4 w-4 text-muted-foreground/70" />
+            <span className="text-muted-foreground/70">Buscar...</span>
+            <kbd className="ml-auto inline-flex h-5 items-center gap-1 rounded border border-border/60 bg-muted/50 px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+              ⌘K
+            </kbd>
           </Button>
         </div>
 
         {/* Right: Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <Button
             size="sm"
-            className="gap-2"
+            className="gap-2 h-9 rounded-lg shadow-sm btn-premium bg-primary hover:bg-primary/90"
             onClick={() => navigate("/casos")}
           >
             <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Novo Caso</span>
+            <span className="hidden sm:inline font-medium">Novo Caso</span>
           </Button>
 
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-5 w-5" />
-            <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-accent" />
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="relative h-9 w-9 rounded-lg hover:bg-muted/80 transition-colors duration-200"
+          >
+            <Bell className="h-5 w-5 text-muted-foreground" />
+            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-accent ring-2 ring-background animate-pulse" />
           </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-9 w-9 rounded-full">
-                <Avatar className="h-9 w-9">
-                  <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+              <Button variant="ghost" className="relative h-9 w-9 rounded-full ring-2 ring-border/60 hover:ring-primary/50 transition-all duration-200">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground text-sm font-semibold">
                     JC
                   </AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56 bg-popover" align="end">
-              <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate("/configuracoes")}>
+            <DropdownMenuContent className="w-56 bg-popover/95 backdrop-blur-lg border-border/60 shadow-lg rounded-xl" align="end">
+              <DropdownMenuLabel className="font-semibold">Minha Conta</DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-border/60" />
+              <DropdownMenuItem 
+                onClick={() => navigate("/configuracoes")}
+                className="cursor-pointer rounded-lg focus:bg-muted/80 transition-colors duration-150"
+              >
                 <User className="mr-2 h-4 w-4" />
                 Perfil
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate("/configuracoes")}>
+              <DropdownMenuItem 
+                onClick={() => navigate("/configuracoes")}
+                className="cursor-pointer rounded-lg focus:bg-muted/80 transition-colors duration-150"
+              >
                 <Settings className="mr-2 h-4 w-4" />
                 Configurações
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+              <DropdownMenuSeparator className="bg-border/60" />
+              <DropdownMenuItem 
+                onClick={handleLogout} 
+                className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10 rounded-lg transition-colors duration-150"
+              >
                 <LogOut className="mr-2 h-4 w-4" />
                 Sair
               </DropdownMenuItem>

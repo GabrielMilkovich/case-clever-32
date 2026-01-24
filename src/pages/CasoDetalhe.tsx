@@ -28,7 +28,10 @@ import {
   FileStack,
   Scroll,
   RefreshCw,
+  ChevronRight,
+  Check,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 // Import new premium components
 import { FactValidationView } from "@/components/cases/FactValidationView";
@@ -766,94 +769,112 @@ export default function CasoDetalhe() {
 
       case "extracao":
         return (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5" />
-                  Extração de Fatos via IA
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-muted-foreground">
-                  A IA analisa os chunks dos documentos e extrai fatos relevantes como datas, salários e jornadas.
-                </p>
-                <div className="flex items-center gap-3">
-                  <Button
-                    onClick={runFactExtraction}
-                    disabled={isExtractingFacts || chunksCount === 0}
-                  >
-                    {isExtractingFacts ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Play className="h-4 w-4 mr-2" />
-                    )}
-                    {facts.length === 0 ? "Iniciar Extração" : "Executar Nova Extração"}
-                  </Button>
-                  {facts.length > 0 && (
-                    <Button
-                      variant="outline"
-                      onClick={restartFactExtraction}
-                      disabled={isExtractingFacts || chunksCount === 0}
-                    >
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Reiniciar do Zero
-                    </Button>
-                  )}
-                  <Badge variant="outline">
-                    {chunksCount} chunks disponíveis
-                  </Badge>
+          <div className="space-y-6 animate-fade-in">
+            {/* Extraction Header Card */}
+            <div className="glass-card rounded-2xl p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary/10 to-accent/10 border border-primary/20">
+                  <Sparkles className="h-6 w-6 text-primary" />
                 </div>
-                {chunksCount === 0 && (
-                  <div className="flex items-center gap-2 text-amber-600">
-                    <AlertTriangle className="h-4 w-4" />
-                    <span className="text-sm">
-                      Nenhum chunk indexado. Processe os documentos primeiro.
-                    </span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {facts.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Fatos Extraídos ({facts.length})</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {facts.slice(0, 12).map((fact) => (
-                      <div
-                        key={fact.id}
-                        className={`p-3 rounded-lg border ${
-                          fact.confirmado
-                            ? "bg-green-50/50 border-green-200"
-                            : "bg-muted/50 border-muted"
-                        }`}
-                      >
-                        <div className="text-xs text-muted-foreground mb-1">
-                          {criticalLabels[fact.chave] || fact.chave}
-                        </div>
-                        <div className="font-medium text-sm truncate">{fact.valor}</div>
-                      </div>
-                    ))}
-                    {facts.length > 12 && (
-                      <div className="p-3 rounded-lg border bg-muted/50 flex items-center justify-center">
-                        <span className="text-muted-foreground text-sm">
-                          +{facts.length - 12} mais
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                <div>
+                  <h3 className="text-lg font-semibold">Extração de Fatos via IA</h3>
+                  <p className="text-sm text-muted-foreground">
+                    A IA analisa os chunks dos documentos e extrai fatos relevantes como datas, salários e jornadas.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3 flex-wrap">
+                <Button
+                  onClick={runFactExtraction}
+                  disabled={isExtractingFacts || chunksCount === 0}
+                  className="btn-premium shadow-sm"
+                >
+                  {isExtractingFacts ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Play className="h-4 w-4 mr-2" />
+                  )}
+                  {facts.length === 0 ? "Executar Nova Extração" : "Executar Nova Extração"}
+                </Button>
+                {facts.length > 0 && (
                   <Button
-                    className="mt-4"
                     variant="outline"
+                    onClick={restartFactExtraction}
+                    disabled={isExtractingFacts || chunksCount === 0}
+                    className="transition-all duration-200 hover:border-primary/50"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Reiniciar do Zero
+                  </Button>
+                )}
+                <Badge 
+                  variant="outline" 
+                  className="px-3 py-1.5 bg-muted/50 font-medium"
+                >
+                  {chunksCount} chunks disponíveis
+                </Badge>
+              </div>
+              
+              {chunksCount === 0 && (
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                  <span className="text-sm text-amber-700 dark:text-amber-300">
+                    Nenhum chunk indexado. Processe os documentos primeiro.
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Extracted Facts Grid */}
+            {facts.length > 0 && (
+              <div className="space-y-4 animate-slide-up" style={{ animationDelay: "100ms" }}>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Fatos Extraídos ({facts.length})</h3>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => setActiveTab("validacao")}
+                    className="transition-all duration-200 hover:border-primary/50"
                   >
                     Ir para Validação
+                    <ChevronRight className="h-4 w-4 ml-1" />
                   </Button>
-                </CardContent>
-              </Card>
+                </div>
+                
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 stagger-children">
+                  {facts.slice(0, 12).map((fact, idx) => (
+                    <div
+                      key={fact.id}
+                      className={cn(
+                        "fact-card group",
+                        fact.confirmado && "bg-gradient-to-br from-green-50/80 to-emerald-50/50 border-green-200/80 dark:from-green-950/30 dark:to-emerald-950/20 dark:border-green-800/50"
+                      )}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                          {criticalLabels[fact.chave] || fact.chave.replace(/_/g, " ")}
+                        </span>
+                        {fact.confirmado && (
+                          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500">
+                            <Check className="h-3 w-3 text-white" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="font-semibold text-foreground truncate group-hover:text-primary transition-colors duration-200">
+                        {fact.valor}
+                      </div>
+                    </div>
+                  ))}
+                  {facts.length > 12 && (
+                    <div className="fact-card flex items-center justify-center bg-muted/30">
+                      <span className="text-muted-foreground text-sm font-medium">
+                        +{facts.length - 12} mais
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         );
