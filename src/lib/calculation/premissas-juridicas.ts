@@ -107,6 +107,29 @@ export interface PremissaPrescricao extends PremissaBase {
   justificativa: string;
 }
 
+// =====================================================
+// PREMISSAS DE HORAS EXTRAS E RESCISÃO
+// =====================================================
+
+export interface PremissaHorasExtras extends PremissaBase {
+  tipo: "horas_extras_config";
+  mediaHorasExtrasMensais: number; // média de HE por mês (ex: 30)
+  percentualHE50: number; // adicional de 50% (padrão: 50)
+  percentualHE100: number; // adicional de 100% (padrão: 100)
+  justificativa: string;
+}
+
+export type TipoDemissao = "sem_justa_causa" | "justa_causa" | "pedido_demissao" | "rescisao_indireta" | "acordo";
+
+export interface PremissaRescisao extends PremissaBase {
+  tipo: "rescisao";
+  tipoDemissao: TipoDemissao;
+  dataAdmissao: string;
+  dataDemissao: string;
+  calcularVerbas: boolean; // se deve calcular automaticamente verbas rescisórias
+  justificativa: string;
+}
+
 export type Premissa =
   | PremissaDivisor
   | PremissaMetodoHE
@@ -117,7 +140,9 @@ export type Premissa =
   | PremissaCorrecao
   | PremissaJuros
   | PremissaHoraNoturna
-  | PremissaPrescricao;
+  | PremissaPrescricao
+  | PremissaHorasExtras
+  | PremissaRescisao;
 
 // =====================================================
 // CONFIGURAÇÃO COMPLETA DE PREMISSAS DO CASO
@@ -141,6 +166,12 @@ export interface PremissasCasoConfig {
   juros: PremissaJuros;
   prescricao: PremissaPrescricao;
   horaNoturna: PremissaHoraNoturna;
+  
+  // Configuração de Horas Extras
+  horasExtrasConfig: PremissaHorasExtras;
+  
+  // Configuração de Rescisão
+  rescisao: PremissaRescisao;
   
   // Bases de Cálculo
   basePericulosidade: PremissaBaseCalculo;
@@ -260,6 +291,35 @@ export const PREMISSAS_TRT3_PADRAO: Omit<PremissasCasoConfig, "id" | "caseId" | 
     adicionalNoturno: 20,
     justificativa: "Hora noturna = 52min30seg conforme CLT Art. 73 §1º",
     fundamentacaoLegal: "CLT Art. 73 §1º",
+  },
+  
+  horasExtrasConfig: {
+    id: "horas_extras_config",
+    tipo: "horas_extras_config",
+    categoria: "Horas Extras",
+    nome: "Configuração de Horas Extras",
+    descricao: "Média mensal e percentuais de adicional",
+    obrigatoria: true,
+    mediaHorasExtrasMensais: 0,
+    percentualHE50: 50,
+    percentualHE100: 100,
+    justificativa: "Adicional de 50% conforme CLT Art. 59 e 100% para domingos/feriados",
+    fundamentacaoLegal: "CLT Art. 59 e Art. 73",
+  },
+  
+  rescisao: {
+    id: "rescisao",
+    tipo: "rescisao",
+    categoria: "Rescisão",
+    nome: "Configuração de Rescisão",
+    descricao: "Tipo de demissão e datas contratuais",
+    obrigatoria: false,
+    tipoDemissao: "sem_justa_causa",
+    dataAdmissao: "",
+    dataDemissao: "",
+    calcularVerbas: true,
+    justificativa: "Cálculo automático de verbas rescisórias com base no tipo de demissão",
+    fundamentacaoLegal: "CLT Art. 477 e seguintes",
   },
   
   basePericulosidade: {
