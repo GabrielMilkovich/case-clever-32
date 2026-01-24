@@ -61,6 +61,283 @@ export type Database = {
           },
         ]
       }
+      calc_lineage: {
+        Row: {
+          created_at: string
+          formula_aplicada: string | null
+          hash_reproducao: string | null
+          id: string
+          inputs: Json
+          output_tipo: string | null
+          output_valor: number | null
+          parametros: Json | null
+          result_item_id: string | null
+          rule_codigo: string | null
+          rule_id: string | null
+          rule_versao: string | null
+          snapshot_id: string
+        }
+        Insert: {
+          created_at?: string
+          formula_aplicada?: string | null
+          hash_reproducao?: string | null
+          id?: string
+          inputs?: Json
+          output_tipo?: string | null
+          output_valor?: number | null
+          parametros?: Json | null
+          result_item_id?: string | null
+          rule_codigo?: string | null
+          rule_id?: string | null
+          rule_versao?: string | null
+          snapshot_id: string
+        }
+        Update: {
+          created_at?: string
+          formula_aplicada?: string | null
+          hash_reproducao?: string | null
+          id?: string
+          inputs?: Json
+          output_tipo?: string | null
+          output_valor?: number | null
+          parametros?: Json | null
+          result_item_id?: string | null
+          rule_codigo?: string | null
+          rule_id?: string | null
+          rule_versao?: string | null
+          snapshot_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calc_lineage_result_item_id_fkey"
+            columns: ["result_item_id"]
+            isOneToOne: false
+            referencedRelation: "calc_result_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calc_lineage_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "calc_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calc_lineage_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "calc_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calc_result_items: {
+        Row: {
+          base_calculo: number | null
+          competencia: string | null
+          created_at: string
+          dependencias: Json | null
+          fator: number | null
+          id: string
+          memoria_detalhada: Json | null
+          ordem: number | null
+          percentual: number | null
+          periodo_fim: string | null
+          periodo_inicio: string | null
+          quantidade: number | null
+          rubrica_codigo: string
+          rubrica_nome: string | null
+          snapshot_id: string
+          valor_bruto: number
+          valor_liquido: number | null
+        }
+        Insert: {
+          base_calculo?: number | null
+          competencia?: string | null
+          created_at?: string
+          dependencias?: Json | null
+          fator?: number | null
+          id?: string
+          memoria_detalhada?: Json | null
+          ordem?: number | null
+          percentual?: number | null
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
+          quantidade?: number | null
+          rubrica_codigo: string
+          rubrica_nome?: string | null
+          snapshot_id: string
+          valor_bruto: number
+          valor_liquido?: number | null
+        }
+        Update: {
+          base_calculo?: number | null
+          competencia?: string | null
+          created_at?: string
+          dependencias?: Json | null
+          fator?: number | null
+          id?: string
+          memoria_detalhada?: Json | null
+          ordem?: number | null
+          percentual?: number | null
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
+          quantidade?: number | null
+          rubrica_codigo?: string
+          rubrica_nome?: string | null
+          snapshot_id?: string
+          valor_bruto?: number
+          valor_liquido?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calc_result_items_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "calc_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calc_rules: {
+        Row: {
+          ativo: boolean | null
+          categoria: string
+          codigo: string
+          created_at: string
+          descricao: string | null
+          formula: Json
+          id: string
+          nome: string
+          parametros_requeridos: Json | null
+          versao: string
+          versao_numero: number
+          vigencia_fim: string | null
+          vigencia_inicio: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          categoria: string
+          codigo: string
+          created_at?: string
+          descricao?: string | null
+          formula?: Json
+          id?: string
+          nome: string
+          parametros_requeridos?: Json | null
+          versao?: string
+          versao_numero?: number
+          vigencia_fim?: string | null
+          vigencia_inicio?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          categoria?: string
+          codigo?: string
+          created_at?: string
+          descricao?: string | null
+          formula?: Json
+          id?: string
+          nome?: string
+          parametros_requeridos?: Json | null
+          versao?: string
+          versao_numero?: number
+          vigencia_fim?: string | null
+          vigencia_inicio?: string | null
+        }
+        Relationships: []
+      }
+      calc_snapshots: {
+        Row: {
+          alertas_consistencia: Json | null
+          aprovado_em: string | null
+          aprovado_por: string | null
+          case_id: string
+          created_at: string
+          created_by: string
+          engine_version: string
+          id: string
+          inputs_snapshot: Json
+          observacoes: string | null
+          profile_id: string | null
+          resultado_bruto: Json | null
+          resultado_liquido: Json | null
+          ruleset_hash: string | null
+          status: Database["public"]["Enums"]["snapshot_status"]
+          total_bruto: number | null
+          total_descontos: number | null
+          total_liquido: number | null
+          versao: number
+          warnings: Json | null
+        }
+        Insert: {
+          alertas_consistencia?: Json | null
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          case_id: string
+          created_at?: string
+          created_by: string
+          engine_version?: string
+          id?: string
+          inputs_snapshot?: Json
+          observacoes?: string | null
+          profile_id?: string | null
+          resultado_bruto?: Json | null
+          resultado_liquido?: Json | null
+          ruleset_hash?: string | null
+          status?: Database["public"]["Enums"]["snapshot_status"]
+          total_bruto?: number | null
+          total_descontos?: number | null
+          total_liquido?: number | null
+          versao?: number
+          warnings?: Json | null
+        }
+        Update: {
+          alertas_consistencia?: Json | null
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          case_id?: string
+          created_at?: string
+          created_by?: string
+          engine_version?: string
+          id?: string
+          inputs_snapshot?: Json
+          observacoes?: string | null
+          profile_id?: string | null
+          resultado_bruto?: Json | null
+          resultado_liquido?: Json | null
+          ruleset_hash?: string | null
+          status?: Database["public"]["Enums"]["snapshot_status"]
+          total_bruto?: number | null
+          total_descontos?: number | null
+          total_liquido?: number | null
+          versao?: number
+          warnings?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calc_snapshots_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "calc_snapshots_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calc_snapshots_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "calculation_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calculation_profiles: {
         Row: {
           ativo: boolean | null
@@ -250,6 +527,8 @@ export type Database = {
           id: string
           numero_processo: string | null
           status: Database["public"]["Enums"]["case_status"] | null
+          tags: string[] | null
+          tribunal: string | null
         }
         Insert: {
           atualizado_em?: string | null
@@ -259,6 +538,8 @@ export type Database = {
           id?: string
           numero_processo?: string | null
           status?: Database["public"]["Enums"]["case_status"] | null
+          tags?: string[] | null
+          tribunal?: string | null
         }
         Update: {
           atualizado_em?: string | null
@@ -268,6 +549,8 @@ export type Database = {
           id?: string
           numero_processo?: string | null
           status?: Database["public"]["Enums"]["case_status"] | null
+          tags?: string[] | null
+          tribunal?: string | null
         }
         Relationships: []
       }
@@ -435,9 +718,11 @@ export type Database = {
         Row: {
           arquivo_url: string | null
           case_id: string
+          competencia: string | null
           error_message: string | null
           file_name: string | null
           hash: string | null
+          hash_integridade: string | null
           id: string
           max_retries: number | null
           metadata: Json
@@ -445,6 +730,8 @@ export type Database = {
           ocr_confidence: number | null
           owner_user_id: string | null
           page_count: number | null
+          periodo_fim: string | null
+          periodo_inicio: string | null
           processing_completed_at: string | null
           processing_started_at: string | null
           queue_priority: number | null
@@ -455,13 +742,16 @@ export type Database = {
           tipo: Database["public"]["Enums"]["doc_type"] | null
           updated_at: string | null
           uploaded_em: string | null
+          versao_documento: number | null
         }
         Insert: {
           arquivo_url?: string | null
           case_id: string
+          competencia?: string | null
           error_message?: string | null
           file_name?: string | null
           hash?: string | null
+          hash_integridade?: string | null
           id?: string
           max_retries?: number | null
           metadata?: Json
@@ -469,6 +759,8 @@ export type Database = {
           ocr_confidence?: number | null
           owner_user_id?: string | null
           page_count?: number | null
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
           processing_completed_at?: string | null
           processing_started_at?: string | null
           queue_priority?: number | null
@@ -479,13 +771,16 @@ export type Database = {
           tipo?: Database["public"]["Enums"]["doc_type"] | null
           updated_at?: string | null
           uploaded_em?: string | null
+          versao_documento?: number | null
         }
         Update: {
           arquivo_url?: string | null
           case_id?: string
+          competencia?: string | null
           error_message?: string | null
           file_name?: string | null
           hash?: string | null
+          hash_integridade?: string | null
           id?: string
           max_retries?: number | null
           metadata?: Json
@@ -493,6 +788,8 @@ export type Database = {
           ocr_confidence?: number | null
           owner_user_id?: string | null
           page_count?: number | null
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
           processing_completed_at?: string | null
           processing_started_at?: string | null
           queue_priority?: number | null
@@ -503,6 +800,7 @@ export type Database = {
           tipo?: Database["public"]["Enums"]["doc_type"] | null
           updated_at?: string | null
           uploaded_em?: string | null
+          versao_documento?: number | null
         }
         Relationships: [
           {
@@ -514,6 +812,72 @@ export type Database = {
           },
           {
             foreignKeyName: "documents_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employment_contracts: {
+        Row: {
+          case_id: string
+          created_at: string
+          data_admissao: string
+          data_demissao: string | null
+          funcao: string | null
+          historico_salarial: Json | null
+          id: string
+          jornada_contratual: Json | null
+          local_trabalho: string | null
+          observacoes: string | null
+          salario_inicial: number | null
+          sindicato: string | null
+          tipo_demissao: Database["public"]["Enums"]["termination_type"] | null
+          updated_at: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          data_admissao: string
+          data_demissao?: string | null
+          funcao?: string | null
+          historico_salarial?: Json | null
+          id?: string
+          jornada_contratual?: Json | null
+          local_trabalho?: string | null
+          observacoes?: string | null
+          salario_inicial?: number | null
+          sindicato?: string | null
+          tipo_demissao?: Database["public"]["Enums"]["termination_type"] | null
+          updated_at?: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          data_admissao?: string
+          data_demissao?: string | null
+          funcao?: string | null
+          historico_salarial?: Json | null
+          id?: string
+          jornada_contratual?: Json | null
+          local_trabalho?: string | null
+          observacoes?: string | null
+          salario_inicial?: number | null
+          sindicato?: string | null
+          tipo_demissao?: Database["public"]["Enums"]["termination_type"] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employment_contracts_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "employment_contracts_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "cases"
@@ -586,6 +950,70 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      extractions: {
+        Row: {
+          campo: string
+          case_id: string
+          confianca: number | null
+          created_at: string
+          document_id: string
+          id: string
+          metodo: string | null
+          origem: Json
+          status: string | null
+          tipo_valor: string
+          valor_proposto: string
+        }
+        Insert: {
+          campo: string
+          case_id: string
+          confianca?: number | null
+          created_at?: string
+          document_id: string
+          id?: string
+          metodo?: string | null
+          origem?: Json
+          status?: string | null
+          tipo_valor?: string
+          valor_proposto: string
+        }
+        Update: {
+          campo?: string
+          case_id?: string
+          confianca?: number | null
+          created_at?: string
+          document_id?: string
+          id?: string
+          metodo?: string | null
+          origem?: Json
+          status?: string | null
+          tipo_valor?: string
+          valor_proposto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extractions_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "extractions_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extractions_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
             referencedColumns: ["id"]
           },
         ]
@@ -804,6 +1232,57 @@ export type Database = {
         }
         Relationships: []
       }
+      parties: {
+        Row: {
+          case_id: string
+          contato: Json | null
+          created_at: string
+          documento: string | null
+          documento_tipo: string | null
+          id: string
+          nome: string
+          tipo: Database["public"]["Enums"]["party_type"]
+          updated_at: string
+        }
+        Insert: {
+          case_id: string
+          contato?: Json | null
+          created_at?: string
+          documento?: string | null
+          documento_tipo?: string | null
+          id?: string
+          nome: string
+          tipo: Database["public"]["Enums"]["party_type"]
+          updated_at?: string
+        }
+        Update: {
+          case_id?: string
+          contato?: Json | null
+          created_at?: string
+          documento?: string | null
+          documento_tipo?: string | null
+          id?: string
+          nome?: string
+          tipo?: Database["public"]["Enums"]["party_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parties_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "parties_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       petition_templates: {
         Row: {
           ativo: boolean | null
@@ -1000,6 +1479,119 @@ export type Database = {
         }
         Relationships: []
       }
+      test_scenarios: {
+        Row: {
+          ativo: boolean | null
+          created_at: string
+          descricao: string | null
+          id: string
+          inputs: Json
+          nome: string
+          resultados_esperados: Json
+          ultima_execucao: string | null
+          ultimo_diff: Json | null
+          ultimo_resultado: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          inputs?: Json
+          nome: string
+          resultados_esperados?: Json
+          ultima_execucao?: string | null
+          ultimo_diff?: Json | null
+          ultimo_resultado?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          inputs?: Json
+          nome?: string
+          resultados_esperados?: Json
+          ultima_execucao?: string | null
+          ultimo_diff?: Json | null
+          ultimo_resultado?: string | null
+        }
+        Relationships: []
+      }
+      validations: {
+        Row: {
+          acao: Database["public"]["Enums"]["validation_action"]
+          campo: string
+          case_id: string
+          extraction_id: string | null
+          id: string
+          justificativa: string | null
+          metadata: Json | null
+          snapshot_id: string | null
+          usuario_id: string
+          validated_at: string
+          valor_anterior: string | null
+          valor_validado: string | null
+        }
+        Insert: {
+          acao: Database["public"]["Enums"]["validation_action"]
+          campo: string
+          case_id: string
+          extraction_id?: string | null
+          id?: string
+          justificativa?: string | null
+          metadata?: Json | null
+          snapshot_id?: string | null
+          usuario_id: string
+          validated_at?: string
+          valor_anterior?: string | null
+          valor_validado?: string | null
+        }
+        Update: {
+          acao?: Database["public"]["Enums"]["validation_action"]
+          campo?: string
+          case_id?: string
+          extraction_id?: string | null
+          id?: string
+          justificativa?: string | null
+          metadata?: Json | null
+          snapshot_id?: string | null
+          usuario_id?: string
+          validated_at?: string
+          valor_anterior?: string | null
+          valor_validado?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "validations_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "validations_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "validations_extraction_id_fkey"
+            columns: ["extraction_id"]
+            isOneToOne: false
+            referencedRelation: "extractions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "validations_snapshot_fk"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "calc_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       case_processing_stats: {
@@ -1059,6 +1651,7 @@ export type Database = {
         | "outro"
       fact_origem: "ia_extracao" | "usuario" | "documento"
       fact_type: "data" | "moeda" | "numero" | "texto" | "boolean"
+      party_type: "reclamante" | "reclamada"
       processing_status:
         | "pending"
         | "queued"
@@ -1068,6 +1661,14 @@ export type Database = {
         | "completed"
         | "failed"
         | "retrying"
+      snapshot_status: "gerado" | "revisao" | "aprovado"
+      termination_type:
+        | "sem_justa_causa"
+        | "justa_causa"
+        | "pedido_demissao"
+        | "rescisao_indireta"
+        | "acordo"
+      validation_action: "aprovar" | "editar" | "rejeitar"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1206,6 +1807,7 @@ export const Constants = {
       ],
       fact_origem: ["ia_extracao", "usuario", "documento"],
       fact_type: ["data", "moeda", "numero", "texto", "boolean"],
+      party_type: ["reclamante", "reclamada"],
       processing_status: [
         "pending",
         "queued",
@@ -1216,6 +1818,15 @@ export const Constants = {
         "failed",
         "retrying",
       ],
+      snapshot_status: ["gerado", "revisao", "aprovado"],
+      termination_type: [
+        "sem_justa_causa",
+        "justa_causa",
+        "pedido_demissao",
+        "rescisao_indireta",
+        "acordo",
+      ],
+      validation_action: ["aprovar", "editar", "rejeitar"],
     },
   },
 } as const
