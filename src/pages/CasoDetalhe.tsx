@@ -45,6 +45,9 @@ import { ProfileSelector } from "@/components/cases/ProfileSelector";
 import { PetitionGenerator } from "@/components/cases/PetitionGenerator";
 import { PremissasEditor } from "@/components/cases/PremissasEditor";
 import { CalendarioTrabalhistaViewer } from "@/components/cases/CalendarioTrabalhistaViewer";
+import { RiskAnalysisPanel } from "@/components/cases/pericial/RiskAnalysisPanel";
+import { ControversyManager } from "@/components/cases/pericial/ControversyManager";
+import { ScenarioManager } from "@/components/cases/pericial/ScenarioManager";
 import {
   CalculationEngine,
   type CalculatorRules,
@@ -807,6 +810,21 @@ export default function CasoDetalhe() {
               </CardContent>
             </Card>
 
+            {/* Pericial Components */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <RiskAnalysisPanel
+                caseId={id!}
+                facts={facts as any}
+                documents={documents as any}
+                onNavigate={setActiveTab}
+              />
+              <ControversyManager
+                caseId={id!}
+                facts={facts as any}
+                documents={documents as any}
+              />
+            </div>
+
             {/* Critical Facts Status */}
             {facts.length > 0 && (
               <Card className="bg-card/80 backdrop-blur-sm">
@@ -1097,7 +1115,12 @@ export default function CasoDetalhe() {
         );
 
       case "premissas":
-        return <PremissasEditor caseId={id!} />;
+        return (
+          <div className="space-y-6">
+            <ScenarioManager caseId={id!} />
+            <PremissasEditor caseId={id!} />
+          </div>
+        );
 
       case "calendario":
         return <CalendarioTrabalhistaViewer caseId={id!} facts={facts} />;
