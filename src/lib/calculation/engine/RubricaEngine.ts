@@ -771,25 +771,51 @@ export class MultaFGTS extends Rubrica {
 // REGISTRY DE RUBRICAS
 // =====================================================
 
+import {
+  SaldoSalario,
+  AvisoPrevio,
+  FeriasVencidas,
+  FeriasProporcionais,
+  DecimoTerceiroProporcional,
+} from './RubricasRescisao';
+
 export const RUBRICAS_REGISTRY: Map<string, new () => Rubrica> = new Map([
+  // Horas Extras
   ['HE50', HorasExtras50],
   ['HE100', HorasExtras100],
   ['DSR_HE', DSRHorasExtras],
+  // Adicionais
   ['ADIC_NOT', AdicionalNoturno],
+  // Reflexos
   ['REFL_FERIAS', ReflexoFerias],
   ['REFL_13', Reflexo13],
   ['FGTS', FGTS],
   ['MULTA_FGTS', MultaFGTS],
+  // Rescisórias
+  ['SALDO_SAL', SaldoSalario],
+  ['AVISO_PREVIO', AvisoPrevio],
+  ['FERIAS_VENC', FeriasVencidas],
+  ['FERIAS_PROP', FeriasProporcionais],
+  ['DECIMO_PROP', DecimoTerceiroProporcional],
 ]);
 
 // Ordem de execução (respeita dependências)
 export const ORDEM_EXECUCAO = [
+  // Horas extras primeiro
   'HE50',
   'HE100',
   'DSR_HE',
+  // Adicionais
   'ADIC_NOT',
+  // Reflexos
   'REFL_FERIAS',
   'REFL_13',
   'FGTS',
   'MULTA_FGTS',
+  // Rescisórias por último
+  'SALDO_SAL',
+  'AVISO_PREVIO',
+  'FERIAS_VENC',
+  'FERIAS_PROP',
+  'DECIMO_PROP',
 ];
