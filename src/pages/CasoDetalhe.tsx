@@ -38,6 +38,7 @@ import { DocumentsManager } from "@/components/cases/DocumentsManager";
 import { ProcessingMonitorPanel } from "@/components/cases/ProcessingMonitorPanel";
 import { SnapshotViewer } from "@/components/cases/SnapshotViewer";
 import { ProfileSelector } from "@/components/cases/ProfileSelector";
+import { PetitionGenerator } from "@/components/cases/PetitionGenerator";
 import {
   CalculationEngine,
   type CalculatorRules,
@@ -977,13 +978,63 @@ export default function CasoDetalhe() {
 
       case "peticao":
         return (
-          <div className="empty-state">
-            <Scroll className="empty-state-icon" />
-            <h3 className="empty-state-title">Geração de Petição</h3>
-            <p className="empty-state-description">
-              Esta funcionalidade será implementada em breve. Aqui você poderá gerar petições
-              automaticamente com base nos cálculos aprovados.
-            </p>
+          <div className="space-y-6">
+            {/* Prerequisites check */}
+            {!canCalculate && (
+              <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-full bg-amber-100 dark:bg-amber-900/50">
+                      <AlertTriangle className="h-6 w-6 text-amber-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-amber-800 dark:text-amber-200">
+                        Validação Pendente
+                      </h4>
+                      <p className="text-sm text-amber-700 dark:text-amber-300">
+                        Confirme os fatos críticos antes de gerar a petição.
+                      </p>
+                    </div>
+                    <Button variant="outline" onClick={() => setActiveTab("validacao")}>
+                      Ir para Validação
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {runs.length === 0 && canCalculate && (
+              <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900/50">
+                      <Calculator className="h-6 w-6 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-blue-800 dark:text-blue-200">
+                        Cálculo Recomendado
+                      </h4>
+                      <p className="text-sm text-blue-700 dark:text-blue-300">
+                        Execute um cálculo para que os valores sejam incluídos na petição.
+                      </p>
+                    </div>
+                    <Button variant="outline" onClick={() => setActiveTab("calculo")}>
+                      Ir para Cálculo
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Petition Generator */}
+            <PetitionGenerator
+              caseId={id!}
+              calculationRunId={runs[0]?.id}
+              onPetitionGenerated={(petitionId) => {
+                toast.success("Petição gerada com sucesso!");
+                updateStatusMutation.mutate("revisado");
+              }}
+            />
           </div>
         );
 
