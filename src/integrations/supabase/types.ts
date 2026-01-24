@@ -247,22 +247,114 @@ export type Database = {
         }
         Relationships: []
       }
+      calc_scenarios: {
+        Row: {
+          ativo: boolean | null
+          case_id: string
+          created_at: string
+          created_by: string | null
+          descricao: string | null
+          divisor: number
+          dsr_fator: number | null
+          hash_config: string | null
+          id: string
+          indice_correcao: string | null
+          media_variaveis_metodo: string | null
+          metodo_dsr: string
+          metodo_he: string
+          nome: string
+          premissas_completas: Json | null
+          prescricao_data_limite: string | null
+          prescricao_tipo: string | null
+          taxa_juros: number | null
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean | null
+          case_id: string
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          divisor?: number
+          dsr_fator?: number | null
+          hash_config?: string | null
+          id?: string
+          indice_correcao?: string | null
+          media_variaveis_metodo?: string | null
+          metodo_dsr?: string
+          metodo_he?: string
+          nome: string
+          premissas_completas?: Json | null
+          prescricao_data_limite?: string | null
+          prescricao_tipo?: string | null
+          taxa_juros?: number | null
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean | null
+          case_id?: string
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          divisor?: number
+          dsr_fator?: number | null
+          hash_config?: string | null
+          id?: string
+          indice_correcao?: string | null
+          media_variaveis_metodo?: string | null
+          metodo_dsr?: string
+          metodo_he?: string
+          nome?: string
+          premissas_completas?: Json | null
+          prescricao_data_limite?: string | null
+          prescricao_tipo?: string | null
+          taxa_juros?: number | null
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calc_scenarios_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "calc_scenarios_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calc_snapshots: {
         Row: {
           alertas_consistencia: Json | null
           aprovado_em: string | null
           aprovado_por: string | null
+          calendario_hash: string | null
           case_id: string
           created_at: string
           created_by: string
+          diff_anterior: Json | null
           engine_version: string
           id: string
           inputs_snapshot: Json
           observacoes: string | null
+          pendencias: Json | null
+          periodo_fim: string | null
+          periodo_inicio: string | null
+          prescricao_aplicada: string | null
           profile_id: string | null
+          qualidade_score: number | null
           resultado_bruto: Json | null
           resultado_liquido: Json | null
           ruleset_hash: string | null
+          scenario_id: string | null
           status: Database["public"]["Enums"]["snapshot_status"]
           total_bruto: number | null
           total_descontos: number | null
@@ -274,17 +366,25 @@ export type Database = {
           alertas_consistencia?: Json | null
           aprovado_em?: string | null
           aprovado_por?: string | null
+          calendario_hash?: string | null
           case_id: string
           created_at?: string
           created_by: string
+          diff_anterior?: Json | null
           engine_version?: string
           id?: string
           inputs_snapshot?: Json
           observacoes?: string | null
+          pendencias?: Json | null
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
+          prescricao_aplicada?: string | null
           profile_id?: string | null
+          qualidade_score?: number | null
           resultado_bruto?: Json | null
           resultado_liquido?: Json | null
           ruleset_hash?: string | null
+          scenario_id?: string | null
           status?: Database["public"]["Enums"]["snapshot_status"]
           total_bruto?: number | null
           total_descontos?: number | null
@@ -296,17 +396,25 @@ export type Database = {
           alertas_consistencia?: Json | null
           aprovado_em?: string | null
           aprovado_por?: string | null
+          calendario_hash?: string | null
           case_id?: string
           created_at?: string
           created_by?: string
+          diff_anterior?: Json | null
           engine_version?: string
           id?: string
           inputs_snapshot?: Json
           observacoes?: string | null
+          pendencias?: Json | null
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
+          prescricao_aplicada?: string | null
           profile_id?: string | null
+          qualidade_score?: number | null
           resultado_bruto?: Json | null
           resultado_liquido?: Json | null
           ruleset_hash?: string | null
+          scenario_id?: string | null
           status?: Database["public"]["Enums"]["snapshot_status"]
           total_bruto?: number | null
           total_descontos?: number | null
@@ -334,6 +442,13 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "calculation_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calc_snapshots_scenario_id_fkey"
+            columns: ["scenario_id"]
+            isOneToOne: false
+            referencedRelation: "calc_scenarios"
             referencedColumns: ["id"]
           },
         ]
@@ -517,6 +632,181 @@ export type Database = {
           tags?: string[] | null
         }
         Relationships: []
+      }
+      calendars: {
+        Row: {
+          ano: number
+          ativo: boolean | null
+          created_at: string
+          feriados: Json
+          fonte: string | null
+          hash_versao: string
+          id: string
+          municipio: string | null
+          nome: string
+          uf: string
+        }
+        Insert: {
+          ano: number
+          ativo?: boolean | null
+          created_at?: string
+          feriados?: Json
+          fonte?: string | null
+          hash_versao: string
+          id?: string
+          municipio?: string | null
+          nome: string
+          uf: string
+        }
+        Update: {
+          ano?: number
+          ativo?: boolean | null
+          created_at?: string
+          feriados?: Json
+          fonte?: string | null
+          hash_versao?: string
+          id?: string
+          municipio?: string | null
+          nome?: string
+          uf?: string
+        }
+        Relationships: []
+      }
+      case_controversies: {
+        Row: {
+          campo: string
+          case_id: string
+          created_at: string
+          created_by: string | null
+          descricao: string
+          document_ids: string[] | null
+          fact_ids: string[] | null
+          fundamentacao_legal: string | null
+          id: string
+          impacto_estimado: number | null
+          justificativa: string | null
+          prioridade: string | null
+          resolvido_em: string | null
+          resolvido_por: string | null
+          status: string
+          updated_at: string
+          valor_escolhido: string | null
+        }
+        Insert: {
+          campo: string
+          case_id: string
+          created_at?: string
+          created_by?: string | null
+          descricao: string
+          document_ids?: string[] | null
+          fact_ids?: string[] | null
+          fundamentacao_legal?: string | null
+          id?: string
+          impacto_estimado?: number | null
+          justificativa?: string | null
+          prioridade?: string | null
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          status: string
+          updated_at?: string
+          valor_escolhido?: string | null
+        }
+        Update: {
+          campo?: string
+          case_id?: string
+          created_at?: string
+          created_by?: string | null
+          descricao?: string
+          document_ids?: string[] | null
+          fact_ids?: string[] | null
+          fundamentacao_legal?: string | null
+          id?: string
+          impacto_estimado?: number | null
+          justificativa?: string | null
+          prioridade?: string | null
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          status?: string
+          updated_at?: string
+          valor_escolhido?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_controversies_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "case_controversies_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      case_risk_analysis: {
+        Row: {
+          analisado_em: string
+          analisado_por: string | null
+          case_id: string
+          fatores: Json
+          id: string
+          nivel_risco: string
+          recomendacoes: string[] | null
+          resumo: string | null
+          score_risco: number | null
+          snapshot_id: string | null
+        }
+        Insert: {
+          analisado_em?: string
+          analisado_por?: string | null
+          case_id: string
+          fatores?: Json
+          id?: string
+          nivel_risco: string
+          recomendacoes?: string[] | null
+          resumo?: string | null
+          score_risco?: number | null
+          snapshot_id?: string | null
+        }
+        Update: {
+          analisado_em?: string
+          analisado_por?: string | null
+          case_id?: string
+          fatores?: Json
+          id?: string
+          nivel_risco?: string
+          recomendacoes?: string[] | null
+          resumo?: string | null
+          score_risco?: number | null
+          snapshot_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_risk_analysis_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "case_risk_analysis_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_risk_analysis_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "calc_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cases: {
         Row: {
@@ -727,11 +1017,14 @@ export type Database = {
           max_retries: number | null
           metadata: Json
           mime_type: string | null
+          ocr_confianca: number | null
           ocr_confidence: number | null
           owner_user_id: string | null
           page_count: number | null
           periodo_fim: string | null
           periodo_inicio: string | null
+          periodo_referencia_fim: string | null
+          periodo_referencia_inicio: string | null
           processing_completed_at: string | null
           processing_started_at: string | null
           queue_priority: number | null
@@ -742,6 +1035,9 @@ export type Database = {
           tipo: Database["public"]["Enums"]["doc_type"] | null
           updated_at: string | null
           uploaded_em: string | null
+          validado: boolean | null
+          validado_em: string | null
+          validado_por: string | null
           versao_documento: number | null
         }
         Insert: {
@@ -756,11 +1052,14 @@ export type Database = {
           max_retries?: number | null
           metadata?: Json
           mime_type?: string | null
+          ocr_confianca?: number | null
           ocr_confidence?: number | null
           owner_user_id?: string | null
           page_count?: number | null
           periodo_fim?: string | null
           periodo_inicio?: string | null
+          periodo_referencia_fim?: string | null
+          periodo_referencia_inicio?: string | null
           processing_completed_at?: string | null
           processing_started_at?: string | null
           queue_priority?: number | null
@@ -771,6 +1070,9 @@ export type Database = {
           tipo?: Database["public"]["Enums"]["doc_type"] | null
           updated_at?: string | null
           uploaded_em?: string | null
+          validado?: boolean | null
+          validado_em?: string | null
+          validado_por?: string | null
           versao_documento?: number | null
         }
         Update: {
@@ -785,11 +1087,14 @@ export type Database = {
           max_retries?: number | null
           metadata?: Json
           mime_type?: string | null
+          ocr_confianca?: number | null
           ocr_confidence?: number | null
           owner_user_id?: string | null
           page_count?: number | null
           periodo_fim?: string | null
           periodo_inicio?: string | null
+          periodo_referencia_fim?: string | null
+          periodo_referencia_inicio?: string | null
           processing_completed_at?: string | null
           processing_started_at?: string | null
           queue_priority?: number | null
@@ -800,6 +1105,9 @@ export type Database = {
           tipo?: Database["public"]["Enums"]["doc_type"] | null
           updated_at?: string | null
           uploaded_em?: string | null
+          validado?: boolean | null
+          validado_em?: string | null
+          validado_por?: string | null
           versao_documento?: number | null
         }
         Relationships: [
@@ -1141,8 +1449,11 @@ export type Database = {
           confirmado_por: string | null
           criado_em: string | null
           id: string
+          justificativa_validacao: string | null
           origem: Database["public"]["Enums"]["fact_origem"]
           pagina: number | null
+          prova_qualidade: string | null
+          status_pericial: string | null
           tipo: Database["public"]["Enums"]["fact_type"]
           valor: string
         }
@@ -1157,8 +1468,11 @@ export type Database = {
           confirmado_por?: string | null
           criado_em?: string | null
           id?: string
+          justificativa_validacao?: string | null
           origem?: Database["public"]["Enums"]["fact_origem"]
           pagina?: number | null
+          prova_qualidade?: string | null
+          status_pericial?: string | null
           tipo?: Database["public"]["Enums"]["fact_type"]
           valor: string
         }
@@ -1173,8 +1487,11 @@ export type Database = {
           confirmado_por?: string | null
           criado_em?: string | null
           id?: string
+          justificativa_validacao?: string | null
           origem?: Database["public"]["Enums"]["fact_origem"]
           pagina?: number | null
+          prova_qualidade?: string | null
+          status_pericial?: string | null
           tipo?: Database["public"]["Enums"]["fact_type"]
           valor?: string
         }
@@ -1451,6 +1768,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      rubrica_requirements: {
+        Row: {
+          alerta_sem_prova: string | null
+          created_at: string
+          descricao_requisito: string | null
+          documentos_requeridos: string[]
+          fatos_requeridos: string[]
+          id: string
+          nivel_exigencia: string | null
+          rubrica_codigo: string
+          rubrica_nome: string
+        }
+        Insert: {
+          alerta_sem_prova?: string | null
+          created_at?: string
+          descricao_requisito?: string | null
+          documentos_requeridos?: string[]
+          fatos_requeridos?: string[]
+          id?: string
+          nivel_exigencia?: string | null
+          rubrica_codigo: string
+          rubrica_nome: string
+        }
+        Update: {
+          alerta_sem_prova?: string | null
+          created_at?: string
+          descricao_requisito?: string | null
+          documentos_requeridos?: string[]
+          fatos_requeridos?: string[]
+          id?: string
+          nivel_exigencia?: string | null
+          rubrica_codigo?: string
+          rubrica_nome?: string
+        }
+        Relationships: []
       }
       tax_tables: {
         Row: {
