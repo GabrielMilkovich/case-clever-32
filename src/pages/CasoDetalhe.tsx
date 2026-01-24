@@ -1103,7 +1103,7 @@ export default function CasoDetalhe() {
         return <CalendarioTrabalhistaViewer caseId={id!} facts={facts} />;
 
       case "calculo":
-        return <SnapshotViewer caseId={id!} />;
+        return <SnapshotViewer caseId={id!} onExecuteCalc={executeCalculation} />;
 
       case "peticao":
         return (
