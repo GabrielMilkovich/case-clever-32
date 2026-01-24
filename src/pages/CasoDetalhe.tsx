@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { MainLayout } from "@/components/layout/MainLayout";
+import { MainLayoutPremium } from "@/components/layout/MainLayoutPremium";
+import { CaseWorkspace } from "@/components/cases/CaseWorkspace";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -17,30 +17,27 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
-  ArrowLeft,
-  Upload,
-  FileText,
-  Sparkles,
-  Calculator,
-  Play,
-  Download,
-  Check,
-  X,
   Loader2,
   AlertTriangle,
-  CheckCircle,
-  Clock,
-  Edit,
-  Trash2,
+  Play,
+  FileText,
+  Sparkles,
   ShieldCheck,
+  Settings2,
+  Calculator,
+  FileStack,
+  Scroll,
   RefreshCw,
 } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+
+// Import new premium components
 import { FactValidationView } from "@/components/cases/FactValidationView";
+import { ValidationViewV2 } from "@/components/cases/ValidationViewV2";
 import { CalculatorSuggestions } from "@/components/cases/CalculatorSuggestions";
 import { DocumentsManager } from "@/components/cases/DocumentsManager";
 import { ProcessingMonitorPanel } from "@/components/cases/ProcessingMonitorPanel";
+import { SnapshotViewer } from "@/components/cases/SnapshotViewer";
+import { ProfileSelector } from "@/components/cases/ProfileSelector";
 import {
   CalculationEngine,
   type CalculatorRules,
@@ -63,10 +60,7 @@ interface Document {
   tipo: string;
   arquivo_url: string | null;
   uploaded_em: string;
-  processing_status?: string;
-  processing_error?: string;
-  chunk_count?: number;
-  page_count?: number;
+  status?: string;
 }
 
 interface Fact {
@@ -107,26 +101,28 @@ interface CaseProcessingStats {
   last_processed_at: string | null;
 }
 
-const statusConfig = {
-  rascunho: { label: "Rascunho", color: "bg-gray-500" },
-  em_analise: { label: "Em Análise", color: "bg-yellow-500" },
-  calculado: { label: "Calculado", color: "bg-blue-500" },
-  revisado: { label: "Revisado", color: "bg-green-500" },
-};
+const CRITICAL_FACTS: string[] = [
+  "data_admissao",
+  "data_demissao",
+  "salario_base",
+  "salario_mensal",
+  "jornada_contratual",
+];
 
-const docTypeLabels: Record<string, string> = {
-  peticao: "Petição",
-  trct: "TRCT",
-  holerite: "Holerite",
-  cartao_ponto: "Cartão de Ponto",
-  sentenca: "Sentença",
-  outro: "Outro",
+const criticalLabels: Record<string, string> = {
+  data_admissao: "Data de Admissão",
+  data_demissao: "Data de Demissão",
+  salario_base: "Salário Base",
+  salario_mensal: "Salário Mensal",
+  jornada_contratual: "Jornada Contratual",
 };
 
 export default function CasoDetalhe() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  
+  const [activeTab, setActiveTab] = useState("resumo");
   const [selectedProfile, setSelectedProfile] = useState<string>("");
   const [isExtractingFacts, setIsExtractingFacts] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
@@ -202,7 +198,34 @@ export default function CasoDetalhe() {
     },
   });
 
-  // Fetch case processing stats (OCR/chunks/indexing)
+  // Fetch snapshots count
+  const { data: snapshotsCount = 0 } = useQuery({
+    queryKey: ["calc_snapshots_count", id],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("calc_snapshots")
+        .select("id", { count: "exact" })
+        .eq("case_id", id);
+      if (error) throw error;
+      return count || 0;
+    },
+  });
+
+  // Fetch extractions count for V2
+  const { data: extractionsCount = 0 } = useQuery({
+    queryKey: ["extractions_count", id],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("extractions")
+        .select("id", { count: "exact" })
+        .eq("case_id", id)
+        .eq("status", "pendente");
+      if (error) throw error;
+      return count || 0;
+    },
+  });
+
+  // Fetch case processing stats
   const { data: processingStats = null } = useQuery({
     queryKey: ["case_processing_stats", id],
     queryFn: async () => {
@@ -217,56 +240,18 @@ export default function CasoDetalhe() {
     enabled: !!id,
   });
 
-  // Fallback: count chunks directly from table when the stats view is empty
+  // Fallback: count chunks directly
   const { data: chunksCountDirect = null } = useQuery({
     queryKey: ["document_chunks_count", id],
     queryFn: async () => {
       const { count, error } = await supabase
         .from("document_chunks")
-        // Avoid `head: true` because some environments return `count=null`.
-        // Limit payload while still getting an accurate count.
         .select("id", { count: "exact" })
         .eq("case_id", id);
       if (error) throw error;
       return typeof count === "number" ? count : 0;
     },
     enabled: !!id,
-  });
-
-  const refreshChunksCount = async () => {
-    if (!id) return;
-    try {
-      const { count, error } = await supabase
-        .from("document_chunks")
-        .select("id", { count: "exact" })
-        .eq("case_id", id);
-      if (error) throw error;
-      const next = typeof count === "number" ? count : 0;
-      queryClient.setQueryData(["document_chunks_count", id], next);
-      toast.success(`Recontagem concluída: ${next} chunks`);
-    } catch (e) {
-      console.error(e);
-      toast.error("Falha ao recontar chunks: " + (e as Error).message);
-    }
-  };
-
-  // Confirm fact
-  const confirmFactMutation = useMutation({
-    mutationFn: async ({ factId, confirmed }: { factId: string; confirmed: boolean }) => {
-      const { data: session } = await supabase.auth.getSession();
-      const { error } = await supabase
-        .from("facts")
-        .update({
-          confirmado: confirmed,
-          confirmado_por: confirmed ? session?.session?.user.id : null,
-          confirmado_em: confirmed ? new Date().toISOString() : null,
-        })
-        .eq("id", factId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["facts", id] });
-    },
   });
 
   // Update case status
@@ -284,70 +269,110 @@ export default function CasoDetalhe() {
     },
   });
 
+  // Loading state
   if (caseLoading) {
     return (
-      <MainLayout>
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <MainLayoutPremium
+        breadcrumbs={[
+          { label: "Casos", href: "/casos" },
+          { label: "Carregando..." },
+        ]}
+      >
+        <div className="flex items-center justify-center py-24">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
         </div>
-      </MainLayout>
+      </MainLayoutPremium>
     );
   }
 
+  // Not found state
   if (!caseData) {
     return (
-      <MainLayout>
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">Caso não encontrado.</p>
-          <Button onClick={() => navigate("/casos")} className="mt-4">
-            Voltar para Casos
-          </Button>
+      <MainLayoutPremium
+        breadcrumbs={[
+          { label: "Casos", href: "/casos" },
+          { label: "Não encontrado" },
+        ]}
+      >
+        <div className="empty-state">
+          <FileText className="empty-state-icon" />
+          <h3 className="empty-state-title">Caso não encontrado</h3>
+          <p className="empty-state-description">
+            O caso solicitado não existe ou você não tem permissão para acessá-lo.
+          </p>
+          <Button onClick={() => navigate("/casos")}>Voltar para Casos</Button>
         </div>
-      </MainLayout>
+      </MainLayoutPremium>
     );
   }
 
+  // Calculate workflow state
   const confirmedFacts = facts.filter((f) => f.confirmado);
   const pendingFacts = facts.filter((f) => !f.confirmado);
-
-  const CRITICAL_FACTS: string[] = [
-    "data_admissao",
-    "data_demissao",
-    "salario_base",
-    "salario_mensal",
-    "jornada_contratual",
-  ];
-
   const criticalFactsInCase = facts.filter((f) => CRITICAL_FACTS.includes(f.chave));
   const canCalculate = criticalFactsInCase.length > 0 && criticalFactsInCase.every((f) => f.confirmado);
+  const missingCriticalKeys = CRITICAL_FACTS.filter((k) => !facts.some((f) => f.chave === k));
+  const unconfirmedCriticalFacts = facts.filter((f) => CRITICAL_FACTS.includes(f.chave) && !f.confirmado);
+  const chunksCount = Math.max(processingStats?.total_chunks ?? 0, chunksCountDirect ?? 0);
 
-  const missingCriticalKeys = CRITICAL_FACTS.filter(
-    (k) => !facts.some((f) => f.chave === k)
-  );
+  // Workflow steps configuration
+  const workflowSteps = [
+    {
+      id: "resumo",
+      label: "Resumo",
+      icon: FileText,
+      completed: documents.length > 0,
+      active: activeTab === "resumo",
+    },
+    {
+      id: "documentos",
+      label: "Documentos",
+      icon: FileStack,
+      completed: documents.length > 0,
+      active: activeTab === "documentos",
+      count: documents.length,
+    },
+    {
+      id: "extracao",
+      label: "Extração",
+      icon: Sparkles,
+      completed: facts.length > 0,
+      active: activeTab === "extracao",
+      count: facts.length,
+    },
+    {
+      id: "validacao",
+      label: "Validação",
+      icon: ShieldCheck,
+      completed: canCalculate,
+      active: activeTab === "validacao",
+      count: pendingFacts.length,
+    },
+    {
+      id: "perfil",
+      label: "Perfil",
+      icon: Settings2,
+      completed: !!selectedProfile,
+      active: activeTab === "perfil",
+    },
+    {
+      id: "calculo",
+      label: "Snapshots",
+      icon: Calculator,
+      completed: snapshotsCount > 0,
+      active: activeTab === "calculo",
+      count: snapshotsCount,
+    },
+    {
+      id: "peticao",
+      label: "Petição",
+      icon: Scroll,
+      completed: caseData.status === "revisado",
+      active: activeTab === "peticao",
+    },
+  ];
 
-  const unconfirmedCriticalFacts = facts.filter(
-    (f) => CRITICAL_FACTS.includes(f.chave) && !f.confirmado
-  );
-
-  const criticalLabels: Record<string, string> = {
-    data_admissao: "Data de Admissão",
-    data_demissao: "Data de Demissão",
-    salario_base: "Salário Base",
-    salario_mensal: "Salário Mensal",
-    jornada_contratual: "Jornada Contratual",
-  };
-
-  const goToValidation = () => {
-    const validacaoTab = document.querySelector('[value="validacao"]') as HTMLButtonElement;
-    validacaoTab?.click();
-  };
-
-  const requestCreateCritical = (key: string) => {
-    setCreateCriticalKeyRequest(key);
-    setCreateCriticalNonce((n) => n + 1);
-    goToValidation();
-  };
-
+  // Helpers
   const mapFactsToEngine = (allFacts: Fact[]): FactMap => {
     const out: FactMap = {};
     for (const f of allFacts) {
@@ -358,7 +383,6 @@ export default function CasoDetalhe() {
         if (f.tipo === "moeda") return "moeda";
         return "texto";
       })();
-
       out[f.chave] = {
         valor: f.valor,
         tipo,
@@ -368,175 +392,6 @@ export default function CasoDetalhe() {
     }
     return out;
   };
-
-  const executeCalculation = async () => {
-    if (!id) return;
-    if (!selectedProfile) {
-      toast.error("Selecione um perfil de cálculo.");
-      return;
-    }
-    if (!canCalculate) {
-      toast.error("Confirme os fatos críticos antes de prosseguir com o cálculo.");
-      return;
-    }
-
-    setIsCalculating(true);
-    try {
-      // 1) Carregar perfil
-      const { data: profile, error: profileErr } = await supabase
-        .from("calculation_profiles")
-        .select("*")
-        .eq("id", selectedProfile)
-        .single();
-      if (profileErr || !profile) throw profileErr || new Error("Perfil não encontrado");
-
-      // 2) Carregar calculadoras vinculadas ao perfil (profile_calculators -> calculator_versions -> calculators)
-      const { data: profileCalcs, error: pcErr } = await supabase
-        .from("profile_calculators")
-        .select(
-          `
-          calculator_version_id,
-          calculator_versions:calculator_version_id (
-            id,
-            versao,
-            vigencia_inicio,
-            vigencia_fim,
-            regras,
-            calculators:calculator_id ( id, nome )
-          )
-        `
-        )
-        .eq("profile_id", selectedProfile);
-      if (pcErr) throw pcErr;
-
-      const calculatorsWithRules = (profileCalcs || [])
-        .map((row: any) => {
-          const cv = row.calculator_versions;
-          const calc = cv?.calculators;
-          if (!cv || !calc?.nome) return null;
-          const rules: CalculatorRules = {
-            versao: cv.versao,
-            vigencia_inicio: cv.vigencia_inicio,
-            vigencia_fim: cv.vigencia_fim ?? undefined,
-            regras: (cv.regras?.regras ?? cv.regras ?? {}) as any,
-            formula: cv.regras?.formula ?? undefined,
-          };
-          return { nome: String(calc.nome), rules };
-        })
-        .filter(Boolean) as { nome: string; rules: CalculatorRules }[];
-
-      // 3) Carregar índices e tabelas
-      const adm = facts.find((f) => f.chave === "data_admissao")?.valor;
-      const dem = facts.find((f) => f.chave === "data_demissao")?.valor;
-      const start = adm ? new Date(adm) : null;
-      const end = dem ? new Date(dem) : null;
-
-      const { data: indexRows, error: idxErr } = await supabase
-        .from("index_series")
-        .select("nome, competencia, valor, fonte")
-        .order("competencia", { ascending: true })
-        .gte("competencia", start && !isNaN(start.getTime()) ? start.toISOString().slice(0, 10) : "1900-01-01")
-        .lte("competencia", end && !isNaN(end.getTime()) ? end.toISOString().slice(0, 10) : "2100-01-01");
-      if (idxErr) throw idxErr;
-
-      const indices: IndexSeries[] = (indexRows || []).map((r: any) => ({
-        nome: r.nome,
-        competencia: new Date(r.competencia),
-        valor: Number(r.valor),
-        fonte: r.fonte ?? undefined,
-      }));
-
-      const { data: taxRows, error: taxErr } = await supabase
-        .from("tax_tables")
-        .select("id, tipo, vigencia_inicio, vigencia_fim, faixas")
-        .order("vigencia_inicio", { ascending: true });
-      if (taxErr) throw taxErr;
-
-      const taxTables: TaxTable[] = (taxRows || []).map((t: any) => ({
-        id: t.id,
-        tipo: t.tipo,
-        vigencia_inicio: new Date(t.vigencia_inicio),
-        vigencia_fim: t.vigencia_fim ? new Date(t.vigencia_fim) : undefined,
-        faixas: Array.isArray(t.faixas) ? t.faixas : [],
-      }));
-
-      // 4) Executar engine
-      const factsSnapshot = mapFactsToEngine(facts);
-      const engineProfile = {
-        id: profile.id,
-        nome: profile.nome,
-        config: (profile.config ?? {}) as any,
-        calculadoras_incluidas: (profile.calculadoras_incluidas ?? []) as any,
-      } as any;
-
-      const engine = new CalculationEngine(
-        engineProfile,
-        indices,
-        taxTables,
-        factsSnapshot
-      );
-      engine.loadCalculators(calculatorsWithRules);
-      const result = engine.executeAll();
-
-      // 5) Persistir run
-      const { data: session } = await supabase.auth.getSession();
-      const userId = session?.session?.user?.id ?? null;
-      const { data: insertedRun, error: runErr } = await supabase
-        .from("calculation_runs")
-        .insert({
-          case_id: id,
-          profile_id: selectedProfile,
-          executado_por: userId,
-          facts_snapshot: result.facts_snapshot as any,
-          calculators_used: result.calculators_used as any,
-          resultado_bruto: result.resultado_bruto as any,
-          resultado_liquido: result.resultado_liquido as any,
-          warnings: result.warnings as any,
-        })
-        .select("id")
-        .single();
-      if (runErr || !insertedRun?.id) throw runErr || new Error("Falha ao salvar cálculo");
-
-      // 6) Persistir memória (audit_lines)
-      if (Array.isArray(result.auditLines) && result.auditLines.length > 0) {
-        const payload = result.auditLines.map((l) => ({
-          run_id: insertedRun.id,
-          linha: l.linha,
-          calculadora: l.calculadora,
-          competencia: l.competencia ?? null,
-          descricao: l.descricao,
-          formula: l.formula ?? null,
-          valor_bruto: l.valor_bruto ?? null,
-          valor_liquido: l.valor_liquido ?? null,
-          metadata: (l.metadata ?? null) as any,
-        }));
-
-        const { error: auditErr } = await supabase.from("audit_lines").insert(payload as any);
-        if (auditErr) throw auditErr;
-      }
-
-      // 7) Atualizar UI
-      await queryClient.invalidateQueries({ queryKey: ["calculation_runs", id] });
-      toast.success("Cálculo executado com sucesso!");
-
-      // Opcional: marcar status como calculado
-      updateStatusMutation.mutate("calculado");
-    } catch (e) {
-      console.error(e);
-      toast.error("Falha ao executar cálculo: " + (e as Error).message);
-    } finally {
-      setIsCalculating(false);
-    }
-  };
-
-  // Some environments keep the stats view stale (often `0`) even when chunks exist.
-  // Prefer the most permissive/accurate number so users can proceed.
-  const chunksCount = (() => {
-    const fromStats = typeof processingStats?.total_chunks === "number" ? processingStats.total_chunks : null;
-    const fromDirect = typeof chunksCountDirect === "number" ? chunksCountDirect : null;
-    if (fromStats === null && fromDirect === null) return null;
-    return Math.max(fromStats ?? 0, fromDirect ?? 0);
-  })();
 
   const runFactExtraction = async () => {
     if (!id) return;
@@ -585,7 +440,7 @@ export default function CasoDetalhe() {
 
       await queryClient.invalidateQueries({ queryKey: ["facts", id] });
       toast.success(
-        `Processo reiniciado: ${data?.facts_valid ?? 0} fato(s) válido(s) (analisados ${data?.chunks_analyzed ?? "—"} chunks)`
+        `Extração reiniciada: ${data?.facts_valid ?? 0} fato(s) válido(s)`
       );
     } catch (e) {
       console.error(e);
@@ -595,280 +450,457 @@ export default function CasoDetalhe() {
     }
   };
 
-  return (
-    <MainLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/casos")}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">{caseData.cliente}</h1>
-              <p className="text-muted-foreground">
-                {caseData.numero_processo || "Sem número de processo"}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Select
-              value={caseData.status}
-              onValueChange={(value) => updateStatusMutation.mutate(value as "rascunho" | "em_analise" | "calculado" | "revisado")}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(statusConfig).map(([key, config]) => (
-                  <SelectItem key={key} value={key}>
-                    <div className="flex items-center gap-2">
-                      <div className={`h-2 w-2 rounded-full ${config.color}`} />
-                      {config.label}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Badge className={statusConfig[caseData.status].color}>
-              {statusConfig[caseData.status].label}
-            </Badge>
-          </div>
-        </div>
+  const executeCalculation = async () => {
+    if (!id) return;
+    if (!selectedProfile) {
+      toast.error("Selecione um perfil de cálculo.");
+      return;
+    }
+    if (!canCalculate) {
+      toast.error("Confirme os fatos críticos antes de prosseguir com o cálculo.");
+      return;
+    }
 
-        {/* Workflow Steps */}
-        <Card>
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              {[
-                { step: 1, label: "Documentos", icon: Upload, done: documents.length > 0 },
-                { step: 2, label: "Fatos Extraídos", icon: Sparkles, done: facts.length > 0 },
-                  { step: 3, label: "Fatos Confirmados", icon: Check, done: canCalculate },
-                { step: 4, label: "Cálculo", icon: Calculator, done: runs.length > 0 },
-                { step: 5, label: "Exportar", icon: Download, done: caseData.status === "revisado" },
-              ].map((item, idx) => (
-                <div key={item.step} className="flex items-center">
-                  <div className={`flex flex-col items-center ${item.done ? "text-primary" : "text-muted-foreground"}`}>
-                    <div
-                      className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${
-                        item.done ? "border-primary bg-primary/10" : "border-muted-foreground/30"
-                      }`}
-                    >
-                      <item.icon className="h-5 w-5" />
-                    </div>
-                    <span className="text-xs mt-2">{item.label}</span>
+    setIsCalculating(true);
+    try {
+      // 1) Load profile
+      const { data: profile, error: profileErr } = await supabase
+        .from("calculation_profiles")
+        .select("*")
+        .eq("id", selectedProfile)
+        .single();
+      if (profileErr || !profile) throw profileErr || new Error("Perfil não encontrado");
+
+      // 2) Load calculators
+      const { data: profileCalcs, error: pcErr } = await supabase
+        .from("profile_calculators")
+        .select(`
+          calculator_version_id,
+          calculator_versions:calculator_version_id (
+            id,
+            versao,
+            vigencia_inicio,
+            vigencia_fim,
+            regras,
+            calculators:calculator_id ( id, nome )
+          )
+        `)
+        .eq("profile_id", selectedProfile);
+      if (pcErr) throw pcErr;
+
+      const calculatorsWithRules = (profileCalcs || [])
+        .map((row: any) => {
+          const cv = row.calculator_versions;
+          const calc = cv?.calculators;
+          if (!cv || !calc?.nome) return null;
+          const rules: CalculatorRules = {
+            versao: cv.versao,
+            vigencia_inicio: cv.vigencia_inicio,
+            vigencia_fim: cv.vigencia_fim ?? undefined,
+            regras: (cv.regras?.regras ?? cv.regras ?? {}) as any,
+            formula: cv.regras?.formula ?? undefined,
+          };
+          return { nome: String(calc.nome), rules };
+        })
+        .filter(Boolean) as { nome: string; rules: CalculatorRules }[];
+
+      // 3) Load indices and tables
+      const adm = facts.find((f) => f.chave === "data_admissao")?.valor;
+      const dem = facts.find((f) => f.chave === "data_demissao")?.valor;
+      const start = adm ? new Date(adm) : null;
+      const end = dem ? new Date(dem) : null;
+
+      const { data: indexRows, error: idxErr } = await supabase
+        .from("index_series")
+        .select("nome, competencia, valor, fonte")
+        .order("competencia", { ascending: true })
+        .gte("competencia", start && !isNaN(start.getTime()) ? start.toISOString().slice(0, 10) : "1900-01-01")
+        .lte("competencia", end && !isNaN(end.getTime()) ? end.toISOString().slice(0, 10) : "2100-01-01");
+      if (idxErr) throw idxErr;
+
+      const indices: IndexSeries[] = (indexRows || []).map((r: any) => ({
+        nome: r.nome,
+        competencia: new Date(r.competencia),
+        valor: Number(r.valor),
+        fonte: r.fonte ?? undefined,
+      }));
+
+      const { data: taxRows, error: taxErr } = await supabase
+        .from("tax_tables")
+        .select("id, tipo, vigencia_inicio, vigencia_fim, faixas")
+        .order("vigencia_inicio", { ascending: true });
+      if (taxErr) throw taxErr;
+
+      const taxTables: TaxTable[] = (taxRows || []).map((t: any) => ({
+        id: t.id,
+        tipo: t.tipo,
+        vigencia_inicio: new Date(t.vigencia_inicio),
+        vigencia_fim: t.vigencia_fim ? new Date(t.vigencia_fim) : undefined,
+        faixas: Array.isArray(t.faixas) ? t.faixas : [],
+      }));
+
+      // 4) Execute engine
+      const factsSnapshot = mapFactsToEngine(facts);
+      const engineProfile = {
+        id: profile.id,
+        nome: profile.nome,
+        config: (profile.config ?? {}) as any,
+        calculadoras_incluidas: (profile.calculadoras_incluidas ?? []) as any,
+      } as any;
+
+      const engine = new CalculationEngine(
+        engineProfile,
+        indices,
+        taxTables,
+        factsSnapshot
+      );
+      engine.loadCalculators(calculatorsWithRules);
+      const result = engine.executeAll();
+
+      // 5) Persist run
+      const { data: session } = await supabase.auth.getSession();
+      const userId = session?.session?.user?.id ?? null;
+      const { data: insertedRun, error: runErr } = await supabase
+        .from("calculation_runs")
+        .insert({
+          case_id: id,
+          profile_id: selectedProfile,
+          executado_por: userId,
+          facts_snapshot: result.facts_snapshot as any,
+          calculators_used: result.calculators_used as any,
+          resultado_bruto: result.resultado_bruto as any,
+          resultado_liquido: result.resultado_liquido as any,
+          warnings: result.warnings as any,
+        })
+        .select("id")
+        .single();
+      if (runErr || !insertedRun?.id) throw runErr || new Error("Falha ao salvar cálculo");
+
+      // 6) Persist audit lines
+      if (Array.isArray(result.auditLines) && result.auditLines.length > 0) {
+        const payload = result.auditLines.map((l) => ({
+          run_id: insertedRun.id,
+          linha: l.linha,
+          calculadora: l.calculadora,
+          competencia: l.competencia ?? null,
+          descricao: l.descricao,
+          formula: l.formula ?? null,
+          valor_bruto: l.valor_bruto ?? null,
+          valor_liquido: l.valor_liquido ?? null,
+          metadata: (l.metadata ?? null) as any,
+        }));
+
+        const { error: auditErr } = await supabase.from("audit_lines").insert(payload as any);
+        if (auditErr) throw auditErr;
+      }
+
+      // 7) Update UI
+      await queryClient.invalidateQueries({ queryKey: ["calculation_runs", id] });
+      await queryClient.invalidateQueries({ queryKey: ["calc_snapshots_count", id] });
+      toast.success("Cálculo executado com sucesso!");
+      updateStatusMutation.mutate("calculado");
+      
+      // Navigate to snapshots tab
+      setActiveTab("calculo");
+    } catch (e) {
+      console.error(e);
+      toast.error("Falha ao executar cálculo: " + (e as Error).message);
+    } finally {
+      setIsCalculating(false);
+    }
+  };
+
+  const goToValidation = () => setActiveTab("validacao");
+  const requestCreateCritical = (key: string) => {
+    setCreateCriticalKeyRequest(key);
+    setCreateCriticalNonce((n) => n + 1);
+    goToValidation();
+  };
+
+  // Render tab content
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case "resumo":
+        return (
+          <div className="space-y-6">
+            {/* Quick Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card className="card-interactive">
+                <CardContent className="pt-6">
+                  <div className="stat-card-value">{documents.length}</div>
+                  <div className="stat-card-label">Documentos</div>
+                </CardContent>
+              </Card>
+              <Card className="card-interactive">
+                <CardContent className="pt-6">
+                  <div className="stat-card-value">{chunksCount}</div>
+                  <div className="stat-card-label">Chunks Indexados</div>
+                </CardContent>
+              </Card>
+              <Card className="card-interactive">
+                <CardContent className="pt-6">
+                  <div className="stat-card-value">{facts.length}</div>
+                  <div className="stat-card-label">Fatos Extraídos</div>
+                </CardContent>
+              </Card>
+              <Card className="card-interactive">
+                <CardContent className="pt-6">
+                  <div className="stat-card-value text-green-600">{confirmedFacts.length}</div>
+                  <div className="stat-card-label">Fatos Confirmados</div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Next Action CTA */}
+            <Card className="border-primary/20 bg-primary/5">
+              <CardHeader>
+                <CardTitle className="text-lg">Próxima Ação Recomendada</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {documents.length === 0 ? (
+                  <div className="flex items-center justify-between">
+                    <p className="text-muted-foreground">Faça upload dos documentos do caso para começar.</p>
+                    <Button onClick={() => setActiveTab("documentos")}>
+                      <FileStack className="h-4 w-4 mr-2" />
+                      Upload de Documentos
+                    </Button>
                   </div>
-                  {idx < 4 && (
-                    <div className={`w-16 h-0.5 mx-2 ${item.done ? "bg-primary" : "bg-muted-foreground/30"}`} />
-                  )}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                ) : facts.length === 0 ? (
+                  <div className="flex items-center justify-between">
+                    <p className="text-muted-foreground">Execute a extração de fatos via IA.</p>
+                    <Button onClick={() => setActiveTab("extracao")}>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Iniciar Extração
+                    </Button>
+                  </div>
+                ) : !canCalculate ? (
+                  <div className="flex items-center justify-between">
+                    <p className="text-muted-foreground">Valide os fatos críticos para liberar o cálculo.</p>
+                    <Button onClick={goToValidation}>
+                      <ShieldCheck className="h-4 w-4 mr-2" />
+                      Validar Fatos
+                    </Button>
+                  </div>
+                ) : snapshotsCount === 0 ? (
+                  <div className="flex items-center justify-between">
+                    <p className="text-muted-foreground">Execute o cálculo para gerar o primeiro snapshot.</p>
+                    <Button onClick={() => setActiveTab("perfil")}>
+                      <Calculator className="h-4 w-4 mr-2" />
+                      Selecionar Perfil
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <p className="text-muted-foreground">Revise os snapshots e gere a petição.</p>
+                    <Button onClick={() => setActiveTab("peticao")}>
+                      <Scroll className="h-4 w-4 mr-2" />
+                      Gerar Petição
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-        {/* Tabs */}
-        <Tabs defaultValue="documentos" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="documentos" className="gap-2">
-              <FileText className="h-4 w-4" />
-              Documentos ({documents.length})
-            </TabsTrigger>
-            <TabsTrigger value="validacao" className="gap-2">
-              <ShieldCheck className="h-4 w-4" />
-              Validação ({pendingFacts.length} pendentes)
-            </TabsTrigger>
-            <TabsTrigger value="calculadoras" className="gap-2">
-              <Sparkles className="h-4 w-4" />
-              Sugestões
-            </TabsTrigger>
-            <TabsTrigger value="calculo" className="gap-2">
-              <Calculator className="h-4 w-4" />
-              Cálculo ({runs.length})
-            </TabsTrigger>
-          </TabsList>
+            {/* Critical Facts Status */}
+            {facts.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <ShieldCheck className="h-5 w-5" />
+                    Status dos Fatos Críticos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    {CRITICAL_FACTS.map((key) => {
+                      const fact = facts.find((f) => f.chave === key);
+                      return (
+                        <div
+                          key={key}
+                          className={`p-3 rounded-lg border ${
+                            fact?.confirmado
+                              ? "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800"
+                              : fact
+                              ? "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800"
+                              : "bg-muted border-muted"
+                          }`}
+                        >
+                          <div className="text-xs text-muted-foreground mb-1">
+                            {criticalLabels[key]}
+                          </div>
+                          <div className="font-medium text-sm truncate">
+                            {fact?.valor || "—"}
+                          </div>
+                          <Badge
+                            variant={fact?.confirmado ? "default" : fact ? "secondary" : "outline"}
+                            className="mt-2 text-xs"
+                          >
+                            {fact?.confirmado ? "Confirmado" : fact ? "Pendente" : "Ausente"}
+                          </Badge>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        );
 
-          {/* Documents Tab - New Document Processor */}
-          <TabsContent value="documentos" className="space-y-4">
+      case "documentos":
+        return (
+          <div className="space-y-6">
             <ProcessingMonitorPanel
               documents={documents as any}
               stats={processingStats as any}
-              totalChunks={typeof chunksCount === "number" ? chunksCount : undefined}
+              totalChunks={chunksCount || undefined}
             />
             <DocumentsManager
               caseId={id!}
               documents={documents as any}
               onDocumentsChange={() => queryClient.invalidateQueries({ queryKey: ["documents", id] })}
             />
-          </TabsContent>
+          </div>
+        );
 
-          {/* Validation Tab - New Split View */}
-          <TabsContent value="validacao" className="space-y-4">
+      case "extracao":
+        return (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5" />
+                  Extração de Fatos via IA
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-muted-foreground">
+                  A IA analisa os chunks dos documentos e extrai fatos relevantes como datas, salários e jornadas.
+                </p>
+                <div className="flex items-center gap-3">
+                  <Button
+                    onClick={runFactExtraction}
+                    disabled={isExtractingFacts || chunksCount === 0}
+                  >
+                    {isExtractingFacts ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Play className="h-4 w-4 mr-2" />
+                    )}
+                    {facts.length === 0 ? "Iniciar Extração" : "Executar Nova Extração"}
+                  </Button>
+                  {facts.length > 0 && (
+                    <Button
+                      variant="outline"
+                      onClick={restartFactExtraction}
+                      disabled={isExtractingFacts || chunksCount === 0}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Reiniciar do Zero
+                    </Button>
+                  )}
+                  <Badge variant="outline">
+                    {chunksCount} chunks disponíveis
+                  </Badge>
+                </div>
+                {chunksCount === 0 && (
+                  <div className="flex items-center gap-2 text-amber-600">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span className="text-sm">
+                      Nenhum chunk indexado. Processe os documentos primeiro.
+                    </span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {facts.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Extração de fatos (IA)</CardTitle>
+                  <CardTitle>Fatos Extraídos ({facts.length})</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Se você reenviou documentos ou quer recomeçar do zero, você pode reiniciar o processo.
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={restartFactExtraction}
-                      disabled={isExtractingFacts || !chunksCount || chunksCount === 0}
-                      className="gap-2"
-                      title="Apaga todos os fatos do caso e reexecuta a extração"
-                    >
-                      {isExtractingFacts ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-4 w-4" />
-                      )}
-                      Reiniciar extração
-                    </Button>
-                    <Badge variant="outline">
-                      {typeof chunksCount === "number" ? `${chunksCount} chunks` : "chunks: —"}
-                    </Badge>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {facts.slice(0, 12).map((fact) => (
+                      <div
+                        key={fact.id}
+                        className={`p-3 rounded-lg border ${
+                          fact.confirmado
+                            ? "bg-green-50/50 border-green-200"
+                            : "bg-muted/50 border-muted"
+                        }`}
+                      >
+                        <div className="text-xs text-muted-foreground mb-1">
+                          {criticalLabels[fact.chave] || fact.chave}
+                        </div>
+                        <div className="font-medium text-sm truncate">{fact.valor}</div>
+                      </div>
+                    ))}
+                    {facts.length > 12 && (
+                      <div className="p-3 rounded-lg border bg-muted/50 flex items-center justify-center">
+                        <span className="text-muted-foreground text-sm">
+                          +{facts.length - 12} mais
+                        </span>
+                      </div>
+                    )}
                   </div>
+                  <Button
+                    className="mt-4"
+                    variant="outline"
+                    onClick={() => setActiveTab("validacao")}
+                  >
+                    Ir para Validação
+                  </Button>
                 </CardContent>
               </Card>
             )}
-            {facts.length === 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Extração de fatos (IA)</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Seus documentos estão indexados, mas ainda não há fatos para validar.
-                    A validação só aparece depois que a extração de fatos é executada.
-                  </p>
+          </div>
+        );
 
-                  <div className="flex items-center gap-2">
-                    <Button
-                      onClick={runFactExtraction}
-                      disabled={isExtractingFacts || !chunksCount || chunksCount === 0}
-                      className="gap-2"
-                    >
-                      {isExtractingFacts ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Sparkles className="h-4 w-4" />
-                      )}
-                      Rodar extração agora
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={refreshChunksCount}
-                      className="gap-2"
-                      disabled={!id}
-                      title="Força uma recontagem dos chunks para este caso"
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                      Recontar
-                    </Button>
-                    <Badge variant="outline">
-                      {typeof chunksCount === "number" ? `${chunksCount} chunks` : "chunks: —"}
-                    </Badge>
-                  </div>
-
-                  {(!chunksCount || chunksCount === 0) && (
-                    <div className="text-sm text-muted-foreground">
-                      Ainda não existe texto indexado (chunks = 0). Se o monitor mostra 100% mas chunks = 0,
-                      houve falha silenciosa na geração de texto.
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+      case "validacao":
+        return (
+          <div className="space-y-6">
+            {/* Show extraction-based ValidationViewV2 if there are extractions */}
+            {extractionsCount > 0 && (
+              <ValidationViewV2 
+                caseId={id!}
+                onValidationComplete={() => setActiveTab("perfil")}
+              />
             )}
+            
+            {/* Always show FactValidationView for facts */}
             <FactValidationView
               caseId={id!}
               facts={facts}
               documents={documents}
               onFactsChange={() => queryClient.invalidateQueries({ queryKey: ["facts", id] })}
-              onValidationComplete={() => {
-                // Switch to calculation tab when validation is complete
-                const calculoTab = document.querySelector('[value="calculo"]') as HTMLButtonElement;
-                calculoTab?.click();
-              }}
+              onValidationComplete={() => setActiveTab("perfil")}
               createCriticalKeyRequest={createCriticalKeyRequest}
               createCriticalNonce={createCriticalNonce}
             />
-          </TabsContent>
+          </div>
+        );
 
-          {/* Calculator Suggestions Tab */}
-          <TabsContent value="calculadoras" className="space-y-4">
-            <CalculatorSuggestions
-              facts={facts}
-              onSelectionChange={(selected) => {
-                console.log("Selected calculators:", selected);
-              }}
-            />
-          </TabsContent>
-
-          {/* Calculation Tab */}
-          <TabsContent value="calculo" className="space-y-4">
-            {!canCalculate && (
-              <Card className="border-dashed">
-                <CardHeader>
-                  <CardTitle>Validação pendente</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Para liberar o cálculo, os fatos críticos precisam existir no caso e estar confirmados.
-                  </p>
-
-                  {missingCriticalKeys.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium">Faltando no caso</div>
-                      <div className="flex flex-wrap gap-2">
-                        {missingCriticalKeys.map((k) => (
-                          <Button
-                            key={k}
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => requestCreateCritical(k)}
-                          >
-                            Adicionar: {criticalLabels[k] || k}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {unconfirmedCriticalFacts.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium">Ainda não confirmados</div>
-                      <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
-                        {unconfirmedCriticalFacts.map((f) => (
-                          <li key={f.id}>{criticalLabels[f.chave] || f.chave}</li>
-                        ))}
-                      </ul>
-                      <Button type="button" variant="outline" onClick={goToValidation}>
-                        Ir confirmar agora
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
+      case "perfil":
+        return (
+          <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Executar Novo Cálculo</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings2 className="h-5 w-5" />
+                  Seleção de Perfil de Cálculo
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex gap-4">
+                <p className="text-muted-foreground">
+                  Escolha o perfil que define as regras, divisores e calculadoras a serem usadas.
+                </p>
+                <div className="flex gap-4 items-end">
                   <div className="flex-1">
                     <Label>Perfil de Cálculo</Label>
                     <Select value={selectedProfile} onValueChange={setSelectedProfile}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecione um perfil" />
+                        <SelectValue placeholder="Selecione um perfil..." />
                       </SelectTrigger>
                       <SelectContent>
                         {profiles.map((profile) => (
@@ -879,121 +911,105 @@ export default function CasoDetalhe() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex items-end">
-                    <Button
-                      size="lg"
-                      disabled={!selectedProfile || !canCalculate}
-                      className="gap-2"
-                      onClick={executeCalculation}
-                    >
-                      {isCalculating ? (
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                      ) : (
-                        <Play className="h-5 w-5" />
-                      )}
-                      {isCalculating ? "Calculando…" : "Executar Cálculo"}
-                    </Button>
-                  </div>
+                  <Button
+                    size="lg"
+                    disabled={!selectedProfile || !canCalculate || isCalculating}
+                    onClick={executeCalculation}
+                  >
+                    {isCalculating ? (
+                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                    ) : (
+                      <Play className="h-5 w-5 mr-2" />
+                    )}
+                    {isCalculating ? "Calculando..." : "Executar Cálculo"}
+                  </Button>
                 </div>
 
                 {!canCalculate && (
-                  <div className="flex items-center justify-between gap-3 p-3 rounded-lg border bg-card">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <AlertTriangle className="h-5 w-5" />
-                      <span>Confirme os fatos críticos na aba Validação para liberar o cálculo.</span>
+                  <div className="flex items-center gap-3 p-4 rounded-lg border bg-amber-50/50 border-amber-200">
+                    <AlertTriangle className="h-5 w-5 text-amber-600" />
+                    <div className="flex-1">
+                      <p className="font-medium text-amber-800">
+                        Validação pendente
+                      </p>
+                      <p className="text-sm text-amber-700">
+                        Confirme os fatos críticos para liberar o cálculo.
+                      </p>
                     </div>
-                    <Button
-                      variant="outline"
-                      onClick={goToValidation}
-                    >
+                    <Button variant="outline" onClick={goToValidation}>
                       Ir para Validação
                     </Button>
+                  </div>
+                )}
+
+                {missingCriticalKeys.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium">Fatos ausentes:</div>
+                    <div className="flex flex-wrap gap-2">
+                      {missingCriticalKeys.map((k) => (
+                        <Button
+                          key={k}
+                          size="sm"
+                          variant="outline"
+                          onClick={() => requestCreateCritical(k)}
+                        >
+                          Adicionar: {criticalLabels[k]}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {runs.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Histórico de Cálculos</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {runs.map((run) => (
-                      <div
-                        key={run.id}
-                        className="p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-sm text-muted-foreground">
-                            {new Date(run.executado_em).toLocaleString("pt-BR")}
-                          </span>
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm" className="gap-1">
-                              <FileText className="h-4 w-4" />
-                              Ver Memória
-                            </Button>
-                            <Button variant="outline" size="sm" className="gap-1">
-                              <Download className="h-4 w-4" />
-                              Exportar PDF
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="p-3 rounded-lg bg-muted">
-                            <p className="text-sm text-muted-foreground">Resultado Bruto</p>
-                            <p className="text-2xl font-bold text-primary">
-                              {typeof run.resultado_bruto === "object" && 
-                               "total" in (run.resultado_bruto as object)
-                                ? (run.resultado_bruto as { total: number }).total.toLocaleString("pt-BR", {
-                                    style: "currency",
-                                    currency: "BRL",
-                                  })
-                                : "—"}
-                            </p>
-                          </div>
-                          <div className="p-3 rounded-lg bg-muted">
-                            <p className="text-sm text-muted-foreground">Resultado Líquido</p>
-                            <p className="text-2xl font-bold text-green-600">
-                              {typeof run.resultado_liquido === "object" && 
-                               "total" in (run.resultado_liquido as object)
-                                ? (run.resultado_liquido as { total: number }).total.toLocaleString("pt-BR", {
-                                    style: "currency",
-                                    currency: "BRL",
-                                  })
-                                : "—"}
-                            </p>
-                          </div>
-                        </div>
-                        {Array.isArray(run.warnings) && run.warnings.length > 0 && (
-                          <div className="mt-3 flex items-center gap-2 text-yellow-600">
-                            <AlertTriangle className="h-4 w-4" />
-                            <span className="text-sm">{run.warnings.length} alerta(s)</span>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            {/* Calculator Suggestions */}
+            <CalculatorSuggestions
+              facts={facts}
+              onSelectionChange={(selected) => {
+                console.log("Selected calculators:", selected);
+              }}
+            />
+          </div>
+        );
 
-            {runs.length === 0 && (
-              <Card className="border-dashed">
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Calculator className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground text-center">
-                    Nenhum cálculo executado ainda.
-                    <br />
-                    Selecione um perfil e execute o cálculo.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-        </Tabs>
-      </div>
-    </MainLayout>
+      case "calculo":
+        return <SnapshotViewer caseId={id!} />;
+
+      case "peticao":
+        return (
+          <div className="empty-state">
+            <Scroll className="empty-state-icon" />
+            <h3 className="empty-state-title">Geração de Petição</h3>
+            <p className="empty-state-description">
+              Esta funcionalidade será implementada em breve. Aqui você poderá gerar petições
+              automaticamente com base nos cálculos aprovados.
+            </p>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <MainLayoutPremium
+      breadcrumbs={[
+        { label: "Casos", href: "/casos" },
+        { label: caseData.cliente },
+      ]}
+      title={caseData.cliente}
+    >
+      <CaseWorkspace
+        cliente={caseData.cliente}
+        numeroProcesso={caseData.numero_processo}
+        status={caseData.status}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        workflowSteps={workflowSteps}
+      >
+        {renderTabContent()}
+      </CaseWorkspace>
+    </MainLayoutPremium>
   );
 }

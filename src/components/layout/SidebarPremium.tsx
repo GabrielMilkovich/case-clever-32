@@ -13,6 +13,7 @@ import {
   FileText,
   LogOut,
   Scale,
+  FlaskConical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ const adminNavItems = [
   { icon: Calculator, label: "Calculadoras", path: "/admin/calculadoras" },
   { icon: Users, label: "Perfis", path: "/admin/perfis" },
   { icon: Database, label: "Índices", path: "/admin/indices" },
+  { icon: FlaskConical, label: "Testes", path: "/admin/testes" },
 ];
 
 export function SidebarPremium() {
