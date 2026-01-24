@@ -36,6 +36,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   type PremissasCasoConfig,
+  type TipoDemissao,
   PREMISSAS_TRT3_PADRAO,
   validarPremissasCompletas,
   gerarHashConfig,
@@ -166,7 +167,7 @@ export function PremissasEditor({
       </div>
 
       {/* Premissas Sections */}
-      <Accordion type="multiple" defaultValue={["jornada", "atualizacao"]} className="space-y-4">
+      <Accordion type="multiple" defaultValue={["jornada", "rescisao", "atualizacao"]} className="space-y-4">
         {/* Jornada e Horas Extras */}
         <AccordionItem value="jornada" className="glass-card rounded-xl border-0">
           <AccordionTrigger className="px-6 py-4 hover:no-underline">
@@ -304,7 +305,188 @@ export function PremissasEditor({
                   <span className="text-sm text-muted-foreground">%</span>
                 </div>
               </div>
+
+              {/* Média de Horas Extras */}
+              <div className="space-y-2">
+                <Label className="font-medium">Média de Horas Extras Mensais</Label>
+                <Input
+                  type="number"
+                  placeholder="Ex: 30"
+                  value={config.horasExtrasConfig?.mediaHorasExtrasMensais || 0}
+                  onChange={(e) => setConfig({
+                    ...config,
+                    horasExtrasConfig: { 
+                      ...config.horasExtrasConfig, 
+                      mediaHorasExtrasMensais: Number(e.target.value) 
+                    }
+                  })}
+                  disabled={isLocked || readOnly}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Quantidade média de horas extras realizadas por mês
+                </p>
+              </div>
+
+              {/* Percentuais HE */}
+              <div className="space-y-2">
+                <Label className="font-medium">Adicional HE 50%</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    className="w-20"
+                    value={config.horasExtrasConfig?.percentualHE50 || 50}
+                    onChange={(e) => setConfig({
+                      ...config,
+                      horasExtrasConfig: { 
+                        ...config.horasExtrasConfig, 
+                        percentualHE50: Number(e.target.value) 
+                      }
+                    })}
+                    disabled={isLocked || readOnly}
+                  />
+                  <span className="text-sm text-muted-foreground">%</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="font-medium">Adicional HE 100%</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    className="w-20"
+                    value={config.horasExtrasConfig?.percentualHE100 || 100}
+                    onChange={(e) => setConfig({
+                      ...config,
+                      horasExtrasConfig: { 
+                        ...config.horasExtrasConfig, 
+                        percentualHE100: Number(e.target.value) 
+                      }
+                    })}
+                    disabled={isLocked || readOnly}
+                  />
+                  <span className="text-sm text-muted-foreground">%</span>
+                </div>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <BookOpen className="h-3 w-3" />
+                  {config.horasExtrasConfig?.fundamentacaoLegal || "CLT Art. 59 e Art. 73"}
+                </p>
+              </div>
             </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        {/* Rescisão Contratual */}
+        <AccordionItem value="rescisao" className="glass-card rounded-xl border-0">
+          <AccordionTrigger className="px-6 py-4 hover:no-underline">
+            <div className="flex items-center gap-3">
+              <Scale className="h-5 w-5 text-primary" />
+              <span className="font-semibold">Rescisão Contratual</span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-6 pb-6">
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* Tipo de Demissão */}
+              <div className="space-y-2">
+                <Label className="font-medium">Tipo de Demissão</Label>
+                <Select 
+                  value={config.rescisao?.tipoDemissao || "sem_justa_causa"}
+                  onValueChange={(v) => setConfig({
+                    ...config,
+                    rescisao: { ...config.rescisao, tipoDemissao: v as TipoDemissao }
+                  })}
+                  disabled={isLocked || readOnly}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sem_justa_causa">Sem Justa Causa</SelectItem>
+                    <SelectItem value="justa_causa">Justa Causa</SelectItem>
+                    <SelectItem value="pedido_demissao">Pedido de Demissão</SelectItem>
+                    <SelectItem value="rescisao_indireta">Rescisão Indireta</SelectItem>
+                    <SelectItem value="acordo">Acordo (Art. 484-A CLT)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <BookOpen className="h-3 w-3" />
+                  CLT Art. 477 e seguintes
+                </p>
+              </div>
+
+              {/* Data de Admissão */}
+              <div className="space-y-2">
+                <Label className="font-medium">Data de Admissão</Label>
+                <Input
+                  type="date"
+                  value={config.rescisao?.dataAdmissao || ""}
+                  onChange={(e) => setConfig({
+                    ...config,
+                    rescisao: { ...config.rescisao, dataAdmissao: e.target.value }
+                  })}
+                  disabled={isLocked || readOnly}
+                />
+              </div>
+
+              {/* Data de Demissão */}
+              <div className="space-y-2">
+                <Label className="font-medium">Data de Demissão</Label>
+                <Input
+                  type="date"
+                  value={config.rescisao?.dataDemissao || ""}
+                  onChange={(e) => setConfig({
+                    ...config,
+                    rescisao: { ...config.rescisao, dataDemissao: e.target.value }
+                  })}
+                  disabled={isLocked || readOnly}
+                />
+              </div>
+
+              {/* Calcular Verbas Automaticamente */}
+              <div className="space-y-2">
+                <Label className="font-medium">Calcular Verbas Rescisórias</Label>
+                <div className="flex items-center gap-4">
+                  <Switch
+                    checked={config.rescisao?.calcularVerbas ?? true}
+                    onCheckedChange={(v) => setConfig({
+                      ...config,
+                      rescisao: { ...config.rescisao, calcularVerbas: v }
+                    })}
+                    disabled={isLocked || readOnly}
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    {config.rescisao?.calcularVerbas !== false 
+                      ? "Saldo, aviso, férias e 13º proporcionais" 
+                      : "Desativado"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Preview das Verbas */}
+            {config.rescisao?.calcularVerbas !== false && config.rescisao?.tipoDemissao && (
+              <div className="mt-6 p-4 rounded-lg bg-muted/50">
+                <Label className="font-medium text-sm mb-2 block">Verbas a calcular:</Label>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline">Saldo de Salário</Badge>
+                  {['sem_justa_causa', 'rescisao_indireta'].includes(config.rescisao.tipoDemissao) && (
+                    <Badge variant="outline">Aviso Prévio Indenizado</Badge>
+                  )}
+                  <Badge variant="outline">Férias Vencidas + 1/3</Badge>
+                  {config.rescisao.tipoDemissao !== 'justa_causa' && (
+                    <>
+                      <Badge variant="outline">Férias Proporcionais + 1/3</Badge>
+                      <Badge variant="outline">13º Proporcional</Badge>
+                    </>
+                  )}
+                  {['sem_justa_causa', 'rescisao_indireta'].includes(config.rescisao.tipoDemissao) && (
+                    <Badge variant="outline">Multa 40% FGTS</Badge>
+                  )}
+                  {config.rescisao.tipoDemissao === 'acordo' && (
+                    <Badge variant="secondary">Multa 20% FGTS (acordo)</Badge>
+                  )}
+                </div>
+              </div>
+            )}
           </AccordionContent>
         </AccordionItem>
 

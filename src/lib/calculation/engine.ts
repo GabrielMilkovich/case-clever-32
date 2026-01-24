@@ -25,6 +25,7 @@ import { createReflexosFeriasCalculator } from './calculators/reflexos-ferias';
 import { createFGTSCalculator } from './calculators/fgts';
 import { createINSSCalculator } from './calculators/inss';
 import { createAtualizacaoMonetariaCalculator } from './calculators/atualizacao-monetaria';
+import { createVerbasRescisoriasCalculator } from './calculators/verbas-rescisorias';
 
 // Registry de calculadoras disponíveis
 const calculatorRegistry: Map<string, (rules: CalculatorRules) => Calculator> = new Map([
@@ -34,6 +35,7 @@ const calculatorRegistry: Map<string, (rules: CalculatorRules) => Calculator> = 
   ['fgts', createFGTSCalculator],
   ['inss', createINSSCalculator],
   ['atualizacao_monetaria', createAtualizacaoMonetariaCalculator],
+  ['verbas_rescisorias', createVerbasRescisoriasCalculator],
 ]);
 
 // Registrar uma nova calculadora
@@ -207,12 +209,13 @@ export class CalculationEngine {
     const results: CalcResult[] = [];
     const calculatorsUsed: CalculatorUsed[] = [];
 
-    // Ordem de execução (verbas base primeiro, depois reflexos)
+    // Ordem de execução (verbas base primeiro, depois reflexos, depois rescisão)
     const executionOrder = [
       'horas_extras',
       'reflexos_13',
       'reflexos_ferias',
       'fgts',
+      'verbas_rescisorias',
       'inss',
       'atualizacao_monetaria',
     ];
