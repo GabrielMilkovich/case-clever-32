@@ -56,11 +56,17 @@ export function createHorasExtrasCalculator(rulesData: CalculatorRules): Calcula
       const verbas: VerbaOutput[] = [];
       let linhaAtual = 0;
 
-      // Obter fatos necessários
-      const salarioBase = parseFactAsNumber(ctx.facts['salario_base']);
+      // Obter fatos necessários - fallback para salario_mensal se salario_base for inválido
+      let salarioBase = parseFactAsNumber(ctx.facts['salario_base']);
+      if (!salarioBase || salarioBase <= 0) {
+        salarioBase = parseFactAsNumber(ctx.facts['salario_mensal']);
+      }
       const dataAdmissao = parseFactAsDate(ctx.facts['data_admissao']);
       const dataDemissao = parseFactAsDate(ctx.facts['data_demissao']) || ctx.dataReferencia;
+      
+      // Média de horas extras mensais - pode vir de premissas ou fatos extraídos
       const horasMensais = parseFactAsNumber(ctx.facts['horas_extras_mensais']) || 
+                          parseFactAsNumber(ctx.facts['media_horas_extras']) ||
                           (inputs.horas_extras_mensais as number) || 0;
       const percentualDomingosFeriados = parseFactAsNumber(ctx.facts['percentual_domingos_feriados']) || 0.2;
 
