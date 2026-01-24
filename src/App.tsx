@@ -13,6 +13,7 @@ import Configuracoes from "./pages/Configuracoes";
 import AdminCalculadoras from "./pages/admin/Calculadoras";
 import AdminPerfis from "./pages/admin/Perfis";
 import AdminIndices from "./pages/admin/Indices";
+import AdminTestes from "./pages/admin/Testes";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
           <Route path="/admin/calculadoras" element={<AdminCalculadoras />} />
           <Route path="/admin/perfis" element={<AdminPerfis />} />
           <Route path="/admin/indices" element={<AdminIndices />} />
+          <Route path="/admin/testes" element={<AdminTestes />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
