@@ -578,7 +578,7 @@ export default function CasoDetalhe() {
       engine.loadCalculators(calculatorsWithRules);
       const result = engine.executeAll();
 
-      // 5) Persist run
+      // 5) Persist run (legacy)
       const { data: session } = await supabase.auth.getSession();
       const userId = session?.session?.user?.id ?? null;
       const { data: insertedRun, error: runErr } = await supabase
@@ -597,7 +597,91 @@ export default function CasoDetalhe() {
         .single();
       if (runErr || !insertedRun?.id) throw runErr || new Error("Falha ao salvar cálculo");
 
-      // 6) Persist audit lines
+      // 6) Create calc_snapshot (new V2 model)
+      // Calculate total values from result
+      const calcTotalFromResult = (resultObj: unknown): number => {
+        if (!resultObj || typeof resultObj !== 'object') return 0;
+        let total = 0;
+        for (const val of Object.values(resultObj as object)) {
+          if (typeof val === 'number') {
+            total += val;
+          } else if (typeof val === 'object' && val !== null) {
+            for (const innerVal of Object.values(val as object)) {
+              if (typeof innerVal === 'number') {
+                total += innerVal;
+              }
+            }
+          }
+        }
+        return total;
+      };
+      
+      const totalBruto = calcTotalFromResult(result.resultado_bruto);
+      const totalLiquido = calcTotalFromResult(result.resultado_liquido);
+
+      // Get next version number
+      const { count: existingSnapshots } = await supabase
+        .from("calc_snapshots")
+        .select("id", { count: "exact" })
+        .eq("case_id", id);
+      const nextVersion = (existingSnapshots || 0) + 1;
+
+      // Generate ruleset hash from calculators used
+      const rulesetHash = Array.isArray(result.calculators_used) 
+        ? result.calculators_used.map((c: any) => `${c.nome}:${c.versao}`).join('|').slice(0, 32)
+        : null;
+
+      const { data: insertedSnapshot, error: snapErr } = await supabase
+        .from("calc_snapshots")
+        .insert({
+          case_id: id,
+          profile_id: selectedProfile,
+          created_by: userId,
+          engine_version: "2.0.0",
+          ruleset_hash: rulesetHash,
+          versao: nextVersion,
+          status: "gerado" as const,
+          inputs_snapshot: result.facts_snapshot as any,
+          resultado_bruto: result.resultado_bruto as any,
+          resultado_liquido: result.resultado_liquido as any,
+          total_bruto: totalBruto,
+          total_liquido: totalLiquido,
+          total_descontos: totalBruto - totalLiquido,
+          warnings: result.warnings as any,
+        })
+        .select("id")
+        .single();
+      if (snapErr) {
+        console.error("Snapshot creation error:", snapErr);
+        // Continue even if snapshot fails - run was already saved
+      }
+
+      // 7) Persist calc_result_items for detailed breakdown
+      if (insertedSnapshot?.id && Array.isArray(result.auditLines) && result.auditLines.length > 0) {
+        const resultItems = result.auditLines
+          .filter((l: any) => l.valor_bruto !== null && l.valor_bruto !== undefined)
+          .map((l: any, idx: number) => ({
+            snapshot_id: insertedSnapshot.id,
+            rubrica_codigo: l.calculadora || "GERAL",
+            rubrica_nome: l.descricao,
+            competencia: l.competencia || null,
+            ordem: idx + 1,
+            valor_bruto: l.valor_bruto || 0,
+            valor_liquido: l.valor_liquido || l.valor_bruto || 0,
+            memoria_detalhada: l.metadata || null,
+          }));
+
+        if (resultItems.length > 0) {
+          const { error: itemsErr } = await supabase
+            .from("calc_result_items")
+            .insert(resultItems as any);
+          if (itemsErr) {
+            console.error("Result items insertion error:", itemsErr);
+          }
+        }
+      }
+
+      // 8) Persist legacy audit lines
       if (Array.isArray(result.auditLines) && result.auditLines.length > 0) {
         const payload = result.auditLines.map((l) => ({
           run_id: insertedRun.id,
@@ -615,10 +699,11 @@ export default function CasoDetalhe() {
         if (auditErr) throw auditErr;
       }
 
-      // 7) Update UI
+      // 9) Update UI
       await queryClient.invalidateQueries({ queryKey: ["calculation_runs", id] });
+      await queryClient.invalidateQueries({ queryKey: ["calc_snapshots", id] });
       await queryClient.invalidateQueries({ queryKey: ["calc_snapshots_count", id] });
-      toast.success("Cálculo executado com sucesso!");
+      toast.success(`Cálculo executado! Snapshot v${nextVersion} gerado.`);
       updateStatusMutation.mutate("calculado");
       
       // Navigate to snapshots tab
