@@ -356,6 +356,20 @@ export default function CasoDetalhe() {
       count: pendingFacts.length,
     },
     {
+      id: "premissas",
+      label: "Premissas",
+      icon: Settings2,
+      completed: false,
+      active: activeTab === "premissas",
+    },
+    {
+      id: "calendario",
+      label: "Calendário",
+      icon: Calendar,
+      completed: false,
+      active: activeTab === "calendario",
+    },
+    {
       id: "perfil",
       label: "Perfil",
       icon: Settings2,
@@ -996,6 +1010,12 @@ export default function CasoDetalhe() {
             />
           </div>
         );
+
+      case "premissas":
+        return <PremissasEditor caseId={id!} />;
+
+      case "calendario":
+        return <CalendarioTrabalhistaViewer caseId={id!} facts={facts} />;
 
       case "calculo":
         return <SnapshotViewer caseId={id!} />;

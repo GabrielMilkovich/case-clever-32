@@ -28,22 +28,34 @@ import {
   type CalendarioCompetencia,
 } from "@/lib/calculation/calendario-trabalhista";
 
+interface Fact {
+  chave: string;
+  valor: string;
+}
+
 interface CalendarioTrabalhistaViewerProps {
+  caseId?: string;
+  facts?: Fact[];
   dataInicio?: string; // "YYYY-MM-DD"
   dataFim?: string; // "YYYY-MM-DD"
   onCompetenciaSelect?: (competencia: CalendarioCompetencia) => void;
 }
 
 export function CalendarioTrabalhistaViewer({
+  caseId,
+  facts = [],
   dataInicio,
   dataFim,
   onCompetenciaSelect,
 }: CalendarioTrabalhistaViewerProps) {
+  // Extract dates from facts if available
+  const factInicio = facts.find((f) => f.chave === "data_admissao")?.valor;
+  const factFim = facts.find((f) => f.chave === "data_demissao")?.valor;
   const [inicio, setInicio] = useState(
-    dataInicio ? dataInicio.slice(0, 7) : "2023-01"
+    dataInicio ? dataInicio.slice(0, 7) : factInicio ? factInicio.slice(0, 7) : "2023-01"
   );
   const [fim, setFim] = useState(
-    dataFim ? dataFim.slice(0, 7) : "2024-12"
+    dataFim ? dataFim.slice(0, 7) : factFim ? factFim.slice(0, 7) : "2024-12"
   );
   const [valorTeste, setValorTeste] = useState<number>(1000);
   const [competenciaTeste, setCompetenciaTeste] = useState<string>("2024-01");
