@@ -7,6 +7,7 @@ import {
   CalcProfile,
   CalcRule,
   CalcResultItem,
+  FundamentoLegal,
   MemoriaCalculo,
   CalcLineage,
   LineageInput,
@@ -16,6 +17,71 @@ import {
   toDecimal,
   hashObject,
 } from '../types/index';
+
+// =====================================================
+// MAPA DE FUNDAMENTOS LEGAIS POR RUBRICA
+// =====================================================
+
+export const FUNDAMENTOS_LEGAIS: Record<string, FundamentoLegal[]> = {
+  HE50: [
+    { dispositivo: 'Art. 59, §1º, CLT', descricao: 'Adicional de no mínimo 50% sobre a hora normal para horas extraordinárias', norma: 'CLT' },
+    { dispositivo: 'Art. 7º, XVI, CF/88', descricao: 'Remuneração do serviço extraordinário superior, no mínimo, em 50% à do normal', norma: 'CF/88' },
+  ],
+  HE100: [
+    { dispositivo: 'Art. 59, §1º, CLT', descricao: 'Adicional sobre hora extra em domingos e feriados', norma: 'CLT' },
+    { dispositivo: 'Art. 7º, XVI, CF/88', descricao: 'Remuneração do serviço extraordinário', norma: 'CF/88' },
+    { dispositivo: 'Súmula 146, TST', descricao: 'Trabalho em domingos e feriados não compensado — pagamento em dobro', norma: 'TST' },
+  ],
+  DSR_HE: [
+    { dispositivo: 'Art. 7º, alínea "a", Lei 605/49', descricao: 'Reflexo das horas extras habituais no repouso semanal remunerado', norma: 'Lei 605/49' },
+    { dispositivo: 'Súmula 172, TST', descricao: 'Horas extras habituais repercutem no cálculo do RSR', norma: 'TST' },
+  ],
+  ADIC_NOT: [
+    { dispositivo: 'Art. 73, CLT', descricao: 'Adicional noturno de no mínimo 20% sobre a hora diurna', norma: 'CLT' },
+    { dispositivo: 'Art. 73, §1º, CLT', descricao: 'Hora noturna reduzida: 52 minutos e 30 segundos', norma: 'CLT' },
+    { dispositivo: 'Art. 7º, IX, CF/88', descricao: 'Remuneração do trabalho noturno superior à do diurno', norma: 'CF/88' },
+  ],
+  REFL_FERIAS: [
+    { dispositivo: 'Art. 142, CLT', descricao: 'Integração das parcelas habituais na remuneração de férias', norma: 'CLT' },
+    { dispositivo: 'Art. 7º, XVII, CF/88', descricao: 'Gozo de férias anuais com remuneração acrescida de 1/3', norma: 'CF/88' },
+    { dispositivo: 'Súmula 151, TST', descricao: 'Integração de horas extras habituais no cálculo de férias', norma: 'TST' },
+  ],
+  REFL_13: [
+    { dispositivo: 'Art. 1º, Lei 4.090/62', descricao: 'Gratificação natalina (13º salário) com base na remuneração integral', norma: 'Lei 4.090/62' },
+    { dispositivo: 'Súmula 45, TST', descricao: 'Integração de horas extras habituais no cálculo do 13º salário', norma: 'TST' },
+  ],
+  FGTS: [
+    { dispositivo: 'Art. 15, Lei 8.036/90', descricao: 'Depósito mensal de 8% sobre a remuneração paga ou devida', norma: 'Lei 8.036/90' },
+    { dispositivo: 'Art. 7º, III, CF/88', descricao: 'Direito ao FGTS', norma: 'CF/88' },
+  ],
+  MULTA_FGTS: [
+    { dispositivo: 'Art. 18, §1º, Lei 8.036/90', descricao: 'Multa de 40% sobre o montante do FGTS na despedida sem justa causa', norma: 'Lei 8.036/90' },
+    { dispositivo: 'Art. 484-A, §1º, CLT', descricao: 'Multa de 20% do FGTS na rescisão por acordo (Reforma Trabalhista)', norma: 'CLT' },
+  ],
+  SALDO_SAL: [
+    { dispositivo: 'Art. 457, CLT', descricao: 'Salário devido pelos dias efetivamente trabalhados no mês da rescisão', norma: 'CLT' },
+    { dispositivo: 'Art. 477, CLT', descricao: 'Obrigação de pagamento das verbas rescisórias', norma: 'CLT' },
+  ],
+  AVISO_PREVIO: [
+    { dispositivo: 'Art. 487, §1º, CLT', descricao: 'Aviso prévio de no mínimo 30 dias', norma: 'CLT' },
+    { dispositivo: 'Art. 1º, Lei 12.506/11', descricao: 'Acréscimo de 3 dias por ano de serviço (máximo 60 dias adicionais)', norma: 'Lei 12.506/11' },
+    { dispositivo: 'Art. 484-A, CLT', descricao: 'Aviso prévio de 50% na rescisão por acordo', norma: 'CLT' },
+  ],
+  FERIAS_VENC: [
+    { dispositivo: 'Art. 137, CLT', descricao: 'Férias em dobro quando não concedidas no período concessivo', norma: 'CLT' },
+    { dispositivo: 'Art. 134, CLT', descricao: 'Concessão de férias no período concessivo', norma: 'CLT' },
+    { dispositivo: 'Art. 7º, XVII, CF/88', descricao: 'Férias anuais com acréscimo de 1/3 constitucional', norma: 'CF/88' },
+  ],
+  FERIAS_PROP: [
+    { dispositivo: 'Art. 146, parágrafo único, CLT', descricao: 'Férias proporcionais na rescisão', norma: 'CLT' },
+    { dispositivo: 'Art. 7º, XVII, CF/88', descricao: 'Acréscimo de 1/3 constitucional', norma: 'CF/88' },
+    { dispositivo: 'Súmula 171, TST', descricao: 'Férias proporcionais devidas mesmo com menos de um ano de serviço', norma: 'TST' },
+  ],
+  DECIMO_PROP: [
+    { dispositivo: 'Art. 1º, Lei 4.090/62', descricao: '13º salário proporcional aos meses trabalhados no ano', norma: 'Lei 4.090/62' },
+    { dispositivo: 'Art. 3º, Lei 4.090/62', descricao: 'Fração de 15 dias ou mais conta como mês integral', norma: 'Lei 4.090/62' },
+  ],
+};
 
 // Configuração de precisão
 Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
@@ -54,12 +120,18 @@ export abstract class Rubrica {
     this.passoAtual = 0;
   }
   
+  // Retorna os fundamentos legais desta rubrica
+  protected getFundamentosLegais(): FundamentoLegal[] {
+    return FUNDAMENTOS_LEGAIS[this.codigo] ?? [];
+  }
+  
   // Registra um passo na memória de cálculo
   protected registrarPasso(
     descricao: string,
     formula: string,
     variaveis: Record<string, string | number>,
-    resultado: Decimal
+    resultado: Decimal,
+    fundamento_legal?: string
   ): Decimal {
     this.passoAtual++;
     this.memorias.push({
@@ -68,8 +140,17 @@ export abstract class Rubrica {
       formula,
       variaveis,
       resultado,
+      fundamento_legal,
     });
     return resultado;
+  }
+  
+  // Cria um result item já com fundamentos legais
+  protected criarResultItem(item: Omit<CalcResultItem, 'fundamento_legal'>): CalcResultItem {
+    return {
+      ...item,
+      fundamento_legal: this.getFundamentosLegais(),
+    };
   }
   
   // Obtém salário base para uma competência
@@ -200,12 +281,13 @@ export class HorasExtras50 extends Rubrica {
           adicional: adicional,
           fator: fator.toNumber()
         },
-        valor
+        valor,
+        'Art. 59, §1º, CLT + Art. 7º, XVI, CF/88'
       );
       
       const valorFinal = this.arredondar(valor);
       
-      resultados.push({
+      resultados.push(this.criarResultItem({
         id: `${this.codigo}-${competencia}`,
         rubrica_codigo: this.codigo,
         rubrica_nome: this.nome,
@@ -225,7 +307,7 @@ export class HorasExtras50 extends Rubrica {
           `${salarioHora} × ${horas} × ${fator}`,
           valorFinal
         ),
-      });
+      }));
       
       this.memorias = [];
       this.passoAtual = 0;
@@ -276,12 +358,13 @@ export class HorasExtras100 extends Rubrica {
           adicional: adicional,
           fator: fator.toNumber()
         },
-        valor
+        valor,
+        'Art. 59, §1º, CLT + Súmula 146, TST'
       );
       
       const valorFinal = this.arredondar(valor);
       
-      resultados.push({
+      resultados.push(this.criarResultItem({
         id: `${this.codigo}-${competencia}`,
         rubrica_codigo: this.codigo,
         rubrica_nome: this.nome,
@@ -301,7 +384,7 @@ export class HorasExtras100 extends Rubrica {
           `${salarioHora} × ${horas} × ${fator}`,
           valorFinal
         ),
-      });
+      }));
       
       this.memorias = [];
       this.passoAtual = 0;
@@ -343,7 +426,8 @@ export class DSRHorasExtras extends Rubrica {
           'DSR por fator fixo',
           'Total HE × Fator',
           { total_he: totalHE.toNumber(), fator: fator.toNumber() },
-          dsr
+          dsr,
+          'Art. 7º, alínea "a", Lei 605/49 + Súmula 172, TST'
         );
       } else {
         // Método A: Clássico semanal
@@ -360,13 +444,14 @@ export class DSRHorasExtras extends Rubrica {
             dias_uteis: diasUteis, 
             dias_dsr: diasDSR 
           },
-          dsr
+          dsr,
+          'Art. 7º, alínea "a", Lei 605/49 + Súmula 172, TST'
         );
       }
       
       const valorFinal = this.arredondar(dsr);
       
-      resultados.push({
+      resultados.push(this.criarResultItem({
         id: `${this.codigo}-${competencia}`,
         rubrica_codigo: this.codigo,
         rubrica_nome: this.nome,
@@ -384,7 +469,7 @@ export class DSRHorasExtras extends Rubrica {
           `Método ${metodo}: ${valorFinal}`,
           valorFinal
         ),
-      });
+      }));
       
       this.memorias = [];
       this.passoAtual = 0;
@@ -440,12 +525,13 @@ export class AdicionalNoturno extends Rubrica {
           horas: horasCalculadas.toNumber(),
           percentual: percentual
         },
-        valor
+        valor,
+        'Art. 73, CLT + Art. 7º, IX, CF/88'
       );
       
       const valorFinal = this.arredondar(valor);
       
-      resultados.push({
+      resultados.push(this.criarResultItem({
         id: `${this.codigo}-${competencia}`,
         rubrica_codigo: this.codigo,
         rubrica_nome: this.nome,
@@ -465,7 +551,7 @@ export class AdicionalNoturno extends Rubrica {
           `${salarioHora} × ${horasCalculadas} × ${percentual}`,
           valorFinal
         ),
-      });
+      }));
       
       this.memorias = [];
       this.passoAtual = 0;
@@ -531,13 +617,14 @@ export class ReflexoFerias extends Rubrica {
       '1/3 constitucional',
       'Férias ÷ 3',
       { ferias: ferias.toNumber() },
-      terco
+      terco,
+      'Art. 7º, XVII, CF/88'
     );
     
     const total = ferias.plus(terco);
     const valorFinal = this.arredondar(total);
     
-    resultados.push({
+    resultados.push(this.criarResultItem({
       id: `${this.codigo}-total`,
       rubrica_codigo: this.codigo,
       rubrica_nome: this.nome,
@@ -552,7 +639,7 @@ export class ReflexoFerias extends Rubrica {
         `${media} + (${media} ÷ 3) = ${valorFinal}`,
         valorFinal
       ),
-    });
+    }));
     
     return resultados;
   }
@@ -608,12 +695,13 @@ export class Reflexo13 extends Rubrica {
         `13º proporcional ${ano}`,
         'Média × (Avos ÷ 12)',
         { media: media.toNumber(), avos, divisor: 12 },
-        decimo
+        decimo,
+        'Art. 1º, Lei 4.090/62 + Súmula 45, TST'
       );
       
       const valorFinal = this.arredondar(decimo);
       
-      resultados.push({
+      resultados.push(this.criarResultItem({
         id: `${this.codigo}-${ano}`,
         rubrica_codigo: this.codigo,
         rubrica_nome: this.nome,
@@ -632,7 +720,7 @@ export class Reflexo13 extends Rubrica {
           `${media} × ${avos}/12`,
           valorFinal
         ),
-      });
+      }));
       
       this.memorias = [];
       this.passoAtual = 0;
@@ -673,12 +761,13 @@ export class FGTS extends Rubrica {
         'FGTS mensal',
         'Base × Alíquota',
         { base: baseCalculo.toNumber(), aliquota },
-        fgts
+        fgts,
+        'Art. 15, Lei 8.036/90'
       );
       
       const valorFinal = this.arredondar(fgts);
       
-      resultados.push({
+      resultados.push(this.criarResultItem({
         id: `${this.codigo}-${competencia}`,
         rubrica_codigo: this.codigo,
         rubrica_nome: this.nome,
@@ -696,7 +785,7 @@ export class FGTS extends Rubrica {
           `${baseCalculo} × ${aliquota}`,
           valorFinal
         ),
-      });
+      }));
       
       this.memorias = [];
       this.passoAtual = 0;
@@ -740,12 +829,13 @@ export class MultaFGTS extends Rubrica {
       'Multa FGTS',
       'Total FGTS × Percentual',
       { total_fgts: totalFGTS.toNumber(), percentual: percentualMulta },
-      multa
+      multa,
+      'Art. 18, §1º, Lei 8.036/90'
     );
     
     const valorFinal = this.arredondar(multa);
     
-    return [{
+    return [this.criarResultItem({
       id: `${this.codigo}-total`,
       rubrica_codigo: this.codigo,
       rubrica_nome: this.nome,
@@ -763,7 +853,7 @@ export class MultaFGTS extends Rubrica {
         `${totalFGTS} × ${percentualMulta}`,
         valorFinal
       ),
-    }];
+    })];
   }
 }
 

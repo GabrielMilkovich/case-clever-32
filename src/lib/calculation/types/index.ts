@@ -204,6 +204,9 @@ export interface CalcResultItem {
   valor_bruto: Decimal;
   valor_liquido?: Decimal;
   
+  // Referência legal
+  fundamento_legal: FundamentoLegal[];
+  
   // Memória detalhada
   memoria: MemoriaCalculo[];
   
@@ -214,12 +217,19 @@ export interface CalcResultItem {
   lineage: CalcLineage;
 }
 
+export interface FundamentoLegal {
+  dispositivo: string;    // "Art. 59, §1º, CLT"
+  descricao: string;      // "Adicional de no mínimo 50% sobre a hora normal"
+  norma: string;          // "CLT" | "CF/88" | "Lei 8.036/90" etc.
+}
+
 export interface MemoriaCalculo {
   passo: number;
   descricao: string;
   formula: string;
   variaveis: Record<string, string | number>;
   resultado: Decimal;
+  fundamento_legal?: string; // ex: "Art. 59, §1º, CLT"
 }
 
 export interface CalcLineage {

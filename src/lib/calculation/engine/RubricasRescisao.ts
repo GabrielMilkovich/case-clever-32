@@ -26,10 +26,7 @@ export class SaldoSalario extends Rubrica {
     const dataDemissao = this.ctx.contrato.data_demissao;
     if (!dataDemissao) return [];
     
-    // Dias trabalhados no mês da rescisão
     const diaRescisao = dataDemissao.getDate();
-    const diasNoMes = new Date(dataDemissao.getFullYear(), dataDemissao.getMonth() + 1, 0).getDate();
-    
     const competencia = `${dataDemissao.getFullYear()}-${String(dataDemissao.getMonth() + 1).padStart(2, '0')}`;
     const salarioBase = this.getSalarioBase(competencia);
     const salarioDia = salarioBase.div(30);
@@ -38,7 +35,8 @@ export class SaldoSalario extends Rubrica {
       'Cálculo do salário diário',
       'Salário Base ÷ 30',
       { salario_base: salarioBase.toNumber(), divisor: 30 },
-      salarioDia
+      salarioDia,
+      'Art. 457, CLT'
     );
     
     const saldo = salarioDia.times(diaRescisao);
@@ -47,12 +45,13 @@ export class SaldoSalario extends Rubrica {
       'Saldo de salário',
       'Salário Diário × Dias Trabalhados',
       { salario_dia: salarioDia.toNumber(), dias: diaRescisao },
-      saldo
+      saldo,
+      'Art. 477, CLT'
     );
     
     const valorFinal = this.arredondar(saldo);
     
-    return [{
+    return [this.criarResultItem({
       id: `${this.codigo}-${competencia}`,
       rubrica_codigo: this.codigo,
       rubrica_nome: this.nome,
@@ -72,7 +71,7 @@ export class SaldoSalario extends Rubrica {
         `(${salarioBase} ÷ 30) × ${diaRescisao}`,
         valorFinal
       ),
-    }];
+    })];
   }
 }
 
@@ -89,7 +88,6 @@ export class AvisoPrevio extends Rubrica {
   calcular(): CalcResultItem[] {
     const tipoDemissao = this.ctx.contrato.tipo_demissao;
     
-    // Só aplica em demissão sem justa causa ou rescisão indireta
     if (!['sem_justa_causa', 'rescisao_indireta'].includes(tipoDemissao)) {
       return [];
     }
@@ -98,16 +96,13 @@ export class AvisoPrevio extends Rubrica {
     const dataDemissao = this.ctx.contrato.data_demissao;
     if (!dataAdmissao || !dataDemissao) return [];
     
-    // Calcular anos de serviço
     const diffMs = dataDemissao.getTime() - dataAdmissao.getTime();
     const anosServico = Math.floor(diffMs / (365.25 * 24 * 60 * 60 * 1000));
     
-    // Dias de aviso: 30 + 3 por ano (máximo 90 dias)
     const diasBase = 30;
     const diasAdicionais = Math.min(anosServico * this.ctx.perfil.parametros.dias_aviso_por_ano, 60);
     let diasAviso = diasBase + diasAdicionais;
     
-    // Para acordo: 50% do aviso
     const parametros = this.ctx.perfil.parametros;
     const fatorAcordo = 'fator_aviso_acordo' in parametros 
       ? (parametros as unknown as Record<string, number>).fator_aviso_acordo 
@@ -123,7 +118,8 @@ export class AvisoPrevio extends Rubrica {
       'Dias de aviso prévio',
       '30 dias + (Anos de Serviço × 3 dias)',
       { dias_base: diasBase, anos_servico: anosServico, dias_adicionais: diasAdicionais },
-      toDecimal(diasAviso)
+      toDecimal(diasAviso),
+      'Art. 487, §1º, CLT + Art. 1º, Lei 12.506/11'
     );
     
     const valor = remuneracao.times(diasAviso).div(30);
@@ -132,12 +128,13 @@ export class AvisoPrevio extends Rubrica {
       'Valor do aviso prévio',
       'Remuneração × (Dias Aviso ÷ 30)',
       { remuneracao: remuneracao.toNumber(), dias_aviso: diasAviso },
-      valor
+      valor,
+      'Art. 487, §1º, CLT'
     );
     
     const valorFinal = this.arredondar(valor);
     
-    return [{
+    return [this.criarResultItem({
       id: `${this.codigo}-total`,
       rubrica_codigo: this.codigo,
       rubrica_nome: this.nome,
@@ -157,7 +154,7 @@ export class AvisoPrevio extends Rubrica {
         `${remuneracao} × (${diasAviso} ÷ 30)`,
         valorFinal
       ),
-    }];
+    })];
   }
 }
 
@@ -176,12 +173,10 @@ export class FeriasVencidas extends Rubrica {
     const dataDemissao = this.ctx.contrato.data_demissao;
     if (!dataAdmissao || !dataDemissao) return [];
     
-    // Calcular períodos aquisitivos vencidos
     const resultados: CalcResultItem[] = [];
     const competencia = `${dataDemissao.getFullYear()}-${String(dataDemissao.getMonth() + 1).padStart(2, '0')}`;
     const remuneracao = this.getRemuneracaoBase(competencia);
     
-    // Contagem de períodos completos
     let periodoInicio = new Date(dataAdmissao);
     let periodoNum = 0;
     
@@ -189,11 +184,9 @@ export class FeriasVencidas extends Rubrica {
       const periodoFim = new Date(periodoInicio);
       periodoFim.setFullYear(periodoFim.getFullYear() + 1);
       
-      // Data limite para gozo (período concessivo)
       const limiteGozo = new Date(periodoFim);
       limiteGozo.setFullYear(limiteGozo.getFullYear() + 1);
       
-      // Se o período venceu (passou do concessivo) e antes da demissão
       if (limiteGozo <= dataDemissao) {
         periodoNum++;
         
@@ -205,12 +198,13 @@ export class FeriasVencidas extends Rubrica {
           `Férias vencidas - Período ${periodoNum}`,
           'Remuneração + 1/3 Constitucional',
           { remuneracao: remuneracao.toNumber(), terco: terco.toNumber() },
-          total
+          total,
+          'Art. 137, CLT + Art. 7º, XVII, CF/88'
         );
         
         const valorFinal = this.arredondar(total);
         
-        resultados.push({
+        resultados.push(this.criarResultItem({
           id: `${this.codigo}-${periodoNum}`,
           rubrica_codigo: this.codigo,
           rubrica_nome: `${this.nome} (${periodoNum}º Período)`,
@@ -231,7 +225,7 @@ export class FeriasVencidas extends Rubrica {
             `${remuneracao} + (${remuneracao} ÷ 3)`,
             valorFinal
           ),
-        });
+        }));
         
         this.memorias = [];
         periodoInicio = new Date(periodoFim);
@@ -239,7 +233,6 @@ export class FeriasVencidas extends Rubrica {
         break;
       }
       
-      // Limite de segurança
       if (periodoNum > 10) break;
     }
     
@@ -260,7 +253,6 @@ export class FeriasProporcionais extends Rubrica {
   calcular(): CalcResultItem[] {
     const tipoDemissao = this.ctx.contrato.tipo_demissao;
     
-    // Não tem direito em justa causa (exceto se tiver período vencido)
     if (tipoDemissao === 'justa_causa') {
       return [];
     }
@@ -269,7 +261,6 @@ export class FeriasProporcionais extends Rubrica {
     const dataDemissao = this.ctx.contrato.data_demissao;
     if (!dataAdmissao || !dataDemissao) return [];
     
-    // Encontrar início do período aquisitivo atual
     let inicioPerAq = new Date(dataAdmissao);
     while (true) {
       const proxAno = new Date(inicioPerAq);
@@ -278,11 +269,9 @@ export class FeriasProporcionais extends Rubrica {
       inicioPerAq = proxAno;
     }
     
-    // Meses trabalhados no período proporcional
     const diffMs = dataDemissao.getTime() - inicioPerAq.getTime();
     const mesesTrabalhados = Math.floor(diffMs / (30 * 24 * 60 * 60 * 1000));
     
-    // Considera fração de 15+ dias como mês completo
     const diasRestantes = Math.floor((diffMs % (30 * 24 * 60 * 60 * 1000)) / (24 * 60 * 60 * 1000));
     const avos = mesesTrabalhados + (diasRestantes >= 15 ? 1 : 0);
     
@@ -299,19 +288,21 @@ export class FeriasProporcionais extends Rubrica {
       'Férias proporcionais base',
       'Remuneração × (Avos ÷ 12)',
       { remuneracao: remuneracao.toNumber(), avos, divisor: 12 },
-      feriasBase
+      feriasBase,
+      'Art. 146, parágrafo único, CLT'
     );
     
     this.registrarPasso(
       '1/3 constitucional',
       'Férias Proporcionais ÷ 3',
       { ferias_prop: feriasBase.toNumber() },
-      terco
+      terco,
+      'Art. 7º, XVII, CF/88'
     );
     
     const valorFinal = this.arredondar(total);
     
-    return [{
+    return [this.criarResultItem({
       id: `${this.codigo}-total`,
       rubrica_codigo: this.codigo,
       rubrica_nome: this.nome,
@@ -332,7 +323,7 @@ export class FeriasProporcionais extends Rubrica {
         `(${remuneracao} × ${avos}/12) + 1/3`,
         valorFinal
       ),
-    }];
+    })];
   }
 }
 
@@ -349,7 +340,6 @@ export class DecimoTerceiroProporcional extends Rubrica {
   calcular(): CalcResultItem[] {
     const tipoDemissao = this.ctx.contrato.tipo_demissao;
     
-    // Não tem direito em justa causa
     if (tipoDemissao === 'justa_causa') {
       return [];
     }
@@ -358,11 +348,9 @@ export class DecimoTerceiroProporcional extends Rubrica {
     const dataDemissao = this.ctx.contrato.data_demissao;
     if (!dataAdmissao || !dataDemissao) return [];
     
-    // Meses trabalhados no ano
     const anoDemissao = dataDemissao.getFullYear();
     let inicioAno = new Date(anoDemissao, 0, 1);
     
-    // Se admissão no mesmo ano, conta da admissão
     if (dataAdmissao.getFullYear() === anoDemissao) {
       inicioAno = dataAdmissao;
     }
@@ -370,7 +358,6 @@ export class DecimoTerceiroProporcional extends Rubrica {
     const diffMs = dataDemissao.getTime() - inicioAno.getTime();
     const mesesNoAno = Math.floor(diffMs / (30 * 24 * 60 * 60 * 1000));
     
-    // Considera fração de 15+ dias como mês completo
     const diasRestantes = Math.floor((diffMs % (30 * 24 * 60 * 60 * 1000)) / (24 * 60 * 60 * 1000));
     const avos = Math.min(mesesNoAno + (diasRestantes >= 15 ? 1 : 0), 12);
     
@@ -385,12 +372,13 @@ export class DecimoTerceiroProporcional extends Rubrica {
       '13º salário proporcional',
       'Remuneração × (Avos ÷ 12)',
       { remuneracao: remuneracao.toNumber(), avos, divisor: 12 },
-      decimo
+      decimo,
+      'Art. 1º, Lei 4.090/62'
     );
     
     const valorFinal = this.arredondar(decimo);
     
-    return [{
+    return [this.criarResultItem({
       id: `${this.codigo}-${anoDemissao}`,
       rubrica_codigo: this.codigo,
       rubrica_nome: this.nome,
@@ -412,7 +400,7 @@ export class DecimoTerceiroProporcional extends Rubrica {
         `${remuneracao} × ${avos}/12`,
         valorFinal
       ),
-    }];
+    })];
   }
 }
 
