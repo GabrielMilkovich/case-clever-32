@@ -61,6 +61,45 @@ export type Database = {
           },
         ]
       }
+      audit_log: {
+        Row: {
+          acao: string
+          after_json: Json | null
+          before_json: Json | null
+          created_at: string
+          entidade: string
+          entidade_id: string | null
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          acao: string
+          after_json?: Json | null
+          before_json?: Json | null
+          created_at?: string
+          entidade: string
+          entidade_id?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          acao?: string
+          after_json?: Json | null
+          before_json?: Json | null
+          created_at?: string
+          entidade?: string
+          entidade_id?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       calc_lineage: {
         Row: {
           created_at: string
@@ -453,6 +492,69 @@ export type Database = {
           },
         ]
       }
+      calculation_cases: {
+        Row: {
+          ajuizamento_data: string | null
+          case_id: string
+          categoria: string | null
+          cct_act: string | null
+          cidade: string | null
+          created_at: string
+          id: string
+          observacoes: string | null
+          periodo_fim: string | null
+          periodo_inicio: string | null
+          tipo_contrato: string | null
+          uf: string | null
+          updated_at: string
+        }
+        Insert: {
+          ajuizamento_data?: string | null
+          case_id: string
+          categoria?: string | null
+          cct_act?: string | null
+          cidade?: string | null
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
+          tipo_contrato?: string | null
+          uf?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ajuizamento_data?: string | null
+          case_id?: string
+          categoria?: string | null
+          cct_act?: string | null
+          cidade?: string | null
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
+          tipo_contrato?: string | null
+          uf?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calculation_cases_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: true
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "calculation_cases_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: true
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calculation_profiles: {
         Row: {
           ativo: boolean | null
@@ -743,6 +845,149 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      case_inputs: {
+        Row: {
+          case_id: string
+          created_at: string
+          data_fim: string | null
+          data_inicio: string
+          id: string
+          metadata_json: Json | null
+          observacoes: string | null
+          quantidade: number | null
+          source_document_id: string | null
+          tipo_evento: string
+          valor: number | null
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          data_fim?: string | null
+          data_inicio: string
+          id?: string
+          metadata_json?: Json | null
+          observacoes?: string | null
+          quantidade?: number | null
+          source_document_id?: string | null
+          tipo_evento: string
+          valor?: number | null
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          data_fim?: string | null
+          data_inicio?: string
+          id?: string
+          metadata_json?: Json | null
+          observacoes?: string | null
+          quantidade?: number | null
+          source_document_id?: string | null
+          tipo_evento?: string
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_inputs_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "case_inputs_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_inputs_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      case_outputs: {
+        Row: {
+          base_calculo: number | null
+          case_id: string
+          created_at: string
+          descontos_json: Json | null
+          formula_aplicada: string | null
+          id: string
+          legal_basis_json: Json | null
+          memoria_json: Json | null
+          ordem: number | null
+          periodo_ref: string | null
+          reflexos_json: Json | null
+          snapshot_id: string | null
+          valor_bruto: number
+          valor_liquido: number | null
+          verba_codigo: string
+          verba_nome: string | null
+        }
+        Insert: {
+          base_calculo?: number | null
+          case_id: string
+          created_at?: string
+          descontos_json?: Json | null
+          formula_aplicada?: string | null
+          id?: string
+          legal_basis_json?: Json | null
+          memoria_json?: Json | null
+          ordem?: number | null
+          periodo_ref?: string | null
+          reflexos_json?: Json | null
+          snapshot_id?: string | null
+          valor_bruto: number
+          valor_liquido?: number | null
+          verba_codigo: string
+          verba_nome?: string | null
+        }
+        Update: {
+          base_calculo?: number | null
+          case_id?: string
+          created_at?: string
+          descontos_json?: Json | null
+          formula_aplicada?: string | null
+          id?: string
+          legal_basis_json?: Json | null
+          memoria_json?: Json | null
+          ordem?: number | null
+          periodo_ref?: string | null
+          reflexos_json?: Json | null
+          snapshot_id?: string | null
+          valor_bruto?: number
+          valor_liquido?: number | null
+          verba_codigo?: string
+          verba_nome?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_outputs_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "case_outputs_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_outputs_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "calc_snapshots"
             referencedColumns: ["id"]
           },
         ]
@@ -1549,6 +1794,131 @@ export type Database = {
         }
         Relationships: []
       }
+      legal_rules: {
+        Row: {
+          ativo: boolean | null
+          categoria: string | null
+          codigo: string
+          created_at: string
+          descricao: string | null
+          flag_controversia: boolean | null
+          formula_texto: string | null
+          id: string
+          jurisdicao: string
+          link_ref: string | null
+          parametros_json: Json | null
+          prioridade: number | null
+          referencia: string | null
+          source_id: string | null
+          tese_opcoes: Json | null
+          titulo: string
+          updated_at: string
+          versao: number | null
+          vigencia_fim: string | null
+          vigencia_inicio: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          categoria?: string | null
+          codigo: string
+          created_at?: string
+          descricao?: string | null
+          flag_controversia?: boolean | null
+          formula_texto?: string | null
+          id?: string
+          jurisdicao?: string
+          link_ref?: string | null
+          parametros_json?: Json | null
+          prioridade?: number | null
+          referencia?: string | null
+          source_id?: string | null
+          tese_opcoes?: Json | null
+          titulo: string
+          updated_at?: string
+          versao?: number | null
+          vigencia_fim?: string | null
+          vigencia_inicio?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          categoria?: string | null
+          codigo?: string
+          created_at?: string
+          descricao?: string | null
+          flag_controversia?: boolean | null
+          formula_texto?: string | null
+          id?: string
+          jurisdicao?: string
+          link_ref?: string | null
+          parametros_json?: Json | null
+          prioridade?: number | null
+          referencia?: string | null
+          source_id?: string | null
+          tese_opcoes?: Json | null
+          titulo?: string
+          updated_at?: string
+          versao?: number | null
+          vigencia_fim?: string | null
+          vigencia_inicio?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_rules_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "legal_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      legal_sources: {
+        Row: {
+          ativo: boolean | null
+          created_at: string
+          id: string
+          nome: string
+          notas: string | null
+          observado_em: string | null
+          orgao: string
+          publicado_em: string | null
+          tipo: string
+          updated_at: string
+          url: string | null
+          vigencia_fim: string | null
+          vigencia_inicio: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string
+          id?: string
+          nome: string
+          notas?: string | null
+          observado_em?: string | null
+          orgao: string
+          publicado_em?: string | null
+          tipo: string
+          updated_at?: string
+          url?: string | null
+          vigencia_fim?: string | null
+          vigencia_inicio?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string
+          id?: string
+          nome?: string
+          notas?: string | null
+          observado_em?: string | null
+          orgao?: string
+          publicado_em?: string | null
+          tipo?: string
+          updated_at?: string
+          url?: string | null
+          vigencia_fim?: string | null
+          vigencia_inicio?: string | null
+        }
+        Relationships: []
+      }
       parties: {
         Row: {
           case_id: string
@@ -1765,6 +2135,53 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "calculation_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reference_tables: {
+        Row: {
+          ativo: boolean | null
+          coletado_em: string | null
+          competencia: string
+          created_at: string
+          dados_json: Json
+          hash_integridade: string | null
+          id: string
+          nome: string
+          notas: string | null
+          source_id: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          coletado_em?: string | null
+          competencia: string
+          created_at?: string
+          dados_json?: Json
+          hash_integridade?: string | null
+          id?: string
+          nome: string
+          notas?: string | null
+          source_id?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          coletado_em?: string | null
+          competencia?: string
+          created_at?: string
+          dados_json?: Json
+          hash_integridade?: string | null
+          id?: string
+          nome?: string
+          notas?: string | null
+          source_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reference_tables_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "legal_sources"
             referencedColumns: ["id"]
           },
         ]
