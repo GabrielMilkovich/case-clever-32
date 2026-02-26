@@ -844,7 +844,9 @@ export default function CasoDetalhe() {
                   </div>
                   <Button onClick={runPreCalcReview} disabled={!selectedProfile || !canCalculate || isCalculating || isReviewing} className="w-full sm:w-auto">
                     {isReviewing ? <Search className="h-4 w-4 mr-2 animate-pulse" /> : isCalculating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
-                    {isReviewing ? "Revisando documentos..." : isCalculating ? "Calculando..." : "Revisar e Calcular"}
+                    {isReviewing 
+                      ? `Revisando documentos... ${reviewElapsed}s ~${Math.max(30 - reviewElapsed, 5)}s restantes`
+                      : isCalculating ? "Calculando..." : "Revisar e Calcular"}
                   </Button>
                 </div>
                 {!canCalculate && (
