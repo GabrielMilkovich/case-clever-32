@@ -120,10 +120,33 @@ const formatDate = (dateStr: string | null | undefined) => {
   if (!dateStr) return "—";
   try {
     const d = new Date(dateStr);
-    return d.toLocaleDateString("pt-BR");
+    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
   } catch {
     return dateStr;
   }
+};
+
+const DEMISSAO_LABELS: Record<string, string> = {
+  sem_justa_causa: "Dispensa sem Justa Causa",
+  justa_causa: "Dispensa por Justa Causa",
+  pedido_demissao: "Pedido de Demissão",
+  rescisao_indireta: "Rescisão Indireta",
+  acordo: "Acordo Mútuo (Art. 484-A CLT)",
+};
+
+const formatFactDisplay = (key: string, valor: string): string => {
+  if (key.includes("data_")) return formatDate(valor);
+  if (key.includes("salario")) {
+    const num = parseFloat(valor.replace(/[^\d.,\-]/g, "").replace(",", "."));
+    if (!isNaN(num)) return formatCurrency(num);
+  }
+  if (key.includes("demissao") || key.includes("motivo")) {
+    return DEMISSAO_LABELS[valor] || valor.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+  }
+  if (key === "jornada_contratual") {
+    return valor.includes("{") ? "44h semanais / 220h mensais" : valor;
+  }
+  return valor;
 };
 
 // =====================================================
@@ -291,7 +314,7 @@ export function CalculationDetailView({ caseId, facts, onExecuteCalc }: Calculat
                     <span className="text-[10px] uppercase text-muted-foreground font-medium">{cf.label}</span>
                   </div>
                   <div className="text-sm font-semibold truncate" title={fact.valor}>
-                    {cf.key.includes("data") ? formatDate(fact.valor) : fact.valor}
+                    {formatFactDisplay(cf.key, fact.valor)}
                   </div>
                   {fact.confianca != null && (
                     <div className="text-[10px] text-muted-foreground mt-0.5">{Math.round(fact.confianca * 100)}% confiança</div>
