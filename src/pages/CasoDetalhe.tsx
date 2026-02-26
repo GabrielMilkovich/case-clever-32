@@ -911,6 +911,21 @@ export default function CasoDetalhe() {
   };
 
   // =====================================================
+  // REVIEW DIALOG HELPERS
+  // =====================================================
+  const review = reviewResult?.review;
+  const reviewMeta = reviewResult?.metadata;
+  const severityColor = (s: string) => {
+    switch (s) {
+      case 'critica': return 'text-red-600 bg-red-50 border-red-200';
+      case 'alta': return 'text-orange-600 bg-orange-50 border-orange-200';
+      case 'media': return 'text-amber-600 bg-amber-50 border-amber-200';
+      case 'baixa': return 'text-blue-600 bg-blue-50 border-blue-200';
+      default: return 'text-muted-foreground bg-muted border-border';
+    }
+  };
+
+  // =====================================================
   // RENDER
   // =====================================================
   return (
@@ -929,6 +944,176 @@ export default function CasoDetalhe() {
       >
         {renderTabContent()}
       </CaseWorkspace>
+
+      {/* ===== PRE-CALC REVIEW DIALOG ===== */}
+      <Dialog open={showReviewDialog} onOpenChange={setShowReviewDialog}>
+        <DialogContent className="max-w-3xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {review?.aprovado ? (
+                <CircleCheck className="h-5 w-5 text-green-600" />
+              ) : (
+                <CircleAlert className="h-5 w-5 text-amber-600" />
+              )}
+              Revisão Documental Pré-Cálculo
+            </DialogTitle>
+            <DialogDescription>
+              {reviewMeta && (
+                <span className="text-xs">
+                  {reviewMeta.chunks_analisados} chunks • {reviewMeta.fatos_verificados} fatos • {reviewMeta.documentos_analisados} documentos analisados
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="max-h-[65vh] pr-4">
+            {review && (
+              <div className="space-y-4">
+                {/* Score */}
+                <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50">
+                  <div className="text-center">
+                    <div className={cn("text-3xl font-bold", review.score_confianca >= 80 ? "text-green-600" : review.score_confianca >= 50 ? "text-amber-600" : "text-red-600")}>
+                      {review.score_confianca}%
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">Confiança</div>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm">{review.resumo_documental}</p>
+                  </div>
+                  <Badge variant={review.aprovado ? "default" : "destructive"} className="text-xs">
+                    {review.aprovado ? "Aprovado" : "Pendências"}
+                  </Badge>
+                </div>
+
+                {/* Divergências */}
+                {review.divergencias?.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold flex items-center gap-2 mb-2">
+                      <FileWarning className="h-4 w-4 text-amber-600" />
+                      Divergências ({review.divergencias.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {review.divergencias.map((d: any, i: number) => (
+                        <div key={i} className={cn("p-3 rounded-lg border text-sm", severityColor(d.severidade))}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium">{d.campo}</span>
+                            <Badge variant="outline" className="text-[10px]">{d.severidade}</Badge>
+                          </div>
+                          {d.valor_fato && <p className="text-xs">Sistema: <strong>{d.valor_fato}</strong></p>}
+                          {d.valor_documento && <p className="text-xs">Documento: <strong>{d.valor_documento}</strong></p>}
+                          {d.documento_fonte && <p className="text-xs opacity-70">Fonte: {d.documento_fonte}</p>}
+                          <p className="text-xs mt-1">💡 {d.recomendacao}</p>
+                          {d.impacto_financeiro && <p className="text-xs mt-1 font-medium">💰 {d.impacto_financeiro}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Dados não cadastrados */}
+                {review.dados_extraidos_nao_cadastrados?.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold flex items-center gap-2 mb-2">
+                      <AlertTriangle className="h-4 w-4 text-orange-600" />
+                      Dados nos Documentos NÃO Cadastrados ({review.dados_extraidos_nao_cadastrados.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {review.dados_extraidos_nao_cadastrados.map((d: any, i: number) => (
+                        <div key={i} className={cn("p-3 rounded-lg border text-sm", severityColor(d.importancia))}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium">{d.campo}: {d.valor_sugerido}</span>
+                            <Badge variant="outline" className="text-[10px]">{d.importancia}</Badge>
+                          </div>
+                          <p className="text-xs">{d.justificativa}</p>
+                          {d.documento_fonte && <p className="text-xs opacity-70 mt-1">Fonte: {d.documento_fonte}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Correções sugeridas */}
+                {review.correcoes_sugeridas?.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold flex items-center gap-2 mb-2">
+                      <Settings2 className="h-4 w-4 text-primary" />
+                      Correções Sugeridas ({review.correcoes_sugeridas.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {review.correcoes_sugeridas.map((c: any, i: number) => (
+                        <div key={i} className="p-3 rounded-lg border bg-primary/5 border-primary/20 text-sm">
+                          <span className="font-medium">{c.campo}</span>
+                          {c.valor_atual && <span className="text-muted-foreground"> ({c.valor_atual})</span>}
+                          <span> → </span>
+                          <span className="font-bold text-primary">{c.valor_correto}</span>
+                          <p className="text-xs mt-1">{c.motivo}</p>
+                          <p className="text-xs opacity-70">Fonte: {c.fonte}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Alertas de cálculo */}
+                {review.alertas_calculo?.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold flex items-center gap-2 mb-2">
+                      <Calculator className="h-4 w-4" />
+                      Alertas para o Cálculo ({review.alertas_calculo.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {review.alertas_calculo.map((a: any, i: number) => (
+                        <div key={i} className="p-3 rounded-lg border bg-accent/5 border-accent/20 text-sm">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant="outline" className="text-[10px]">{a.tipo}</Badge>
+                            <span className="font-medium">{a.descricao}</span>
+                          </div>
+                          <p className="text-xs">{a.impacto}</p>
+                          {a.acao_necessaria && <p className="text-xs mt-1 text-primary">⚡ {a.acao_necessaria}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Verbas identificadas */}
+                {review.verbas_identificadas?.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold flex items-center gap-2 mb-2">
+                      <TrendingUp className="h-4 w-4 text-green-600" />
+                      Verbas Identificáveis ({review.verbas_identificadas.length})
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {review.verbas_identificadas.map((v: any, i: number) => (
+                        <div key={i} className="p-2 rounded-lg border bg-green-50/50 border-green-200 text-sm">
+                          <span className="font-medium">{v.verba}</span>
+                          <Badge variant="outline" className={cn("text-[10px] ml-2",
+                            v.confianca === 'alta' ? 'border-green-300 text-green-700' :
+                            v.confianca === 'media' ? 'border-amber-300 text-amber-700' :
+                            'border-red-300 text-red-700'
+                          )}>{v.confianca}</Badge>
+                          <p className="text-xs text-muted-foreground mt-1">{v.base_documental}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </ScrollArea>
+
+          <Separator />
+          <div className="flex gap-3 justify-end pt-2">
+            <Button variant="outline" onClick={() => setShowReviewDialog(false)}>
+              <Ban className="h-4 w-4 mr-2" /> Cancelar e Corrigir
+            </Button>
+            <Button onClick={executeCalculation} disabled={isCalculating}>
+              {isCalculating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
+              Prosseguir com Cálculo
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </MainLayoutPremium>
   );
 }
