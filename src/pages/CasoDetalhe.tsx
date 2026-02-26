@@ -366,6 +366,21 @@ export default function CasoDetalhe() {
 
       const adm = facts.find(f => f.chave === "data_admissao")?.valor;
       const dem = facts.find(f => f.chave === "data_demissao")?.valor;
+
+      // Fix definitivo: garante cálculo de verbas rescisórias quando há vínculo encerrado,
+      // mesmo que o perfil ainda não tenha essa calculadora vinculada no admin.
+      const hasRescisoriasCalculator = calculatorsWithRules.some(c => c.nome === "verbas_rescisorias");
+      if (adm && dem && !hasRescisoriasCalculator) {
+        calculatorsWithRules.push({
+          nome: "verbas_rescisorias",
+          rules: {
+            versao: "1.0.0",
+            vigencia_inicio: new Date().toISOString().slice(0, 10),
+            regras: {},
+          } as CalculatorRules,
+        });
+      }
+
       const start = adm ? new Date(adm) : null;
       const end = dem ? new Date(dem) : null;
 
@@ -397,19 +412,11 @@ export default function CasoDetalhe() {
 
       if (!insertedRun?.id) throw new Error("Falha ao salvar cálculo");
 
-      // Calc totals
-      const calcTotal = (obj: unknown): number => {
-        if (!obj || typeof obj !== 'object') return 0;
-        let total = 0;
-        for (const val of Object.values(obj as object)) {
-          if (typeof val === 'number') total += val;
-          else if (typeof val === 'object' && val) for (const v of Object.values(val as object)) { if (typeof v === 'number') total += v; }
-        }
-        return total;
-      };
+      const totalBrutoRaw = Number(result.resultado_bruto?.total ?? 0);
+      const totalLiquidoRaw = Number(result.resultado_liquido?.total ?? totalBrutoRaw);
+      const totalBruto = Number.isFinite(totalBrutoRaw) ? totalBrutoRaw : 0;
+      const totalLiquido = Number.isFinite(totalLiquidoRaw) ? totalLiquidoRaw : totalBruto;
 
-      const totalBruto = calcTotal(result.resultado_bruto);
-      const totalLiquido = calcTotal(result.resultado_liquido);
       const { count: existingSnaps } = await supabase.from("calc_snapshots").select("id", { count: "exact" }).eq("case_id", id);
       const nextVersion = (existingSnaps || 0) + 1;
 
