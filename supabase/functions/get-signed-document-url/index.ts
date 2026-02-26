@@ -16,6 +16,7 @@ const corsHeaders = {
 type Body = {
   document_id?: string;
   expires_in?: number; // seconds
+  mode?: "url" | "blob";
 };
 
 serve(async (req) => {
@@ -52,6 +53,7 @@ serve(async (req) => {
     const body = (await req.json().catch(() => ({}))) as Body;
     const documentId = body.document_id;
     const expiresIn = Math.max(60, Math.min(3600, body.expires_in ?? 3600));
+    const mode = body.mode ?? "url";
 
     if (!documentId) {
       return new Response(JSON.stringify({ error: "document_id is required" }), {
@@ -108,6 +110,35 @@ serve(async (req) => {
 
     // Bucket atual (privado)
     const bucket = "juriscalculo-documents";
+
+    // Modo blob: retorna bytes do arquivo para prévia inline sem bloqueio de iframe
+    if (mode === "blob") {
+      const { data: fileData, error: downloadErr } = await supabase.storage
+        .from(bucket)
+        .download(document.storage_path);
+
+      if (downloadErr || !fileData) {
+        console.error("download error:", downloadErr);
+        return new Response(JSON.stringify({ error: "Could not download document" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const arrayBuffer = await fileData.arrayBuffer();
+      const safeFileName = (document.file_name ?? "documento").replace(/[\r\n"]/g, "");
+
+      return new Response(arrayBuffer, {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": document.mime_type || "application/pdf",
+          "Content-Disposition": `inline; filename="${safeFileName}"`,
+          "Cache-Control": "private, max-age=300",
+        },
+      });
+    }
+
+    // Modo url (padrão): gera URL assinada
     const { data: signedUrlData, error: signedErr } = await supabase.storage
       .from(bucket)
       .createSignedUrl(document.storage_path, expiresIn);
