@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import {
   Loader2, AlertTriangle, Play, FileText, Sparkles, ShieldCheck,
   Calculator, FileStack, Scroll, RefreshCw, ChevronRight, Check,
-  Settings2, Clock, ArrowRight, CheckCircle2, XCircle, TrendingUp,
+  Settings2, Clock, ArrowRight, CheckCircle2, XCircle, TrendingUp, BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +33,7 @@ import { ProcessingMonitorPanel } from "@/components/cases/ProcessingMonitorPane
 import { CalculationDetailView } from "@/components/cases/CalculationDetailView";
 import { PetitionGenerator } from "@/components/cases/PetitionGenerator";
 import { PremissasEditor } from "@/components/cases/PremissasEditor";
+import { CaseBriefing } from "@/components/cases/CaseBriefing";
 import { RiskAnalysisPanel } from "@/components/cases/pericial/RiskAnalysisPanel";
 import { ControversyManager } from "@/components/cases/pericial/ControversyManager";
 import { ScenarioManager } from "@/components/cases/pericial/ScenarioManager";
@@ -281,6 +282,12 @@ export default function CasoDetalhe() {
       completed: caseData.status === "revisado",
       active: activeTab === "peticao",
       tooltip: "Geração de petição inicial",
+    },
+    {
+      id: "roteiro", label: "Roteiro", icon: BookOpen,
+      completed: false,
+      active: activeTab === "roteiro",
+      tooltip: "Roteiro completo do caso gerado por IA",
     },
   ];
 
@@ -824,6 +831,19 @@ export default function CasoDetalhe() {
               }}
             />
           </div>
+        );
+
+      case "roteiro":
+        return (
+          <CaseBriefing
+            caseId={id!}
+            caseInfo={{
+              cliente: caseData.cliente,
+              numero_processo: caseData.numero_processo,
+              tribunal: (caseData as any).tribunal,
+              status: caseData.status,
+            }}
+          />
         );
 
       default:
