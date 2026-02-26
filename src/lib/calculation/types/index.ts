@@ -221,6 +221,7 @@ export interface FundamentoLegal {
   dispositivo: string;    // "Art. 59, §1º, CLT"
   descricao: string;      // "Adicional de no mínimo 50% sobre a hora normal"
   norma: string;          // "CLT" | "CF/88" | "Lei 8.036/90" etc.
+  status?: 'vigente' | 'cancelada' | 'modulada' | 'historica' | 'controversa';
 }
 
 export interface MemoriaCalculo {

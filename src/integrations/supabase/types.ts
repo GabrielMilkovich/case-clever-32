@@ -1809,7 +1809,9 @@ export type Database = {
           parametros_json: Json | null
           prioridade: number | null
           referencia: string | null
+          referencia_curta: string | null
           source_id: string | null
+          status: string
           tese_opcoes: Json | null
           titulo: string
           updated_at: string
@@ -1831,7 +1833,9 @@ export type Database = {
           parametros_json?: Json | null
           prioridade?: number | null
           referencia?: string | null
+          referencia_curta?: string | null
           source_id?: string | null
+          status?: string
           tese_opcoes?: Json | null
           titulo: string
           updated_at?: string
@@ -1853,7 +1857,9 @@ export type Database = {
           parametros_json?: Json | null
           prioridade?: number | null
           referencia?: string | null
+          referencia_curta?: string | null
           source_id?: string | null
+          status?: string
           tese_opcoes?: Json | null
           titulo?: string
           updated_at?: string
@@ -1881,6 +1887,7 @@ export type Database = {
           observado_em: string | null
           orgao: string
           publicado_em: string | null
+          status: string
           tipo: string
           updated_at: string
           url: string | null
@@ -1896,6 +1903,7 @@ export type Database = {
           observado_em?: string | null
           orgao: string
           publicado_em?: string | null
+          status?: string
           tipo: string
           updated_at?: string
           url?: string | null
@@ -1911,6 +1919,7 @@ export type Database = {
           observado_em?: string | null
           orgao?: string
           publicado_em?: string | null
+          status?: string
           tipo?: string
           updated_at?: string
           url?: string | null
