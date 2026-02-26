@@ -190,6 +190,33 @@ export function DocumentsManager({
     }
   }, []);
 
+  // Detectar tipo de documento automaticamente pelo nome do arquivo
+  const detectDocType = (fileName: string): string => {
+    const name = fileName.toLowerCase();
+    
+    // TRCT / Termo de Rescisão
+    if (name.includes("trct") || name.includes("rescis") || name.includes("termo_rescis") || name.includes("termo de rescis")) {
+      return "trct";
+    }
+    // Holerite / Contracheque
+    if (name.includes("holerite") || name.includes("contracheque") || name.includes("recibo_pagamento") || name.includes("folha_pagamento") || name.includes("demonstrativo")) {
+      return "holerite";
+    }
+    // Cartão de ponto
+    if (name.includes("ponto") || name.includes("cartao_ponto") || name.includes("registro_ponto") || name.includes("jornada") || name.includes("frequencia")) {
+      return "cartao_ponto";
+    }
+    // Petição
+    if (name.includes("peticao") || name.includes("petição") || name.includes("inicial") || name.includes("contestacao") || name.includes("contestação") || name.includes("recurso")) {
+      return "peticao";
+    }
+    // Sentença
+    if (name.includes("sentenca") || name.includes("sentença") || name.includes("acordao") || name.includes("acórdão") || name.includes("decisao") || name.includes("decisão") || name.includes("despacho")) {
+      return "sentenca";
+    }
+    return "outro";
+  };
+
   // Upload de arquivos
   const handleFileUpload = useCallback(async (files: FileList) => {
     if (!caseId || files.length === 0) return;
@@ -211,10 +238,13 @@ export function DocumentsManager({
           continue;
         }
 
+        // Detectar tipo automaticamente pelo nome do arquivo
+        const autoDetectedType = detectDocType(file.name);
+
         const formData = new FormData();
         formData.append("file", file);
         formData.append("case_id", caseId);
-        formData.append("doc_type", selectedType);
+        formData.append("doc_type", autoDetectedType);
 
         // Use backend upload function (handles ownership checks + storage + DB insert + signed URL)
         const { data, error } = await supabase.functions.invoke("upload-document", {
