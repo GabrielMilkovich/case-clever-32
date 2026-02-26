@@ -1,5 +1,6 @@
 // =====================================================
 // ENGINE DE RUBRICAS V3 - CÁLCULO DETERMINÍSTICO AUDITÁVEL
+// Memória de Cálculo + Base Legal obrigatória com URLs oficiais
 // OJ 394 modulação, Súmula 340, INSS/IRRF, status legal
 // =====================================================
 
@@ -15,86 +16,169 @@ import {
   MonthlyData,
   ContractData,
   ValidatedInput,
+  RubricaRisco,
   toDecimal,
   hashObject,
 } from '../types/index';
 
 // =====================================================
-// MAPA DE FUNDAMENTOS LEGAIS POR RUBRICA (V3: com status)
+// MAPA DE FUNDAMENTOS LEGAIS POR RUBRICA (V3: URLs oficiais obrigatórias)
 // =====================================================
 
 export const FUNDAMENTOS_LEGAIS: Record<string, FundamentoLegal[]> = {
   HE50: [
-    { dispositivo: 'Art. 59, §1º, CLT', descricao: 'Adicional de no mínimo 50% sobre a hora normal', norma: 'CLT', status: 'vigente' },
-    { dispositivo: 'Art. 7º, XVI, CF/88', descricao: 'Remuneração do serviço extraordinário superior em 50%', norma: 'CF/88', status: 'vigente' },
+    { dispositivo: 'Art. 59, §1º, CLT', descricao: 'Adicional de no mínimo 50% sobre a hora normal', norma: 'CLT', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452.htm#art59' },
+    { dispositivo: 'Art. 7º, XVI, CF/88', descricao: 'Remuneração do serviço extraordinário superior em 50%', norma: 'CF/88', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/constituicao/constituicao.htm#art7' },
   ],
   HE100: [
-    { dispositivo: 'Art. 59, §1º, CLT', descricao: 'Adicional sobre hora extra em domingos e feriados', norma: 'CLT', status: 'vigente' },
-    { dispositivo: 'Súmula 146, TST', descricao: 'Trabalho em domingos e feriados não compensado — pagamento em dobro', norma: 'TST', status: 'vigente' },
+    { dispositivo: 'Art. 59, §1º, CLT', descricao: 'Adicional sobre hora extra em domingos e feriados', norma: 'CLT', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452.htm#art59' },
+    { dispositivo: 'Súmula 146, TST', descricao: 'Trabalho em domingos e feriados não compensado — pagamento em dobro', norma: 'TST', status: 'vigente', url_oficial: 'https://www.tst.jus.br/sumulas' },
   ],
   HE_COMISSIONISTA: [
-    { dispositivo: 'Súmula 340, TST', descricao: 'Comissionista puro: HE = apenas adicional sobre valor-hora das comissões', norma: 'TST', status: 'vigente' },
-    { dispositivo: 'Art. 7º, XVI, CF/88', descricao: 'Remuneração do serviço extraordinário', norma: 'CF/88', status: 'vigente' },
+    { dispositivo: 'Súmula 340, TST', descricao: 'Comissionista puro: HE = apenas adicional sobre valor-hora das comissões', norma: 'TST', status: 'vigente', url_oficial: 'https://www.tst.jus.br/sumulas' },
+    { dispositivo: 'Art. 7º, XVI, CF/88', descricao: 'Remuneração do serviço extraordinário', norma: 'CF/88', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/constituicao/constituicao.htm#art7' },
   ],
   DSR_HE: [
-    { dispositivo: 'Art. 7º, alínea "a", Lei 605/49', descricao: 'Reflexo das horas extras habituais no DSR', norma: 'Lei 605/49', status: 'vigente' },
-    { dispositivo: 'Súmula 172, TST', descricao: 'Horas extras habituais repercutem no cálculo do RSR', norma: 'TST', status: 'vigente' },
+    { dispositivo: 'Art. 7º, alínea "a", Lei 605/49', descricao: 'Reflexo das horas extras habituais no DSR', norma: 'Lei 605/49', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/leis/l0605.htm' },
+    { dispositivo: 'Súmula 172, TST', descricao: 'Horas extras habituais repercutem no cálculo do RSR', norma: 'TST', status: 'vigente', url_oficial: 'https://www.tst.jus.br/sumulas' },
   ],
   DSR_OJ394_PRE: [
-    { dispositivo: 'OJ 394, SDI-1, TST (pré-modulação)', descricao: 'Até 19/03/2023: DSR majorado NÃO repercute em férias, 13º, aviso e FGTS', norma: 'TST', status: 'historica' },
+    { dispositivo: 'OJ 394, SDI-1, TST (pré-modulação)', descricao: 'Até 19/03/2023: DSR majorado NÃO repercute em férias, 13º, aviso e FGTS', norma: 'TST', status: 'historica', url_oficial: 'https://www.tst.jus.br/web/guest/orientacoes-jurisprudenciais', vigencia_fim: '2023-03-19' },
   ],
   DSR_OJ394_POS: [
-    { dispositivo: 'OJ 394, SDI-1, TST (pós-modulação)', descricao: 'A partir de 20/03/2023: DSR majorado repercute em férias, 13º, aviso e FGTS', norma: 'TST', status: 'vigente' },
-    { dispositivo: 'IRR-10169-57.2013.5.05.0024', descricao: 'Modulação de efeitos pelo TST Pleno', norma: 'TST', status: 'vigente' },
+    { dispositivo: 'OJ 394, SDI-1, TST (pós-modulação)', descricao: 'A partir de 20/03/2023: DSR majorado repercute em férias, 13º, aviso e FGTS', norma: 'TST', status: 'vigente', url_oficial: 'https://www.tst.jus.br/web/guest/orientacoes-jurisprudenciais', vigencia_inicio: '2023-03-20' },
+    { dispositivo: 'IRR-10169-57.2013.5.05.0024', descricao: 'Modulação de efeitos pelo TST Pleno', norma: 'TST', status: 'vigente', url_oficial: 'https://www.tst.jus.br/' },
   ],
   ADIC_NOT: [
-    { dispositivo: 'Art. 73, CLT', descricao: 'Adicional noturno de no mínimo 20% sobre a hora diurna', norma: 'CLT', status: 'vigente' },
-    { dispositivo: 'Art. 73, §1º, CLT', descricao: 'Hora noturna reduzida: 52 minutos e 30 segundos', norma: 'CLT', status: 'vigente' },
+    { dispositivo: 'Art. 73, CLT', descricao: 'Adicional noturno de no mínimo 20% sobre a hora diurna', norma: 'CLT', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452.htm#art73' },
+    { dispositivo: 'Art. 73, §1º, CLT', descricao: 'Hora noturna reduzida: 52 minutos e 30 segundos', norma: 'CLT', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452.htm#art73' },
   ],
   REFL_FERIAS: [
-    { dispositivo: 'Art. 142, CLT', descricao: 'Integração das parcelas habituais na remuneração de férias', norma: 'CLT', status: 'vigente' },
-    { dispositivo: 'Art. 7º, XVII, CF/88', descricao: 'Férias com acréscimo de 1/3', norma: 'CF/88', status: 'vigente' },
-    // Súmula 151 CANCELADA - não usar como fundamento
+    { dispositivo: 'Art. 142, CLT', descricao: 'Integração das parcelas habituais na remuneração de férias', norma: 'CLT', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452.htm#art142' },
+    { dispositivo: 'Art. 7º, XVII, CF/88', descricao: 'Férias com acréscimo de 1/3', norma: 'CF/88', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/constituicao/constituicao.htm#art7' },
+    // Súmula 151 CANCELADA - NÃO incluída como fundamento
   ],
   REFL_13: [
-    { dispositivo: 'Art. 1º, Lei 4.090/62', descricao: '13º salário com base na remuneração integral', norma: 'Lei 4.090/62', status: 'vigente' },
-    { dispositivo: 'Súmula 45, TST', descricao: 'HE habituais integram cálculo do 13º', norma: 'TST', status: 'vigente' },
+    { dispositivo: 'Art. 1º, Lei 4.090/62', descricao: '13º salário com base na remuneração integral', norma: 'Lei 4.090/62', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/leis/l4090.htm' },
+    { dispositivo: 'Súmula 45, TST', descricao: 'HE habituais integram cálculo do 13º', norma: 'TST', status: 'vigente', url_oficial: 'https://www.tst.jus.br/sumulas' },
   ],
   FGTS: [
-    { dispositivo: 'Art. 15, Lei 8.036/90', descricao: 'Depósito mensal de 8% sobre a remuneração', norma: 'Lei 8.036/90', status: 'vigente' },
+    { dispositivo: 'Art. 15, Lei 8.036/90', descricao: 'Depósito mensal de 8% sobre a remuneração', norma: 'Lei 8.036/90', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/leis/l8036consol.htm' },
   ],
   MULTA_FGTS: [
-    { dispositivo: 'Art. 18, §1º, Lei 8.036/90', descricao: 'Multa de 40% na despedida sem justa causa', norma: 'Lei 8.036/90', status: 'vigente' },
-    { dispositivo: 'Art. 484-A, §1º, CLT', descricao: 'Multa de 20% na rescisão por acordo', norma: 'CLT', status: 'vigente' },
+    { dispositivo: 'Art. 18, §1º, Lei 8.036/90', descricao: 'Multa de 40% na despedida sem justa causa', norma: 'Lei 8.036/90', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/leis/l8036consol.htm' },
+    { dispositivo: 'Art. 484-A, §1º, CLT', descricao: 'Multa de 20% na rescisão por acordo', norma: 'CLT', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452.htm#art484a' },
   ],
   SALDO_SAL: [
-    { dispositivo: 'Art. 457, CLT', descricao: 'Salário devido pelos dias trabalhados no mês da rescisão', norma: 'CLT', status: 'vigente' },
+    { dispositivo: 'Art. 457, CLT', descricao: 'Salário devido pelos dias trabalhados no mês da rescisão', norma: 'CLT', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452.htm#art457' },
   ],
   AVISO_PREVIO: [
-    { dispositivo: 'Art. 487, §1º, CLT', descricao: 'Aviso prévio de no mínimo 30 dias', norma: 'CLT', status: 'vigente' },
-    { dispositivo: 'Art. 1º, Lei 12.506/11', descricao: 'Acréscimo de 3 dias por ano de serviço (máx 60 dias adicionais)', norma: 'Lei 12.506/11', status: 'vigente' },
+    { dispositivo: 'Art. 487, §1º, CLT', descricao: 'Aviso prévio de no mínimo 30 dias', norma: 'CLT', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452.htm#art487' },
+    { dispositivo: 'Art. 1º, Lei 12.506/11', descricao: 'Acréscimo de 3 dias por ano de serviço (máx 60 dias adicionais)', norma: 'Lei 12.506/11', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/_ato2011-2014/2011/lei/l12506.htm' },
   ],
   FERIAS_VENC: [
-    { dispositivo: 'Art. 137, CLT', descricao: 'Férias em dobro quando não concedidas no prazo', norma: 'CLT', status: 'vigente' },
-    { dispositivo: 'Art. 7º, XVII, CF/88', descricao: 'Férias com 1/3 constitucional', norma: 'CF/88', status: 'vigente' },
+    { dispositivo: 'Art. 137, CLT', descricao: 'Férias em dobro quando não concedidas no prazo', norma: 'CLT', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452.htm#art137' },
+    { dispositivo: 'Art. 7º, XVII, CF/88', descricao: 'Férias com 1/3 constitucional', norma: 'CF/88', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/constituicao/constituicao.htm#art7' },
   ],
   FERIAS_PROP: [
-    { dispositivo: 'Art. 146, parágrafo único, CLT', descricao: 'Férias proporcionais na rescisão', norma: 'CLT', status: 'vigente' },
-    { dispositivo: 'Súmula 171, TST', descricao: 'Férias proporcionais devidas mesmo com menos de 1 ano', norma: 'TST', status: 'vigente' },
+    { dispositivo: 'Art. 146, parágrafo único, CLT', descricao: 'Férias proporcionais na rescisão', norma: 'CLT', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452.htm#art146' },
+    { dispositivo: 'Súmula 171, TST', descricao: 'Férias proporcionais devidas mesmo com menos de 1 ano', norma: 'TST', status: 'vigente', url_oficial: 'https://www.tst.jus.br/sumulas' },
   ],
   DECIMO_PROP: [
-    { dispositivo: 'Art. 1º, Lei 4.090/62', descricao: '13º proporcional aos meses trabalhados', norma: 'Lei 4.090/62', status: 'vigente' },
-    { dispositivo: 'Art. 3º, Lei 4.090/62', descricao: 'Fração ≥ 15 dias = mês integral', norma: 'Lei 4.090/62', status: 'vigente' },
+    { dispositivo: 'Art. 1º, Lei 4.090/62', descricao: '13º proporcional aos meses trabalhados', norma: 'Lei 4.090/62', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/leis/l4090.htm' },
+    { dispositivo: 'Art. 3º, Lei 4.090/62', descricao: 'Fração ≥ 15 dias = mês integral', norma: 'Lei 4.090/62', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/leis/l4090.htm' },
   ],
   INSS: [
-    { dispositivo: 'EC 103/2019', descricao: 'Alíquotas progressivas de INSS', norma: 'EC 103/2019', status: 'vigente' },
-    { dispositivo: 'Art. 28, Lei 8.212/91', descricao: 'Base de cálculo da contribuição previdenciária', norma: 'Lei 8.212/91', status: 'vigente' },
+    { dispositivo: 'EC 103/2019', descricao: 'Alíquotas progressivas de INSS', norma: 'EC 103/2019', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/constituicao/emendas/emc/emc103.htm' },
+    { dispositivo: 'Art. 28, Lei 8.212/91', descricao: 'Base de cálculo da contribuição previdenciária', norma: 'Lei 8.212/91', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/leis/l8212cons.htm' },
   ],
   IRRF: [
-    { dispositivo: 'Lei 7.713/88', descricao: 'Imposto de Renda na Fonte sobre rendimentos do trabalho', norma: 'Lei 7.713/88', status: 'vigente' },
-    { dispositivo: 'RFB - Tabela Progressiva', descricao: 'Faixas e alíquotas vigentes', norma: 'RFB', status: 'vigente' },
+    { dispositivo: 'Lei 7.713/88', descricao: 'Imposto de Renda na Fonte sobre rendimentos do trabalho', norma: 'Lei 7.713/88', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/leis/l7713.htm' },
+    { dispositivo: 'RFB - Tabela Progressiva', descricao: 'Faixas e alíquotas vigentes', norma: 'RFB', status: 'vigente', url_oficial: 'https://www.gov.br/receitafederal/pt-br/assuntos/orientacao-tributaria/tributos/irpf-imposto-de-renda-pessoa-fisica' },
   ],
 };
+
+// URLs oficiais permitidas (validação)
+const URLS_OFICIAIS_PERMITIDAS = [
+  'planalto.gov.br',
+  'tst.jus.br',
+  'stf.jus.br',
+  'portal.stf.jus.br',
+  'gov.br',
+  'bcb.gov.br',
+];
+
+export function validarUrlOficial(url: string): boolean {
+  return URLS_OFICIAIS_PERMITIDAS.some(domain => url.includes(domain));
+}
+
+// =====================================================
+// VALIDAÇÃO DE FUNDAMENTOS LEGAIS
+// =====================================================
+
+export interface FundamentoValidationResult {
+  valido: boolean;
+  rubrica_codigo: string;
+  erros: string[];
+  avisos: string[];
+}
+
+export function validarFundamentosRubrica(codigo: string): FundamentoValidationResult {
+  const fundamentos = FUNDAMENTOS_LEGAIS[codigo];
+  const result: FundamentoValidationResult = { valido: true, rubrica_codigo: codigo, erros: [], avisos: [] };
+
+  if (!fundamentos || fundamentos.length === 0) {
+    result.valido = false;
+    result.erros.push(`Fundamento legal ausente para a rubrica ${codigo}. Cálculo BLOQUEADO.`);
+    return result;
+  }
+
+  for (const f of fundamentos) {
+    if (!f.url_oficial) {
+      result.valido = false;
+      result.erros.push(`Fundamento "${f.dispositivo}" sem URL oficial. Cálculo BLOQUEADO.`);
+    } else if (!validarUrlOficial(f.url_oficial)) {
+      result.valido = false;
+      result.erros.push(`URL "${f.url_oficial}" não é fonte oficial permitida para "${f.dispositivo}".`);
+    }
+
+    if (f.status === 'cancelada') {
+      result.valido = false;
+      result.erros.push(`Fundamento "${f.dispositivo}" está CANCELADO/SUPERADO. Não pode ser usado como default.`);
+    }
+
+    if (f.status === 'modulada' || f.status === 'controversa') {
+      result.avisos.push(`Fundamento "${f.dispositivo}" tem status "${f.status}" — tese selecionada deve ser justificada.`);
+    }
+
+    if (f.status === 'historica') {
+      result.avisos.push(`Fundamento "${f.dispositivo}" é histórico — aplicável apenas a competências dentro da vigência.`);
+    }
+  }
+
+  return result;
+}
+
+// =====================================================
+// GERADOR DE NARRATIVA JURÍDICA
+// =====================================================
+
+export function gerarNarrativaRubrica(item: CalcResultItem): string {
+  const fundamentos = item.fundamento_legal
+    .filter(f => f.status !== 'cancelada')
+    .map(f => f.dispositivo)
+    .join('; ');
+
+  const memoriaResumo = item.memoria
+    .filter(m => m.fundamento_legal)
+    .map(m => `${m.descricao}: ${m.formula}`)
+    .join('. ');
+
+  const valorStr = `R$ ${item.valor_bruto.toFixed(2)}`;
+  const competenciaStr = item.competencia ? ` (competência ${item.competencia})` : '';
+
+  return `${item.rubrica_nome}${competenciaStr}: apurado o valor de ${valorStr}. ${memoriaResumo ? memoriaResumo + '.' : ''} Fundamentação: ${fundamentos || 'NÃO CADASTRADA'}.`;
+}
 
 // Configuração de precisão
 Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
@@ -138,6 +222,18 @@ export abstract class Rubrica {
   protected getFundamentosLegais(): FundamentoLegal[] {
     return FUNDAMENTOS_LEGAIS[this.codigo] ?? [];
   }
+
+  /**
+   * Valida que fundamentos legais existem e são válidos.
+   * Retorna null se ok, ou string de erro se bloqueado.
+   */
+  protected validarFundamentos(): string | null {
+    const validacao = validarFundamentosRubrica(this.codigo);
+    if (!validacao.valido) {
+      return validacao.erros.join(' | ');
+    }
+    return null;
+  }
   
   protected registrarPasso(
     descricao: string, formula: string,
@@ -149,8 +245,22 @@ export abstract class Rubrica {
     return resultado;
   }
   
-  protected criarResultItem(item: Omit<CalcResultItem, 'fundamento_legal'>): CalcResultItem {
-    return { ...item, fundamento_legal: this.getFundamentosLegais() };
+  protected criarResultItem(item: Omit<CalcResultItem, 'fundamento_legal' | 'narrativa' | 'premissas'>): CalcResultItem {
+    const fundamentos = this.getFundamentosLegais();
+    const resultItem: CalcResultItem = {
+      ...item,
+      fundamento_legal: fundamentos,
+      premissas: {
+        divisor: this.ctx.perfil.parametros.divisor,
+        arredondamento: this.ctx.perfil.parametros.arredondamento,
+        casas_decimais: this.ctx.perfil.parametros.casas_decimais,
+        metodo_dsr: this.ctx.perfil.parametros.metodo_dsr,
+        indice_atualizacao: this.ctx.perfil.parametros.indice_atualizacao,
+      },
+    };
+    // Gerar narrativa automaticamente
+    resultItem.narrativa = gerarNarrativaRubrica(resultItem);
+    return resultItem;
   }
   
   protected getSalarioBase(competencia: string): Decimal {
@@ -205,9 +315,6 @@ export abstract class Rubrica {
     };
   }
   
-  /**
-   * Verifica se a competência é pré ou pós-modulação da OJ 394
-   */
   protected isOJ394Pos(competencia: string): boolean {
     const compDate = new Date(competencia + '-01');
     return compDate >= OJ394_MODULACAO_DATE;
@@ -217,7 +324,7 @@ export abstract class Rubrica {
 }
 
 // =====================================================
-// RUBRICA: HORAS EXTRAS 50% (Mensalista padrão)
+// RUBRICA: HORAS EXTRAS 50%
 // =====================================================
 
 export class HorasExtras50 extends Rubrica {
@@ -227,6 +334,9 @@ export class HorasExtras50 extends Rubrica {
   dependencias: string[] = [];
   
   calcular(): CalcResultItem[] {
+    const bloqueio = this.validarFundamentos();
+    if (bloqueio) throw new Error(bloqueio);
+
     const resultados: CalcResultItem[] = [];
     const adicional = this.ctx.perfil.parametros.adicional_he_50;
     
@@ -273,6 +383,9 @@ export class HorasExtras100 extends Rubrica {
   dependencias: string[] = [];
   
   calcular(): CalcResultItem[] {
+    const bloqueio = this.validarFundamentos();
+    if (bloqueio) throw new Error(bloqueio);
+
     const resultados: CalcResultItem[] = [];
     const adicional = this.ctx.perfil.parametros.adicional_he_100;
     
@@ -317,6 +430,9 @@ export class DSRHorasExtras extends Rubrica {
   dependencias = ['HE50', 'HE100'];
   
   calcular(): CalcResultItem[] {
+    const bloqueio = this.validarFundamentos();
+    if (bloqueio) throw new Error(bloqueio);
+
     const resultados: CalcResultItem[] = [];
     const metodo = this.ctx.perfil.parametros.metodo_dsr;
     
@@ -326,7 +442,6 @@ export class DSRHorasExtras extends Rubrica {
       const totalHE = he50.plus(he100);
       if (totalHE.isZero()) continue;
       
-      // Determinar regime OJ 394
       const isPos = this.isOJ394Pos(competencia);
       const oj394Label = isPos ? 'OJ 394 PÓS (repercute)' : 'OJ 394 PRE (não repercute)';
       
@@ -347,24 +462,28 @@ export class DSRHorasExtras extends Rubrica {
       }
       
       const valorFinal = this.arredondar(dsr);
-      
-      // Fundamentos legais dinâmicos baseados no regime
       const fundamentos = [
         ...FUNDAMENTOS_LEGAIS['DSR_HE'],
         ...(isPos ? FUNDAMENTOS_LEGAIS['DSR_OJ394_POS'] : FUNDAMENTOS_LEGAIS['DSR_OJ394_PRE']),
       ];
       
-      resultados.push({
+      const item: CalcResultItem = {
         id: `${this.codigo}-${competencia}`, rubrica_codigo: this.codigo,
         rubrica_nome: `${this.nome} [${isPos ? 'OJ394-PÓS' : 'OJ394-PRE'}]`,
         competencia, base_calculo: totalHE, quantidade: new Decimal(1),
         valor_bruto: valorFinal, fundamento_legal: fundamentos,
         memoria: [...this.memorias], dependencias: this.dependencias,
+        premissas: {
+          metodo_dsr: metodo, oj394_regime: isPos ? 'pos' : 'pre',
+          divisor: this.ctx.perfil.parametros.divisor,
+        },
         lineage: this.criarLineage(
           [{ campo: 'total_he', valor: totalHE.toNumber(), tipo: 'money' },
            { campo: 'oj394_regime', valor: isPos ? 'pos' : 'pre', tipo: 'string' }],
           `Método ${metodo} [${oj394Label}]: ${valorFinal}`, valorFinal),
-      });
+      };
+      item.narrativa = gerarNarrativaRubrica(item);
+      resultados.push(item);
       this.memorias = []; this.passoAtual = 0;
     }
     return resultados;
@@ -382,6 +501,9 @@ export class AdicionalNoturno extends Rubrica {
   dependencias: string[] = [];
   
   calcular(): CalcResultItem[] {
+    const bloqueio = this.validarFundamentos();
+    if (bloqueio) throw new Error(bloqueio);
+
     const resultados: CalcResultItem[] = [];
     const percentual = this.ctx.perfil.parametros.percentual_noturno;
     const reducao = this.ctx.perfil.parametros.reducao_hora_noturna;
@@ -431,6 +553,9 @@ export class ReflexoFerias extends Rubrica {
   dependencias = ['HE50', 'HE100', 'DSR_HE', 'ADIC_NOT'];
   
   calcular(): CalcResultItem[] {
+    const bloqueio = this.validarFundamentos();
+    if (bloqueio) throw new Error(bloqueio);
+
     let totalIntegravel = new Decimal(0);
     let mesesTrabalhados = 0;
     
@@ -439,7 +564,6 @@ export class ReflexoFerias extends Rubrica {
       for (const dep of ['HE50', 'HE100', 'ADIC_NOT']) {
         integravelMes = integravelMes.plus(this.getResultadoRubrica(dep, competencia));
       }
-      // DSR: integra férias apenas se OJ 394 PÓS para essa competência
       const dsrVal = this.getResultadoRubrica('DSR_HE', competencia);
       if (!dsrVal.isZero() && this.isOJ394Pos(competencia)) {
         integravelMes = integravelMes.plus(dsrVal);
@@ -450,7 +574,7 @@ export class ReflexoFerias extends Rubrica {
     
     const media = totalIntegravel.div(mesesTrabalhados);
     this.registrarPasso('Média integrável (OJ 394 aware)', 'Total ÷ Meses',
-      { total: totalIntegravel.toNumber(), meses: mesesTrabalhados }, media);
+      { total: totalIntegravel.toNumber(), meses: mesesTrabalhados }, media, 'Art. 142, CLT');
     
     const terco = media.div(3);
     this.registrarPasso('1/3 constitucional', 'Média ÷ 3', { media: media.toNumber() }, terco, 'Art. 7º, XVII, CF/88');
@@ -469,7 +593,7 @@ export class ReflexoFerias extends Rubrica {
 }
 
 // =====================================================
-// RUBRICA: REFLEXOS EM 13º (OJ 394 + Súmula 45 aware)
+// RUBRICA: REFLEXOS EM 13º (OJ 394 + Súmula 45)
 // =====================================================
 
 export class Reflexo13 extends Rubrica {
@@ -479,6 +603,9 @@ export class Reflexo13 extends Rubrica {
   dependencias = ['HE50', 'HE100', 'DSR_HE', 'ADIC_NOT'];
   
   calcular(): CalcResultItem[] {
+    const bloqueio = this.validarFundamentos();
+    if (bloqueio) throw new Error(bloqueio);
+
     const resultados: CalcResultItem[] = [];
     const porAno = new Map<number, { total: Decimal; meses: number }>();
     
@@ -488,7 +615,6 @@ export class Reflexo13 extends Rubrica {
       for (const dep of ['HE50', 'HE100', 'ADIC_NOT']) {
         integravelMes = integravelMes.plus(this.getResultadoRubrica(dep, competencia));
       }
-      // DSR: integra 13º apenas se OJ 394 PÓS
       const dsrVal = this.getResultadoRubrica('DSR_HE', competencia);
       if (!dsrVal.isZero() && this.isOJ394Pos(competencia)) {
         integravelMes = integravelMes.plus(dsrVal);
@@ -538,6 +664,9 @@ export class FGTS extends Rubrica {
   dependencias = ['HE50', 'HE100', 'DSR_HE', 'ADIC_NOT', 'REFL_FERIAS', 'REFL_13'];
   
   calcular(): CalcResultItem[] {
+    const bloqueio = this.validarFundamentos();
+    if (bloqueio) throw new Error(bloqueio);
+
     const resultados: CalcResultItem[] = [];
     const aliquota = this.ctx.perfil.parametros.aliquota_fgts;
     
@@ -546,7 +675,6 @@ export class FGTS extends Rubrica {
       for (const dep of ['HE50', 'HE100', 'ADIC_NOT']) {
         baseCalculo = baseCalculo.plus(this.getResultadoRubrica(dep, competencia));
       }
-      // DSR integra FGTS apenas se OJ 394 PÓS
       const dsrVal = this.getResultadoRubrica('DSR_HE', competencia);
       if (!dsrVal.isZero() && this.isOJ394Pos(competencia)) {
         baseCalculo = baseCalculo.plus(dsrVal);
@@ -583,6 +711,9 @@ export class MultaFGTS extends Rubrica {
   dependencias = ['FGTS'];
   
   calcular(): CalcResultItem[] {
+    const bloqueio = this.validarFundamentos();
+    if (bloqueio) throw new Error(bloqueio);
+
     const tipoDemissao = this.ctx.contrato.tipo_demissao;
     if (!['sem_justa_causa', 'rescisao_indireta'].includes(tipoDemissao)) return [];
     
@@ -619,8 +750,10 @@ export class INSSRubrica extends Rubrica {
   dependencias = ['HE50', 'HE100', 'DSR_HE', 'ADIC_NOT'];
   
   calcular(): CalcResultItem[] {
+    const bloqueio = this.validarFundamentos();
+    if (bloqueio) throw new Error(bloqueio);
+
     const resultados: CalcResultItem[] = [];
-    // Faixas INSS 2024 (hardcoded fallback, ideally from reference_tables)
     const faixas = [
       { ate: new Decimal(1412.00), aliquota: new Decimal(0.075) },
       { ate: new Decimal(2666.68), aliquota: new Decimal(0.09) },
@@ -636,23 +769,19 @@ export class INSSRubrica extends Rubrica {
       if (remuneracao.isZero()) continue;
       
       let inssTotal = new Decimal(0);
-      let restante = remuneracao;
       let faixaAnterior = new Decimal(0);
       
       for (const faixa of faixas) {
-        if (restante.isZero()) break;
         const baseFaixa = Decimal.min(remuneracao, faixa.ate).minus(faixaAnterior);
         if (baseFaixa.isPositive()) {
           inssTotal = inssTotal.plus(baseFaixa.times(faixa.aliquota));
+          this.registrarPasso(`INSS Faixa até R$ ${faixa.ate}`, `R$ ${baseFaixa.toFixed(2)} × ${(faixa.aliquota.toNumber()*100).toFixed(1)}%`,
+            { base_faixa: baseFaixa.toNumber(), aliquota: faixa.aliquota.toNumber() },
+            baseFaixa.times(faixa.aliquota), 'EC 103/2019');
         }
         faixaAnterior = faixa.ate;
-        restante = remuneracao.minus(faixa.ate);
-        if (restante.isNegative()) restante = new Decimal(0);
+        if (remuneracao.lessThanOrEqualTo(faixa.ate)) break;
       }
-      
-      this.registrarPasso('INSS progressivo', 'Soma das faixas',
-        { remuneracao: remuneracao.toNumber(), inss: inssTotal.toNumber() },
-        inssTotal, 'EC 103/2019');
       
       const valorFinal = this.arredondar(inssTotal);
       resultados.push(this.criarResultItem({
@@ -680,8 +809,10 @@ export class IRRFRubrica extends Rubrica {
   dependencias = ['INSS'];
   
   calcular(): CalcResultItem[] {
+    const bloqueio = this.validarFundamentos();
+    if (bloqueio) throw new Error(bloqueio);
+
     const resultados: CalcResultItem[] = [];
-    // Faixas IRRF 2024
     const faixas = [
       { ate: new Decimal(2259.20), aliquota: new Decimal(0), deducao: new Decimal(0) },
       { ate: new Decimal(2826.65), aliquota: new Decimal(0.075), deducao: new Decimal(169.44) },
@@ -704,14 +835,13 @@ export class IRRFRubrica extends Rubrica {
       for (const faixa of faixas) {
         if (baseIR.lessThanOrEqualTo(faixa.ate)) {
           irrf = baseIR.times(faixa.aliquota).minus(faixa.deducao);
+          this.registrarPasso('IRRF', `Base R$ ${baseIR.toFixed(2)} × ${(faixa.aliquota.toNumber()*100).toFixed(1)}% - R$ ${faixa.deducao.toFixed(2)}`,
+            { base_ir: baseIR.toNumber(), aliquota: faixa.aliquota.toNumber(), deducao: faixa.deducao.toNumber() },
+            irrf, 'Lei 7.713/88');
           break;
         }
       }
       if (irrf.isNegative()) irrf = new Decimal(0);
-      
-      this.registrarPasso('IRRF', 'Base × Alíquota - Dedução',
-        { base_ir: baseIR.toNumber(), irrf: irrf.toNumber(), inss_deduzido: inss.toNumber() },
-        irrf, 'Lei 7.713/88');
       
       const valorFinal = this.arredondar(irrf);
       resultados.push(this.criarResultItem({
@@ -719,8 +849,9 @@ export class IRRFRubrica extends Rubrica {
         competencia, base_calculo: baseIR, quantidade: new Decimal(1),
         valor_bruto: valorFinal, memoria: [...this.memorias], dependencias: this.dependencias,
         lineage: this.criarLineage(
-          [{ campo: 'base_ir', valor: baseIR.toNumber(), tipo: 'money' }],
-          `IRRF sobre ${baseIR}`, valorFinal),
+          [{ campo: 'base_ir', valor: baseIR.toNumber(), tipo: 'money' },
+           { campo: 'inss_deduzido', valor: inss.toNumber(), tipo: 'money' }],
+          `IRRF sobre ${baseIR} (Rem ${remuneracao} - INSS ${inss})`, valorFinal),
       }));
       this.memorias = []; this.passoAtual = 0;
     }
