@@ -14,6 +14,8 @@ import AdminCalculadoras from "./pages/admin/Calculadoras";
 import AdminPerfis from "./pages/admin/Perfis";
 import AdminIndices from "./pages/admin/Indices";
 import AdminTestes from "./pages/admin/Testes";
+import NovoCalculo from "./pages/NovoCalculo";
+import RegrasTabelas from "./pages/RegrasTabelas";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +34,8 @@ const App = () => (
           <Route path="/documentos" element={<Documentos />} />
           <Route path="/busca" element={<Busca />} />
           <Route path="/configuracoes" element={<Configuracoes />} />
+          <Route path="/novo-calculo" element={<NovoCalculo />} />
+          <Route path="/regras-tabelas" element={<RegrasTabelas />} />
           <Route path="/admin/calculadoras" element={<AdminCalculadoras />} />
           <Route path="/admin/perfis" element={<AdminPerfis />} />
           <Route path="/admin/indices" element={<AdminIndices />} />
