@@ -16,12 +16,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   Loader2, AlertTriangle, Play, FileText, Sparkles, ShieldCheck,
   Calculator, FileStack, Scroll, RefreshCw, ChevronRight, Check,
   Settings2, Clock, ArrowRight, CheckCircle2, XCircle, TrendingUp, BookOpen,
+  Search, FileWarning, CircleAlert, CircleCheck, Ban,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
