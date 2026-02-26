@@ -20,7 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const mainNavItems = [
-  { icon: LayoutDashboard, label: "Visão Geral", path: "/" },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
   { icon: Briefcase, label: "Casos", path: "/casos" },
   { icon: Search, label: "Busca", path: "/busca" },
   { icon: BookOpen, label: "Biblioteca", path: "/documentos" },
@@ -44,7 +44,7 @@ export function SidebarPremium() {
     if (error) {
       toast.error("Erro ao sair: " + error.message);
     } else {
-      toast.success("Logout realizado com sucesso");
+      toast.success("Sessão encerrada");
       navigate("/auth");
     }
   };
@@ -55,94 +55,82 @@ export function SidebarPremium() {
   };
 
   return (
-    <aside 
-      className="fixed left-0 top-0 z-50 flex h-screen w-64 flex-col border-r overflow-hidden"
-      style={{ 
-        backgroundColor: 'hsl(215 50% 18%)', 
-        borderColor: 'hsl(215 40% 25%)' 
+    <aside
+      className="fixed left-0 top-0 z-50 flex h-screen w-60 flex-col overflow-hidden"
+      style={{
+        backgroundColor: 'hsl(222 47% 14%)',
+        borderRight: '1px solid hsl(222 30% 22%)',
       }}
     >
-      {/* Decorative gradient overlay */}
-      <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom, hsl(38 75% 55% / 0.05), transparent, transparent)' }} />
-      
       {/* Logo */}
-      <div 
-        className="relative flex h-16 items-center gap-3 border-b px-5"
-        style={{ borderColor: 'hsl(215 40% 25%)' }}
+      <div
+        className="flex h-14 items-center gap-3 px-5"
+        style={{ borderBottom: '1px solid hsl(222 30% 22%)' }}
       >
-        <div 
-          className="flex h-10 w-10 items-center justify-center rounded-xl shadow-lg transition-transform duration-300 hover:scale-105"
-          style={{ 
-            background: 'linear-gradient(135deg, hsl(38 75% 55%), hsl(38 65% 48%))',
-            boxShadow: '0 4px 12px hsl(38 75% 55% / 0.25)'
-          }}
+        <div
+          className="flex h-8 w-8 items-center justify-center rounded-md"
+          style={{ background: 'linear-gradient(135deg, hsl(40 76% 52%), hsl(36 80% 46%))' }}
         >
-          <Scale className="h-5 w-5" style={{ color: 'hsl(215 25% 15%)' }} />
+          <Scale className="h-4 w-4" style={{ color: 'hsl(222 47% 11%)' }} />
         </div>
         <div className="flex flex-col">
-          <span className="text-lg font-bold tracking-tight" style={{ color: 'hsl(210 25% 92%)' }}>
+          <span className="text-sm font-bold tracking-tight" style={{ color: 'hsl(213 31% 91%)' }}>
             JurisCálculo
           </span>
-          <span className="text-[11px] font-medium uppercase tracking-wider" style={{ color: 'hsl(210 25% 92% / 0.5)' }}>
-            Gestão Trabalhista
+          <span className="text-[10px] uppercase tracking-widest" style={{ color: 'hsl(213 31% 91% / 0.4)' }}>
+            Trabalhista
           </span>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="relative flex-1 overflow-y-auto px-3 py-5 custom-scrollbar">
-        {/* Main Nav */}
-        <div className="space-y-1">
-          {mainNavItems.map((item, idx) => (
+      <nav className="flex-1 overflow-y-auto px-3 py-4 custom-scrollbar">
+        <div className="space-y-0.5">
+          {mainNavItems.map((item) => (
             <Link
               key={item.path}
               to={item.path}
               className={cn(
-                "sidebar-nav-item animate-fade-in",
+                "sidebar-nav-item relative",
                 isActive(item.path) && "active"
               )}
-              style={{ animationDelay: `${idx * 50}ms` }}
             >
-              <item.icon className="h-5 w-5 flex-shrink-0" />
-              <span className="font-medium">{item.label}</span>
+              <item.icon className="h-4 w-4 flex-shrink-0" />
+              <span>{item.label}</span>
             </Link>
           ))}
         </div>
 
-        {/* Admin Section */}
-        <div className="mt-8">
+        {/* Admin */}
+        <div className="mt-6">
+          <div className="px-3 mb-2">
+            <span className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: 'hsl(213 31% 91% / 0.3)' }}>
+              Administração
+            </span>
+          </div>
           <Collapsible open={adminOpen} onOpenChange={setAdminOpen}>
             <CollapsibleTrigger asChild>
-              <button className="sidebar-nav-item w-full justify-between group">
+              <button className="sidebar-nav-item w-full justify-between">
                 <span className="flex items-center gap-3">
-                  <Settings className="h-5 w-5 flex-shrink-0" />
-                  <span className="font-medium">Administração</span>
+                  <Settings className="h-4 w-4 flex-shrink-0" />
+                  <span>Configurar</span>
                 </span>
                 <ChevronDown
-                  className={cn(
-                    "h-4 w-4 transition-transform duration-300",
-                    adminOpen && "rotate-180"
-                  )}
-                  style={{ color: 'hsl(210 25% 92% / 0.5)' }}
+                  className={cn("h-3.5 w-3.5 transition-transform duration-200", adminOpen && "rotate-180")}
+                  style={{ color: 'hsl(213 31% 91% / 0.4)' }}
                 />
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent className="overflow-hidden data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up">
-              <div 
-                className="space-y-1 mt-2 ml-4 border-l-2 pl-3"
-                style={{ borderColor: 'hsl(215 40% 25% / 0.5)' }}
-              >
-                {adminNavItems.map((item, idx) => (
+              <div className="space-y-0.5 mt-1 ml-3 pl-3" style={{ borderLeft: '1px solid hsl(222 30% 22% / 0.6)' }}>
+                {adminNavItems.map((item) => (
                   <Link
                     key={item.path}
                     to={item.path}
-                    className={cn(
-                      "sidebar-nav-item",
-                      isActive(item.path) && "active"
-                    )}
+                    className={cn("sidebar-nav-item", isActive(item.path) && "active")}
                   >
-                    <item.icon className="h-4 w-4 flex-shrink-0" />
-                    <span className="text-sm">{item.label}</span>
+                    <item.icon className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span className="text-xs">{item.label}</span>
                   </Link>
                 ))}
               </div>
@@ -152,35 +140,18 @@ export function SidebarPremium() {
       </nav>
 
       {/* Footer */}
-      <div 
-        className="relative border-t p-3 space-y-1"
-        style={{ borderColor: 'hsl(215 40% 25%)' }}
-      >
-        <Link
-          to="/configuracoes"
-          className={cn(
-            "sidebar-nav-item",
-            isActive("/configuracoes") && "active"
-          )}
-        >
-          <Settings className="h-5 w-5 flex-shrink-0" />
-          <span className="font-medium">Configurações</span>
+      <div className="px-3 py-3 space-y-0.5" style={{ borderTop: '1px solid hsl(222 30% 22%)' }}>
+        <Link to="/configuracoes" className={cn("sidebar-nav-item", isActive("/configuracoes") && "active")}>
+          <Settings className="h-4 w-4 flex-shrink-0" />
+          <span>Configurações</span>
         </Link>
         <button
           onClick={handleLogout}
-          className="sidebar-nav-item w-full transition-all duration-200"
-          style={{ color: 'hsl(210 25% 92% / 0.5)' }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = 'hsl(0 72% 65%)';
-            e.currentTarget.style.backgroundColor = 'hsl(0 72% 51% / 0.1)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = 'hsl(210 25% 92% / 0.5)';
-            e.currentTarget.style.backgroundColor = 'transparent';
-          }}
+          className="sidebar-nav-item w-full"
+          style={{ color: 'hsl(213 31% 91% / 0.4)' }}
         >
-          <LogOut className="h-5 w-5 flex-shrink-0" />
-          <span className="font-medium">Sair</span>
+          <LogOut className="h-4 w-4 flex-shrink-0" />
+          <span>Sair</span>
         </button>
       </div>
     </aside>

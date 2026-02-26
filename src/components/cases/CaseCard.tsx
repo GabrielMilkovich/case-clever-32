@@ -20,50 +20,34 @@ const statusLabels = {
   revisado: "Revisado",
 };
 
-export function CaseCard({
-  id,
-  cliente,
-  numeroProcesso,
-  status,
-  criadoEm,
-  documentCount = 0,
-}: CaseCardProps) {
+export function CaseCard({ id, cliente, numeroProcesso, status, criadoEm }: CaseCardProps) {
   return (
     <Link to={`/casos/${id}`}>
-      <Card className="group glass-card hover:shadow-elevated transition-all duration-200 hover:-translate-y-0.5">
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+      <Card className="card-interactive group">
+        <CardHeader className="pb-2 pt-4 px-4">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h3 className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors truncate">
                 {cliente}
               </h3>
               {numeroProcesso && (
-                <p className="text-sm text-muted-foreground font-mono">
+                <p className="text-xs text-muted-foreground font-mono mt-0.5 truncate">
                   {numeroProcesso}
                 </p>
               )}
             </div>
-            <span className={`status-badge status-${status}`}>
+            <span className={`status-badge status-${status} flex-shrink-0`}>
               {statusLabels[status]}
             </span>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1.5">
-                <FileText className="h-4 w-4" />
-                {documentCount} docs
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Calendar className="h-4 w-4" />
-                {formatDistanceToNow(new Date(criadoEm), {
-                  addSuffix: true,
-                  locale: ptBR,
-                })}
-              </span>
-            </div>
-            <ChevronRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
+        <CardContent className="px-4 pb-4">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Calendar className="h-3 w-3" />
+              {formatDistanceToNow(new Date(criadoEm), { addSuffix: true, locale: ptBR })}
+            </span>
+            <ChevronRight className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
           </div>
         </CardContent>
       </Card>
