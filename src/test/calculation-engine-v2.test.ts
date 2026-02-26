@@ -396,13 +396,6 @@ describe('CalculationEngineV2 - Sem Justa Causa', () => {
     }
   });
 
-    const inss13 = result.items.find(i => i.rubrica_codigo === 'INSS' && i.id?.includes('13prop'));
-    expect(inss13).toBeDefined();
-    
-    if (inss13) {
-      expect(inss13.valor_bruto.toNumber()).toBeGreaterThan(0);
-    }
-  });
 
   it('total líquido deve ser menor que total bruto', () => {
     const contrato = criarContratoJefferson();
