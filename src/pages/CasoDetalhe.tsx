@@ -351,10 +351,42 @@ export default function CasoDetalhe() {
     }
   };
 
-  const executeCalculation = async () => {
+  // =====================================================
+  // PRE-CALC REVIEW (runs before calculation)
+  // =====================================================
+  const runPreCalcReview = async () => {
     if (!id || !selectedProfile || !canCalculate) {
       if (!selectedProfile) toast.error("Selecione um perfil de cálculo.");
       if (!canCalculate) toast.error("Confirme os fatos críticos primeiro.");
+      return;
+    }
+
+    setIsReviewing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("pre-calc-review", {
+        body: { case_id: id },
+      });
+
+      if (error) throw error;
+
+      if (data?.review) {
+        setReviewResult(data);
+        setShowReviewDialog(true);
+      } else {
+        toast.warning("Revisão não retornou resultados. Prosseguindo com cálculo...");
+        await executeCalculation();
+      }
+    } catch (e) {
+      console.error("Pre-calc review error:", e);
+      toast.error("Erro na revisão: " + (e as Error).message);
+    } finally {
+      setIsReviewing(false);
+    }
+  };
+
+  const executeCalculation = async () => {
+    setShowReviewDialog(false);
+    if (!id || !selectedProfile || !canCalculate) {
       return;
     }
 
