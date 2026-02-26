@@ -21,9 +21,8 @@ import {
 import {
   ExecutionContext,
   Rubrica,
-  RUBRICAS_REGISTRY,
-  ORDEM_EXECUCAO,
 } from './RubricaEngine';
+import { RUBRICAS_REGISTRY, ORDEM_EXECUCAO } from './RubricaRegistry';
 import { SituationAnalyzer, AnaliseResult } from './SituationAnalyzer';
 import { ReportGenerator, RelatorioCompleto } from './ReportGenerator';
 
