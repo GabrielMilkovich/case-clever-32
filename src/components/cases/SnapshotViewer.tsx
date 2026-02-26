@@ -49,8 +49,18 @@ import {
   GitCompare,
   Scale,
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, isValid, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+const safeFormatDate = (dateStr: string | null | undefined, fmt = "dd/MM/yyyy HH:mm"): string => {
+  if (!dateStr) return "—";
+  try {
+    const d = typeof dateStr === 'string' ? parseISO(dateStr) : new Date(dateStr);
+    return isValid(d) ? format(d, fmt, { locale: ptBR }) : "—";
+  } catch {
+    return "—";
+  }
+};
 import { SnapshotDiff } from "./pericial/SnapshotDiff";
 import { ImpugnationPackage } from "./pericial/ImpugnationPackage";
 
@@ -264,7 +274,7 @@ export function SnapshotViewer({ caseId, onExecuteCalc }: SnapshotViewerProps) {
                   </div>
                   <div className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    {format(new Date(snapshot.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                    {safeFormatDate(snapshot.created_at)}
                   </div>
                   {snapshot.warnings && (snapshot.warnings as any[]).length > 0 && (
                     <div className="mt-2 flex items-center gap-1 text-xs text-amber-600">
