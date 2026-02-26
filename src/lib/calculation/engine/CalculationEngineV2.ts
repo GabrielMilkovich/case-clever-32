@@ -158,6 +158,11 @@ export class CalculationEngineV2 {
     const rubricasAtivas = this.input.perfil.rubricas_ativas;
     
     for (const codigo of ORDEM_EXECUCAO) {
+      // Verificar se rubrica está bloqueada por situação detectada
+      if (rubricasBloqueadas.has(codigo)) {
+        continue;
+      }
+      
       // Verificar se rubrica está ativa no perfil
       if (rubricasAtivas.length > 0 && !rubricasAtivas.includes(codigo)) {
         continue;
