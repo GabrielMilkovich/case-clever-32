@@ -17,15 +17,32 @@ const EXTRACTION_TOPICS = [
   "data de admissão contrato início trabalho",
   "data de demissão rescisão término desligamento",
   "salário base remuneração mensal vencimento",
-  "jornada de trabalho horário expediente",
-  "horas extras adicional hora excedente",
-  "adicional insalubridade periculosidade noturno",
-  "férias vencidas proporcionais período aquisitivo",
-  "décimo terceiro salário gratificação natalina",
-  "FGTS fundo garantia depósito multa",
-  "aviso prévio indenizado trabalhado",
-  "cargo função atividade exercida",
-  "motivo rescisão justa causa pedido demissão",
+  "jornada de trabalho horário expediente escala turno",
+  "horas extras adicional hora excedente quantidade percentual",
+  "adicional insalubridade periculosidade noturno transferência",
+  "férias vencidas proporcionais período aquisitivo concessivo gozo abono",
+  "décimo terceiro salário gratificação natalina proporcional",
+  "FGTS fundo garantia depósito multa rescisória saldo extrato",
+  "aviso prévio indenizado trabalhado projetado dias",
+  "cargo função atividade exercida promoção alteração",
+  "motivo rescisão justa causa pedido demissão acordo mútuo",
+  "verbas rescisórias TRCT saldo salário multa",
+  "DSR descanso semanal remunerado reflexo",
+  "comissão variável prêmio bonificação gratificação",
+  "vale transporte vale refeição alimentação benefícios descontados",
+  "intervalo intrajornada supressão parcial redução",
+  "equiparação salarial paradigma desvio acúmulo função",
+  "estabilidade provisória gestante CIPA acidente",
+  "acidente trabalho doença ocupacional CAT afastamento INSS",
+  "contribuição sindical desconto autorização",
+  "banco de horas compensação acordo individual coletivo",
+  "local trabalho endereço empresa filial transferência",
+  "CNPJ empregador razão social nome fantasia",
+  "CPF nome completo empregado dados pessoais",
+  "convenção coletiva CCT ACT piso salarial categoria",
+  "multa artigo 477 467 CLT atraso pagamento",
+  "seguro desemprego guias entrega",
+  "PPP perfil profissiográfico aposentadoria especial",
 ];
 
 // Tool schema para extração com chunk_id obrigatório
@@ -176,7 +193,7 @@ serve(async (req) => {
       .eq("case_id", case_id)
       .order("document_id", { ascending: true })
       .order("chunk_index", { ascending: true })
-      .limit(40);
+      .limit(80);
 
     if (chunksErr) {
       console.error("Error fetching document_chunks:", chunksErr);
@@ -208,7 +225,7 @@ serve(async (req) => {
 
     // Formatar chunks para o prompt
     const chunksForPrompt = allRelevantChunks
-      .slice(0, 30) // Limitar por segurança de contexto
+      .slice(0, 60) // Limitar por segurança de contexto
       .map((chunk, index) => `
 === CHUNK ${index + 1} ===
 CHUNK_ID: ${chunk.id}
