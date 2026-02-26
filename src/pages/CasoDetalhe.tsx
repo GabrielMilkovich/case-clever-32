@@ -102,6 +102,7 @@ export default function CasoDetalhe() {
   const [isExtractingFacts, setIsExtractingFacts] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [isReviewing, setIsReviewing] = useState(false);
+  const [reviewElapsed, setReviewElapsed] = useState(0);
   const [reviewResult, setReviewResult] = useState<any>(null);
   const [showReviewDialog, setShowReviewDialog] = useState(false);
   const [createCriticalKeyRequest, setCreateCriticalKeyRequest] = useState<string | null>(null);
