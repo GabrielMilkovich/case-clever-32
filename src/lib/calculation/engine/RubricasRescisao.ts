@@ -248,7 +248,7 @@ export class FeriasVencidas extends Rubrica {
           emDobro 
             ? 'Remuneração + 1/3 Constitucional × 2 (dobra Art. 137, CLT)'
             : 'Remuneração + 1/3 Constitucional',
-          { remuneracao: remuneracao.toNumber(), terco: terco.toNumber(), em_dobro: emDobro },
+          { remuneracao: remuneracao.toNumber(), terco: terco.toNumber(), em_dobro: emDobro ? 1 : 0 },
           total,
           emDobro ? 'Art. 137, CLT + Art. 7º, XVII, CF/88' : 'Art. 146, caput, CLT + Art. 7º, XVII, CF/88'
         );
