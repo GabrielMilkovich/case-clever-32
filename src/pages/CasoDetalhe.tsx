@@ -277,12 +277,12 @@ export default function CasoDetalhe() {
       count: snapshotsCount || undefined,
       tooltip: "Execução e snapshots de cálculo",
     },
-    {
-      id: "peticao", label: "Petição", icon: Scroll,
-      completed: caseData.status === "revisado",
-      active: activeTab === "peticao",
-      tooltip: "Geração de petição inicial",
-    },
+    // {
+    //   id: "peticao", label: "Petição", icon: Scroll,
+    //   completed: caseData.status === "revisado",
+    //   active: activeTab === "peticao",
+    //   tooltip: "Geração de petição inicial",
+    // },
     {
       id: "roteiro", label: "Roteiro", icon: BookOpen,
       completed: false,
