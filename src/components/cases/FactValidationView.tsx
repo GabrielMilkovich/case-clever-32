@@ -747,28 +747,57 @@ export function FactValidationView({
       console.error(e);
     }
 
-    const documentId = evidence?.document_id ?? documents[0]?.id;
+    // 2) Se não achou via fact_evidences, tentar via chunk_id na citação
+    let documentId = evidence?.document_id;
+    let pageNumber = evidence?.page_number ?? null;
+
+    if (!documentId && fact.citacao) {
+      const chunkMatch = fact.citacao.match(/CHUNK_ID:\s*([a-f0-9-]+)/i);
+      if (chunkMatch) {
+        try {
+          const { data: chunkData } = await supabase
+            .from("document_chunks")
+            .select("document_id, page_number")
+            .eq("id", chunkMatch[1])
+            .single();
+          if (chunkData) {
+            documentId = chunkData.document_id;
+            pageNumber = chunkData.page_number ?? pageNumber;
+          }
+        } catch (e) {
+          console.error("Chunk lookup failed:", e);
+        }
+      }
+    }
+
+    // 3) Fallback: usar fact.pagina ou primeiro documento
+    if (!documentId) {
+      documentId = documents[0]?.id;
+    }
+    if (!pageNumber && fact.pagina) {
+      pageNumber = fact.pagina;
+    }
+
     if (!documentId) {
       toast.error("Nenhum documento disponível para visualização.");
       return;
     }
 
-    setSelectedPageNumber(evidence?.page_number ?? null);
+    setSelectedPageNumber(pageNumber);
 
-    // 2) Gerar URL assinada fresca
+    // 4) Gerar URL assinada fresca e carregar como blob
     signedUrlMutation.mutate(documentId, {
       onSuccess: (res) => {
-        const previewUrl = buildPreviewUrl(res.signedUrl, res.mimeType ?? null, evidence?.page_number ?? null);
+        const previewUrl = buildPreviewUrl(res.signedUrl, res.mimeType ?? null, pageNumber);
         setSelectedDocUrl(previewUrl);
         setSelectedDoc({
-          id: documentId,
+          id: documentId!,
           tipo: "outro",
           arquivo_url: res.signedUrl,
           uploaded_em: new Date().toISOString(),
           file_name: res.fileName ?? null,
           mime_type: res.mimeType ?? null,
         });
-        // Fetch as blob for inline preview (bypasses X-Frame-Options)
         fetchAndCreateBlobUrl(res.signedUrl, res.mimeType);
       },
       onError: (e) => {
@@ -776,7 +805,7 @@ export function FactValidationView({
         const fallbackDoc = documents.find((d) => d.id === documentId) ?? documents[0];
         if (fallbackDoc?.arquivo_url) {
           setSelectedDoc(fallbackDoc);
-          setSelectedDocUrl(buildPreviewUrl(fallbackDoc.arquivo_url, fallbackDoc.mime_type ?? null, evidence?.page_number ?? null));
+          setSelectedDocUrl(buildPreviewUrl(fallbackDoc.arquivo_url, fallbackDoc.mime_type ?? null, pageNumber));
           fetchAndCreateBlobUrl(fallbackDoc.arquivo_url, fallbackDoc.mime_type);
           toast.warning("Não foi possível gerar um link novo. Usando o link atual.");
           return;
