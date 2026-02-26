@@ -634,6 +634,8 @@ export function FactValidationView({
   // HELPERS
   // =====================================================
 
+  const STORAGE_BUCKET = "juriscalculo-documents";
+
   const signedUrlMutation = useMutation({
     mutationFn: async (documentId: string) => {
       const { data, error } = await supabase.functions.invoke(
@@ -651,6 +653,37 @@ export function FactValidationView({
       return data as { signedUrl: string; fileName?: string | null; mimeType?: string | null };
     },
   });
+
+  const getFreshSignedUrlFromStorage = async (documentId: string) => {
+    const baseDoc = documents.find((d) => d.id === documentId);
+    if (!baseDoc?.storage_path) return null;
+
+    const { data, error } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .createSignedUrl(baseDoc.storage_path, 3600);
+
+    if (error || !data?.signedUrl) return null;
+
+    return {
+      signedUrl: data.signedUrl,
+      fileName: baseDoc.file_name ?? null,
+      mimeType: baseDoc.mime_type ?? null,
+    };
+  };
+
+  const getBestSignedUrl = async (documentId: string) => {
+    try {
+      return await signedUrlMutation.mutateAsync(documentId);
+    } catch (edgeError) {
+      console.error("Falha ao gerar URL via função de backend:", edgeError);
+      const storageSigned = await getFreshSignedUrlFromStorage(documentId);
+      if (storageSigned) {
+        toast.warning("Usando rota alternativa para gerar o preview.");
+        return storageSigned;
+      }
+      throw edgeError;
+    }
+  };
 
   const getConfidenceConfig = (confianca: number | null) => {
     if (!confianca || confianca === 0)
@@ -706,16 +739,16 @@ export function FactValidationView({
   const fetchAndCreateBlobUrl = async (signedUrl: string, mimeType?: string | null) => {
     setBlobLoading(true);
     try {
-      const response = await fetch(signedUrl);
-      if (!response.ok) throw new Error('Fetch failed');
+      const response = await fetch(signedUrl, { cache: "no-store" });
+      if (!response.ok) throw new Error("Fetch failed");
       const blob = await response.blob();
-      const type = mimeType || blob.type || 'application/pdf';
+      const type = mimeType || blob.type || "application/pdf";
       const newBlob = new Blob([blob], { type });
       if (blobUrl) URL.revokeObjectURL(blobUrl);
       const url = URL.createObjectURL(newBlob);
       setBlobUrl(url);
     } catch (e) {
-      console.error('Blob fetch failed:', e);
+      console.error("Blob fetch failed:", e);
       setBlobUrl(null);
     } finally {
       setBlobLoading(false);
@@ -727,7 +760,10 @@ export function FactValidationView({
     setSelectedDoc(null);
     setSelectedDocUrl(null);
     setSelectedPageNumber(null);
-    if (blobUrl) { URL.revokeObjectURL(blobUrl); setBlobUrl(null); }
+    if (blobUrl) {
+      URL.revokeObjectURL(blobUrl);
+      setBlobUrl(null);
+    }
 
     // 1) Tentar encontrar evidência (documento + página) para este fato
     let evidence: FactEvidence | null = null;
@@ -785,34 +821,48 @@ export function FactValidationView({
 
     setSelectedPageNumber(pageNumber);
 
-    // 4) Gerar URL assinada fresca e carregar como blob
-    signedUrlMutation.mutate(documentId, {
-      onSuccess: (res) => {
-        const previewUrl = buildPreviewUrl(res.signedUrl, res.mimeType ?? null, pageNumber);
-        setSelectedDocUrl(previewUrl);
-        setSelectedDoc({
-          id: documentId!,
-          tipo: "outro",
-          arquivo_url: res.signedUrl,
-          uploaded_em: new Date().toISOString(),
-          file_name: res.fileName ?? null,
-          mime_type: res.mimeType ?? null,
-        });
-        fetchAndCreateBlobUrl(res.signedUrl, res.mimeType);
-      },
-      onError: (e) => {
-        console.error(e);
-        const fallbackDoc = documents.find((d) => d.id === documentId) ?? documents[0];
-        if (fallbackDoc?.arquivo_url) {
-          setSelectedDoc(fallbackDoc);
-          setSelectedDocUrl(buildPreviewUrl(fallbackDoc.arquivo_url, fallbackDoc.mime_type ?? null, pageNumber));
-          fetchAndCreateBlobUrl(fallbackDoc.arquivo_url, fallbackDoc.mime_type);
-          toast.warning("Não foi possível gerar um link novo. Usando o link atual.");
-          return;
-        }
-        toast.error("Não foi possível abrir o documento.");
-      },
-    });
+    const sourceDoc = documents.find((d) => d.id === documentId) ?? null;
+    if (sourceDoc) setSelectedDoc(sourceDoc);
+
+    // 4) Sempre tentar URL assinada fresca (função de backend -> storage fallback)
+    try {
+      const res = await getBestSignedUrl(documentId);
+      const resolvedMimeType = res.mimeType ?? sourceDoc?.mime_type ?? null;
+      const previewUrl = buildPreviewUrl(res.signedUrl, resolvedMimeType, pageNumber);
+      setSelectedDocUrl(previewUrl);
+      setSelectedDoc(
+        sourceDoc
+          ? {
+              ...sourceDoc,
+              arquivo_url: res.signedUrl,
+              file_name: res.fileName ?? sourceDoc.file_name,
+              mime_type: resolvedMimeType,
+            }
+          : {
+              id: documentId,
+              tipo: "outro",
+              arquivo_url: res.signedUrl,
+              uploaded_em: new Date().toISOString(),
+              file_name: res.fileName ?? null,
+              mime_type: resolvedMimeType,
+            }
+      );
+      await fetchAndCreateBlobUrl(res.signedUrl, resolvedMimeType);
+      return;
+    } catch (e) {
+      console.error(e);
+    }
+
+    // 5) Último fallback: URL já salva no documento (pode estar expirada)
+    if (sourceDoc?.arquivo_url) {
+      setSelectedDoc(sourceDoc);
+      setSelectedDocUrl(buildPreviewUrl(sourceDoc.arquivo_url, sourceDoc.mime_type ?? null, pageNumber));
+      await fetchAndCreateBlobUrl(sourceDoc.arquivo_url, sourceDoc.mime_type);
+      toast.warning("Usando link existente do documento. Se falhar, abra em nova aba.");
+      return;
+    }
+
+    toast.error("Não foi possível abrir o documento.");
   };
 
   const handleEdit = (fact: Fact) => {
@@ -1348,7 +1398,7 @@ export function FactValidationView({
                   </div>
                 </div>
 
-                {/* Inline preview via blob URL — bypasses X-Frame-Options */}
+                {/* Inline preview: prioriza blob (evita bloqueios), com fallback para URL assinada direta */}
                 {blobLoading ? (
                   <div className="h-[600px] rounded-lg border-2 border-dashed flex items-center justify-center bg-muted/20">
                     <div className="text-center text-muted-foreground">
@@ -1356,24 +1406,20 @@ export function FactValidationView({
                       <p className="font-medium">Carregando documento…</p>
                     </div>
                   </div>
-                ) : blobUrl ? (
+                ) : (
                   <div className="h-[600px] rounded-lg overflow-hidden border">
                     <iframe
-                      src={blobUrl + (selectedPageNumber ? `#page=${selectedPageNumber}` : '')}
+                      src={blobUrl ? blobUrl + (selectedPageNumber ? `#page=${selectedPageNumber}` : "") : selectedDocUrl}
                       className="w-full h-full"
                       title="Document Preview"
                     />
                   </div>
-                ) : (
-                  <div className="h-[600px] rounded-lg border-2 border-dashed flex items-center justify-center bg-muted/20">
-                    <div className="text-center text-muted-foreground max-w-md">
-                      <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p className="font-medium">Não foi possível carregar a prévia</p>
-                      <p className="text-sm mt-1">
-                        Use <span className="text-foreground">"Abrir em nova aba"</span> ou <span className="text-foreground">"Baixar"</span>.
-                      </p>
-                    </div>
-                  </div>
+                )}
+
+                {!blobLoading && !blobUrl && (
+                  <p className="text-xs text-muted-foreground">
+                    Prévia em modo compatível. Se não renderizar no painel, use <span className="text-foreground">"Abrir em nova aba"</span>.
+                  </p>
                 )}
               </div>
             ) : (
