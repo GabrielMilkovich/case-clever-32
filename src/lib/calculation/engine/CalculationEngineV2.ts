@@ -64,6 +64,7 @@ export class CalculationEngineV2 {
   private warnings: CalcWarning[] = [];
   private alertas: ConsistencyAlert[] = [];
   private items: CalcResultItem[] = [];
+  private analise!: AnaliseResult;
   
   constructor(private input: EngineInput) {
     // Construir contexto
