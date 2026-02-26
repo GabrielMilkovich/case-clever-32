@@ -22,7 +22,6 @@ import { toast } from "sonner";
 const mainNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
   { icon: Briefcase, label: "Casos", path: "/casos" },
-  { icon: Calculator, label: "Novo Cálculo", path: "/novo-calculo" },
   { icon: Scale, label: "Regras & Tabelas", path: "/regras-tabelas" },
   { icon: Search, label: "Busca", path: "/busca" },
   { icon: BookOpen, label: "Biblioteca", path: "/documentos" },
