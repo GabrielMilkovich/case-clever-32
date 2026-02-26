@@ -182,7 +182,17 @@ export class FeriasVencidas extends Rubrica {
     
     const resultados: CalcResultItem[] = [];
     const competencia = `${dataDemissao.getFullYear()}-${String(dataDemissao.getMonth() + 1).padStart(2, '0')}`;
-    const remuneracao = this.getRemuneracaoBase(competencia);
+    const { valor: remuneracao, usouMedia, mesesMedia } = this.getRemuneracaoFeriasOu13(competencia);
+    
+    if (usouMedia) {
+      this.registrarPasso(
+        'Base de cálculo: média variável dos últimos meses',
+        `Soma remunerações ÷ ${mesesMedia} meses (Art. 142, §§ 1º-3º, CLT)`,
+        { meses_usados: mesesMedia },
+        remuneracao,
+        'Art. 142, §§ 1º a 3º, CLT'
+      );
+    }
     
     let periodoInicio = new Date(dataAdmissao);
     let periodoNum = 0;
@@ -285,7 +295,17 @@ export class FeriasProporcionais extends Rubrica {
     if (avos === 0) return [];
     
     const competencia = `${dataDemissao.getFullYear()}-${String(dataDemissao.getMonth() + 1).padStart(2, '0')}`;
-    const remuneracao = this.getRemuneracaoBase(competencia);
+    const { valor: remuneracao, usouMedia, mesesMedia } = this.getRemuneracaoFeriasOu13(competencia);
+    
+    if (usouMedia) {
+      this.registrarPasso(
+        'Base de cálculo: média variável dos últimos meses',
+        `Soma remunerações ÷ ${mesesMedia} meses (Art. 142, §§ 1º-3º, CLT)`,
+        { meses_usados: mesesMedia },
+        remuneracao,
+        'Art. 142, §§ 1º a 3º, CLT'
+      );
+    }
     
     const feriasBase = remuneracao.times(avos).div(12);
     const terco = feriasBase.div(3);
@@ -371,7 +391,17 @@ export class DecimoTerceiroProporcional extends Rubrica {
     if (avos === 0) return [];
     
     const competencia = `${dataDemissao.getFullYear()}-${String(dataDemissao.getMonth() + 1).padStart(2, '0')}`;
-    const remuneracao = this.getRemuneracaoBase(competencia);
+    const { valor: remuneracao, usouMedia, mesesMedia } = this.getRemuneracaoFeriasOu13(competencia);
+    
+    if (usouMedia) {
+      this.registrarPasso(
+        'Base de cálculo: média variável dos últimos 12 meses',
+        `Soma remunerações ÷ ${mesesMedia} meses (Art. 2º, Decreto 57.155/65)`,
+        { meses_usados: mesesMedia },
+        remuneracao,
+        'Art. 2º, Decreto 57.155/65'
+      );
+    }
     
     const decimo = remuneracao.times(avos).div(12);
     
