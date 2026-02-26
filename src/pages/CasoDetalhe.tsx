@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MainLayoutPremium } from "@/components/layout/MainLayoutPremium";
@@ -109,7 +109,7 @@ export default function CasoDetalhe() {
   const [createCriticalNonce, setCreateCriticalNonce] = useState(0);
 
   // Timer for review elapsed time
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isReviewing) return;
     const interval = setInterval(() => setReviewElapsed(prev => prev + 1), 1000);
     return () => clearInterval(interval);
