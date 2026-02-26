@@ -82,6 +82,11 @@ ${Object.entries(calcResult.resultado_bruto?.por_verba || {}).map(([codigo, data
     const contractText = contract_info ?
       `Admissão: ${contract_info.data_admissao}\nDemissão: ${contract_info.data_demissao || 'Em aberto'}\nTipo demissão: ${contract_info.tipo_demissao || 'Não informado'}\nSalário inicial: R$ ${contract_info.salario_inicial || 'N/A'}\nFunção: ${contract_info.funcao || 'N/A'}` : "";
 
+    // Build raw document text from chunks
+    const chunksText = (document_chunks || []).map((c: any, i: number) =>
+      `--- Chunk ${i + 1} (Doc: ${c.doc_type || 'desconhecido'}, Pág: ${c.page_number || '?'}) ---\n${c.content}`
+    ).join("\n\n") || "Nenhum texto de documento disponível.";
+
     const systemPrompt = `Você é um assistente jurídico trabalhista sênior. Sua tarefa é produzir um ROTEIRO COMPLETO E DETALHADO do caso para que o advogado entenda absolutamente tudo antes de ir a uma audiência ou redigir peças processuais.
 
 O roteiro deve ser estruturado nas seguintes seções (use Markdown com headers ##):
