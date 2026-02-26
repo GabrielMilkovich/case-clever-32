@@ -129,6 +129,21 @@ export function CaseBriefing({ caseId, caseInfo }: CaseBriefingProps) {
     },
   });
 
+  // Fetch raw document chunks for comprehensive AI analysis
+  const { data: documentChunks = [] } = useQuery({
+    queryKey: ["document_chunks_briefing", caseId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("document_chunks")
+        .select("content, page_number, doc_type, chunk_index, document_id")
+        .eq("case_id", caseId)
+        .order("document_id")
+        .order("chunk_index")
+        .limit(80);
+      return data || [];
+    },
+  });
+
   const saveBriefing = async (content: string) => {
     try {
       const { data: session } = await supabase.auth.getSession();
