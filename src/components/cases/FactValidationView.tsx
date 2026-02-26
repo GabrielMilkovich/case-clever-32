@@ -390,7 +390,8 @@ export function FactValidationView({
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [selectedDocUrl, setSelectedDocUrl] = useState<string | null>(null);
   const [selectedPageNumber, setSelectedPageNumber] = useState<number | null>(null);
-  const [tryEmbedPreview, setTryEmbedPreview] = useState(false);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [blobLoading, setBlobLoading] = useState(false);
   const [editingFact, setEditingFact] = useState<Fact | null>(null);
   const [editForm, setEditForm] = useState({ valor: "", tipo: "" });
 
@@ -695,12 +696,38 @@ export function FactValidationView({
     return signedUrl;
   };
 
+  // Cleanup blob URL on unmount or change
+  useEffect(() => {
+    return () => {
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    };
+  }, [blobUrl]);
+
+  const fetchAndCreateBlobUrl = async (signedUrl: string, mimeType?: string | null) => {
+    setBlobLoading(true);
+    try {
+      const response = await fetch(signedUrl);
+      if (!response.ok) throw new Error('Fetch failed');
+      const blob = await response.blob();
+      const type = mimeType || blob.type || 'application/pdf';
+      const newBlob = new Blob([blob], { type });
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      const url = URL.createObjectURL(newBlob);
+      setBlobUrl(url);
+    } catch (e) {
+      console.error('Blob fetch failed:', e);
+      setBlobUrl(null);
+    } finally {
+      setBlobLoading(false);
+    }
+  };
+
   const handleViewDocument = async (fact: Fact) => {
     setSelectedFact(fact);
-    setTryEmbedPreview(false);
     setSelectedDoc(null);
     setSelectedDocUrl(null);
     setSelectedPageNumber(null);
+    if (blobUrl) { URL.revokeObjectURL(blobUrl); setBlobUrl(null); }
 
     // 1) Tentar encontrar evidência (documento + página) para este fato
     let evidence: FactEvidence | null = null;
@@ -733,27 +760,25 @@ export function FactValidationView({
       onSuccess: (res) => {
         const previewUrl = buildPreviewUrl(res.signedUrl, res.mimeType ?? null, evidence?.page_number ?? null);
         setSelectedDocUrl(previewUrl);
-        setSelectedDoc((prev) => ({
-          // Preenche o que for possível (para exibição)
+        setSelectedDoc({
           id: documentId,
-          tipo: prev?.tipo ?? "outro",
+          tipo: "outro",
           arquivo_url: res.signedUrl,
-          uploaded_em: prev?.uploaded_em ?? new Date().toISOString(),
-          file_name: res.fileName ?? prev?.file_name ?? null,
-          mime_type: res.mimeType ?? prev?.mime_type ?? null,
-        }));
+          uploaded_em: new Date().toISOString(),
+          file_name: res.fileName ?? null,
+          mime_type: res.mimeType ?? null,
+        });
+        // Fetch as blob for inline preview (bypasses X-Frame-Options)
+        fetchAndCreateBlobUrl(res.signedUrl, res.mimeType);
       },
       onError: (e) => {
         console.error(e);
-
-        // Fallback: se existir arquivo_url no array de documents, tenta usar (pode estar expirado)
         const fallbackDoc = documents.find((d) => d.id === documentId) ?? documents[0];
         if (fallbackDoc?.arquivo_url) {
           setSelectedDoc(fallbackDoc);
           setSelectedDocUrl(buildPreviewUrl(fallbackDoc.arquivo_url, fallbackDoc.mime_type ?? null, evidence?.page_number ?? null));
-          toast.warning(
-            "Não foi possível gerar um link novo. Usando o link atual (pode estar expirado)."
-          );
+          fetchAndCreateBlobUrl(fallbackDoc.arquivo_url, fallbackDoc.mime_type);
+          toast.warning("Não foi possível gerar um link novo. Usando o link atual.");
           return;
         }
         toast.error("Não foi possível abrir o documento.");
@@ -1274,7 +1299,6 @@ export function FactValidationView({
                       variant="outline"
                       size="sm"
                       className="gap-2"
-                      disabled={signedUrlMutation.isPending}
                     >
                       <a href={selectedDocUrl} target="_blank" rel="noreferrer">
                         <ExternalLink className="h-4 w-4" />
@@ -1286,51 +1310,40 @@ export function FactValidationView({
                       variant="outline"
                       size="sm"
                       className="gap-2"
-                      disabled={signedUrlMutation.isPending}
                     >
                       <a href={selectedDocUrl} download rel="noreferrer">
                         <Download className="h-4 w-4" />
                         Baixar
                       </a>
                     </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={signedUrlMutation.isPending}
-                      onClick={() => setTryEmbedPreview((v) => !v)}
-                    >
-                      {signedUrlMutation.isPending ? (
-                        <span className="inline-flex items-center gap-2">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Gerando link…
-                        </span>
-                      ) : tryEmbedPreview ? (
-                        "Ocultar prévia"
-                      ) : (
-                        "Tentar prévia aqui"
-                      )}
-                    </Button>
                   </div>
                 </div>
 
-                {!tryEmbedPreview ? (
+                {/* Inline preview via blob URL — bypasses X-Frame-Options */}
+                {blobLoading ? (
                   <div className="h-[600px] rounded-lg border-2 border-dashed flex items-center justify-center bg-muted/20">
-                    <div className="text-center text-muted-foreground max-w-md">
-                      <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p className="font-medium">Pré-visualização bloqueada pelo navegador</p>
-                      <p className="text-sm mt-1">
-                        Isso acontece porque o servidor do arquivo impede abertura embutida (iframe). Use <span className="text-foreground">“Abrir em nova aba”</span>.
-                      </p>
+                    <div className="text-center text-muted-foreground">
+                      <Loader2 className="h-8 w-8 mx-auto mb-3 animate-spin text-primary" />
+                      <p className="font-medium">Carregando documento…</p>
                     </div>
                   </div>
-                ) : (
+                ) : blobUrl ? (
                   <div className="h-[600px] rounded-lg overflow-hidden border">
                     <iframe
-                      src={selectedDocUrl}
+                      src={blobUrl + (selectedPageNumber ? `#page=${selectedPageNumber}` : '')}
                       className="w-full h-full"
                       title="Document Preview"
                     />
+                  </div>
+                ) : (
+                  <div className="h-[600px] rounded-lg border-2 border-dashed flex items-center justify-center bg-muted/20">
+                    <div className="text-center text-muted-foreground max-w-md">
+                      <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p className="font-medium">Não foi possível carregar a prévia</p>
+                      <p className="text-sm mt-1">
+                        Use <span className="text-foreground">"Abrir em nova aba"</span> ou <span className="text-foreground">"Baixar"</span>.
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
