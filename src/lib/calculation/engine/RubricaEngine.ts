@@ -836,41 +836,64 @@ export class INSSRubrica extends Rubrica {
   codigo = 'INSS';
   nome = 'INSS Desconto';
   categoria = 'tributos';
-  dependencias = ['HE50', 'HE100', 'DSR_HE', 'ADIC_NOT'];
+  dependencias = ['HE50', 'HE100', 'DSR_HE', 'ADIC_NOT', 'SALDO_SAL', 'AVISO_PREVIO', 'DECIMO_PROP'];
+  
+  // Tabelas progressivas por ano (Portaria MPS/MF)
+  private getFaixas(ano: number) {
+    if (ano >= 2025) {
+      // Portaria MPS/MF nº 6/2025 — Salário mínimo R$ 1.518,00
+      return [
+        { ate: new Decimal(1518.00), aliquota: new Decimal(0.075) },
+        { ate: new Decimal(2793.88), aliquota: new Decimal(0.09) },
+        { ate: new Decimal(4190.83), aliquota: new Decimal(0.12) },
+        { ate: new Decimal(8157.41), aliquota: new Decimal(0.14) },
+      ];
+    }
+    // 2024 — Salário mínimo R$ 1.412,00
+    return [
+      { ate: new Decimal(1412.00), aliquota: new Decimal(0.075) },
+      { ate: new Decimal(2666.68), aliquota: new Decimal(0.09) },
+      { ate: new Decimal(4000.03), aliquota: new Decimal(0.12) },
+      { ate: new Decimal(7786.02), aliquota: new Decimal(0.14) },
+    ];
+  }
+
+  private calcularINSSProgressivo(remuneracao: Decimal, faixas: ReturnType<typeof this.getFaixas>, label: string): Decimal {
+    let inssTotal = new Decimal(0);
+    let faixaAnterior = new Decimal(0);
+    
+    for (const faixa of faixas) {
+      const baseFaixa = Decimal.min(remuneracao, faixa.ate).minus(faixaAnterior);
+      if (baseFaixa.isPositive()) {
+        inssTotal = inssTotal.plus(baseFaixa.times(faixa.aliquota));
+        this.registrarPasso(`${label} Faixa até R$ ${faixa.ate}`, `R$ ${baseFaixa.toFixed(2)} × ${(faixa.aliquota.toNumber()*100).toFixed(1)}%`,
+          { base_faixa: baseFaixa.toNumber(), aliquota: faixa.aliquota.toNumber() },
+          baseFaixa.times(faixa.aliquota), 'EC 103/2019');
+      }
+      faixaAnterior = faixa.ate;
+      if (remuneracao.lessThanOrEqualTo(faixa.ate)) break;
+    }
+    return inssTotal;
+  }
   
   calcular(): CalcResultItem[] {
     const bloqueio = this.validarFundamentos();
     if (bloqueio) throw new Error(bloqueio);
 
     const resultados: CalcResultItem[] = [];
-    const faixas = [
-      { ate: new Decimal(1412.00), aliquota: new Decimal(0.075) },
-      { ate: new Decimal(2666.68), aliquota: new Decimal(0.09) },
-      { ate: new Decimal(4000.03), aliquota: new Decimal(0.12) },
-      { ate: new Decimal(7786.02), aliquota: new Decimal(0.14) },
-    ];
     
+    // ── LOOP 1: INSS sobre dadosMensais (contracheques) ──
     for (const [competencia, dados] of this.ctx.dadosMensais) {
+      const ano = parseInt(competencia.split('-')[0]);
+      const faixas = this.getFaixas(ano);
+      
       let remuneracao = dados.salario_base;
       for (const dep of ['HE50', 'HE100', 'DSR_HE', 'ADIC_NOT']) {
         remuneracao = remuneracao.plus(this.getResultadoRubrica(dep, competencia));
       }
       if (remuneracao.isZero()) continue;
       
-      let inssTotal = new Decimal(0);
-      let faixaAnterior = new Decimal(0);
-      
-      for (const faixa of faixas) {
-        const baseFaixa = Decimal.min(remuneracao, faixa.ate).minus(faixaAnterior);
-        if (baseFaixa.isPositive()) {
-          inssTotal = inssTotal.plus(baseFaixa.times(faixa.aliquota));
-          this.registrarPasso(`INSS Faixa até R$ ${faixa.ate}`, `R$ ${baseFaixa.toFixed(2)} × ${(faixa.aliquota.toNumber()*100).toFixed(1)}%`,
-            { base_faixa: baseFaixa.toNumber(), aliquota: faixa.aliquota.toNumber() },
-            baseFaixa.times(faixa.aliquota), 'EC 103/2019');
-        }
-        faixaAnterior = faixa.ate;
-        if (remuneracao.lessThanOrEqualTo(faixa.ate)) break;
-      }
+      const inssTotal = this.calcularINSSProgressivo(remuneracao, faixas, 'INSS');
       
       const valorFinal = this.arredondar(inssTotal);
       resultados.push(this.criarResultItem({
@@ -883,6 +906,63 @@ export class INSSRubrica extends Rubrica {
       }));
       this.memorias = []; this.passoAtual = 0;
     }
+    
+    // ── LOOP 2: INSS sobre verbas rescisórias tributáveis ──
+    // Base legal: Art. 28, Lei 8.212/91
+    // Tributáveis: Saldo de Salário, Aviso Prévio Indenizado
+    // Isentas: Férias indenizadas + 1/3 (Art. 28, §9º, "d", Lei 8.212/91)
+    const dataDemissao = this.ctx.contrato.data_demissao || new Date();
+    const anoRescisao = dataDemissao.getFullYear();
+    const mesRescisao = `${anoRescisao}-${String(dataDemissao.getMonth() + 1).padStart(2, '0')}`;
+    const faixasRescisao = this.getFaixas(anoRescisao);
+    
+    // Somar verbas rescisórias tributáveis
+    let baseRescisoria = new Decimal(0);
+    const saldoSal = this.getResultadoRubrica('SALDO_SAL');
+    const avisoPrevio = this.getResultadoRubrica('AVISO_PREVIO');
+    baseRescisoria = baseRescisoria.plus(saldoSal).plus(avisoPrevio);
+    
+    if (baseRescisoria.greaterThan(0)) {
+      this.registrarPasso('Base INSS rescisória', 'Saldo Salário + Aviso Prévio',
+        { saldo_sal: saldoSal.toNumber(), aviso_previo: avisoPrevio.toNumber() },
+        baseRescisoria, 'Art. 28, Lei 8.212/91');
+      
+      const inssRescisao = this.calcularINSSProgressivo(baseRescisoria, faixasRescisao, 'INSS Rescisão');
+      
+      const valorFinal = this.arredondar(inssRescisao);
+      resultados.push(this.criarResultItem({
+        id: `${this.codigo}-rescisao`, rubrica_codigo: this.codigo, rubrica_nome: 'INSS s/ Verbas Rescisórias',
+        competencia: mesRescisao, base_calculo: baseRescisoria, quantidade: new Decimal(1),
+        valor_bruto: valorFinal, memoria: [...this.memorias], dependencias: ['SALDO_SAL', 'AVISO_PREVIO'],
+        lineage: this.criarLineage(
+          [{ campo: 'base_rescisoria', valor: baseRescisoria.toNumber(), tipo: 'money' }],
+          `INSS progressivo rescisório sobre ${baseRescisoria}`, valorFinal),
+      }));
+      this.memorias = []; this.passoAtual = 0;
+    }
+    
+    // ── ITEM SEPARADO: INSS sobre 13º Proporcional ──
+    // Art. 214, §6º, RPS: tributação isolada (tabela própria, não soma com demais verbas)
+    const decimo = this.getResultadoRubrica('DECIMO_PROP');
+    if (decimo.greaterThan(0)) {
+      this.registrarPasso('Base INSS 13º', '13º Proporcional (tributação isolada)',
+        { decimo_prop: decimo.toNumber() },
+        decimo, 'Art. 214, §6º, Decreto 3.048/99 (RPS)');
+      
+      const inss13 = this.calcularINSSProgressivo(decimo, faixasRescisao, 'INSS 13º');
+      
+      const valorFinal = this.arredondar(inss13);
+      resultados.push(this.criarResultItem({
+        id: `${this.codigo}-13prop`, rubrica_codigo: this.codigo, rubrica_nome: 'INSS s/ 13º Proporcional',
+        competencia: `${anoRescisao}-13`, base_calculo: decimo, quantidade: new Decimal(1),
+        valor_bruto: valorFinal, memoria: [...this.memorias], dependencias: ['DECIMO_PROP'],
+        lineage: this.criarLineage(
+          [{ campo: 'decimo_prop', valor: decimo.toNumber(), tipo: 'money' }],
+          `INSS isolado sobre 13º ${decimo}`, valorFinal),
+      }));
+      this.memorias = []; this.passoAtual = 0;
+    }
+    
     return resultados;
   }
 }
