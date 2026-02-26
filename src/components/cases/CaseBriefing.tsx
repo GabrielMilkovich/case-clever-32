@@ -376,7 +376,7 @@ export function CaseBriefing({ caseId, caseInfo }: CaseBriefingProps) {
           {[
             { label: "Fatos", value: facts.length },
             { label: "Documentos", value: documents.length },
-            { label: "Linhas de Auditoria", value: auditLines.length },
+            { label: "Chunks (texto)", value: documentChunks.length },
             { label: "Controvérsias", value: controversies.length },
           ].map((s) => (
             <Card key={s.label} className="bg-card/80">
