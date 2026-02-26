@@ -1,10 +1,10 @@
 // =====================================================
 // ROTEIRO DO CASO PARA O ADVOGADO — Gerado por IA
-// Analisa todo o caso e produz briefing completo com streaming
+// Salva automaticamente após geração. Gera independente de cálculo.
 // =====================================================
 
-import { useState, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,8 +17,8 @@ import {
   RefreshCw,
   Download,
   Sparkles,
-  AlertTriangle,
   Clock,
+  CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -36,8 +36,32 @@ export function CaseBriefing({ caseId, caseInfo }: CaseBriefingProps) {
   const [briefing, setBriefing] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedAt, setGeneratedAt] = useState<Date | null>(null);
+  const queryClient = useQueryClient();
 
-  // Fetch all required data
+  // Load saved briefing
+  const { data: savedBriefing, isLoading: loadingSaved } = useQuery({
+    queryKey: ["case_briefing", caseId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("case_briefings" as any)
+        .select("*")
+        .eq("case_id", caseId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data as any;
+    },
+  });
+
+  // Populate from saved
+  useEffect(() => {
+    if (savedBriefing && !briefing && !isGenerating) {
+      setBriefing(savedBriefing.content);
+      setGeneratedAt(new Date(savedBriefing.updated_at || savedBriefing.created_at));
+    }
+  }, [savedBriefing, briefing, isGenerating]);
+
+  // Fetch all data for context (optional - used if available)
   const { data: facts = [] } = useQuery({
     queryKey: ["facts", caseId],
     queryFn: async () => {
@@ -105,12 +129,30 @@ export function CaseBriefing({ caseId, caseInfo }: CaseBriefingProps) {
     },
   });
 
-  const generateBriefing = useCallback(async () => {
-    if (!latestRun) {
-      toast.error("Execute um cálculo antes de gerar o roteiro.");
-      return;
-    }
+  const saveBriefing = async (content: string) => {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const userId = session?.session?.user?.id ?? null;
 
+      if (savedBriefing?.id) {
+        await (supabase.from("case_briefings" as any) as any)
+          .update({ content, updated_at: new Date().toISOString() })
+          .eq("id", savedBriefing.id);
+      } else {
+        await (supabase.from("case_briefings" as any) as any)
+          .insert({
+            case_id: caseId,
+            content,
+            created_by: userId,
+          });
+      }
+      queryClient.invalidateQueries({ queryKey: ["case_briefing", caseId] });
+    } catch (e) {
+      console.error("Failed to save briefing:", e);
+    }
+  };
+
+  const generateBriefing = useCallback(async () => {
     setIsGenerating(true);
     setBriefing("");
 
@@ -131,12 +173,12 @@ export function CaseBriefing({ caseId, caseInfo }: CaseBriefingProps) {
             status: d.status,
             ocr_confidence: d.ocr_confidence || d.ocr_confianca,
           })),
-          calculation_result: {
+          calculation_result: latestRun ? {
             resultado_bruto: latestRun.resultado_bruto,
             resultado_liquido: latestRun.resultado_liquido,
-          },
+          } : { resultado_bruto: { total: 0, por_verba: {} }, resultado_liquido: { total: 0, por_verba: {} } },
           audit_lines: auditLines,
-          warnings: latestRun.warnings || [],
+          warnings: latestRun?.warnings || [],
           controversies,
           case_info: caseInfo,
           contract_info: contract ? {
@@ -163,7 +205,6 @@ export function CaseBriefing({ caseId, caseInfo }: CaseBriefingProps) {
 
       if (!resp.body) throw new Error("Sem resposta do servidor");
 
-      // Parse SSE stream
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
       let textBuffer = "";
@@ -224,15 +265,20 @@ export function CaseBriefing({ caseId, caseInfo }: CaseBriefingProps) {
         }
       }
 
+      // Save to database
+      if (fullText) {
+        await saveBriefing(fullText);
+      }
+
       setGeneratedAt(new Date());
-      toast.success("Roteiro gerado com sucesso!");
+      toast.success("Roteiro gerado e salvo com sucesso!");
     } catch (e) {
       console.error(e);
       toast.error("Falha ao gerar roteiro: " + (e as Error).message);
     } finally {
       setIsGenerating(false);
     }
-  }, [facts, documents, latestRun, auditLines, controversies, caseInfo, contract]);
+  }, [facts, documents, latestRun, auditLines, controversies, caseInfo, contract, savedBriefing]);
 
   const exportAsText = () => {
     if (!briefing) return;
@@ -245,7 +291,13 @@ export function CaseBriefing({ caseId, caseInfo }: CaseBriefingProps) {
     URL.revokeObjectURL(url);
   };
 
-  const hasCalc = !!latestRun;
+  if (loadingSaved) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -274,7 +326,7 @@ export function CaseBriefing({ caseId, caseInfo }: CaseBriefingProps) {
               <Button
                 size="sm"
                 onClick={generateBriefing}
-                disabled={isGenerating || !hasCalc}
+                disabled={isGenerating}
                 className="gap-1.5"
               >
                 {isGenerating ? (
@@ -289,17 +341,17 @@ export function CaseBriefing({ caseId, caseInfo }: CaseBriefingProps) {
             </div>
           </div>
 
-          {!hasCalc && (
-            <div className="flex items-center gap-2 mt-3 p-2 rounded-md bg-accent/5 border border-accent/20 text-xs text-accent">
-              <AlertTriangle className="h-3 w-3" />
-              Execute um cálculo primeiro para que a IA possa analisar o caso completo.
+          {savedBriefing && !isGenerating && (
+            <div className="flex items-center gap-2 mt-3 p-2 rounded-md bg-primary/5 border border-primary/10 text-xs text-muted-foreground">
+              <CheckCircle2 className="h-3 w-3 text-primary" />
+              Roteiro salvo automaticamente
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Stats */}
-      {hasCalc && !briefing && !isGenerating && (
+      {/* Stats when no briefing yet */}
+      {!briefing && !isGenerating && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
             { label: "Fatos", value: facts.length },
@@ -367,24 +419,16 @@ export function CaseBriefing({ caseId, caseInfo }: CaseBriefingProps) {
 // Simple markdown to HTML converter
 function markdownToHtml(md: string): string {
   return md
-    // Headers
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
     .replace(/^## (.+)$/gm, '<h2>$1</h2>')
     .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    // Bold
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    // Italic
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    // Unordered lists
     .replace(/^- (.+)$/gm, '<li>$1</li>')
     .replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
-    // Ordered lists
     .replace(/^\d+\.\s(.+)$/gm, '<li>$1</li>')
-    // Horizontal rules
     .replace(/^---$/gm, '<hr />')
-    // Paragraphs (lines not already wrapped)
     .replace(/^(?!<[hul]|<li|<hr)(.+)$/gm, '<p>$1</p>')
-    // Line breaks
     .replace(/\n\n/g, '')
     .replace(/\n/g, '');
 }
