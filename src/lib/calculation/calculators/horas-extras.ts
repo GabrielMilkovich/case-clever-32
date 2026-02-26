@@ -65,9 +65,23 @@ export function createHorasExtrasCalculator(rulesData: CalculatorRules): Calcula
       const dataDemissao = parseFactAsDate(ctx.facts['data_demissao']) || ctx.dataReferencia;
       
       // Média de horas extras mensais - pode vir de premissas ou fatos extraídos
-      const horasMensais = parseFactAsNumber(ctx.facts['horas_extras_mensais']) || 
+      let horasMensais = parseFactAsNumber(ctx.facts['horas_extras_mensais']) || 
                           parseFactAsNumber(ctx.facts['media_horas_extras']) ||
                           (inputs.horas_extras_mensais as number) || 0;
+
+      // FALLBACK: Se não há fato de horas extras, estimar com base na jornada
+      // Muitos casos trabalhistas alegam horas extras sem registro de ponto
+      if (horasMensais <= 0) {
+        // Estimativa conservadora: 2h extras por dia útil (~44h/mês)
+        horasMensais = 44;
+        warnings.push({
+          tipo: 'atencao',
+          codigo: 'HE_ESTIMADAS',
+          mensagem: 'Horas extras estimadas em 44h/mês (2h/dia útil). Nenhum fato "horas_extras_mensais" encontrado.',
+          sugestao: 'Adicione o fato "horas_extras_mensais" com o valor real para maior precisão.',
+        });
+      }
+
       const percentualDomingosFeriados = parseFactAsNumber(ctx.facts['percentual_domingos_feriados']) || 0.2;
 
       // Validações
