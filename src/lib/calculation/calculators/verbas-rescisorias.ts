@@ -178,9 +178,13 @@ export function createVerbasRescisoriasCalculator(rules: CalculatorRules): Calcu
       const competencia = `${dataDemissao.getFullYear()}-${String(dataDemissao.getMonth() + 1).padStart(2, '0')}`;
       
       // 1. SALDO DE SALÁRIO (sempre calculado)
+      // Art. 64 CLT: para mensalistas, o mês = 30 dias sempre.
+      // Se trabalhou o mês inteiro (último dia do mês), saldo = salário integral.
       const diaRescisao = dataDemissao.getDate();
+      const ultimoDiaMes = new Date(dataDemissao.getFullYear(), dataDemissao.getMonth() + 1, 0).getDate();
+      const diasParaCalculo = (diaRescisao >= ultimoDiaMes) ? 30 : diaRescisao;
       const salarioDia = salarioBase / 30;
-      const saldoSalario = arredondarMoeda(salarioDia * diaRescisao);
+      const saldoSalario = arredondarMoeda(salarioDia * diasParaCalculo);
       
       verbas.push({
         codigo: 'SALDO_SAL',
@@ -193,8 +197,8 @@ export function createVerbasRescisoriasCalculator(rules: CalculatorRules): Calcu
         linha: lineNum++,
         calculadora: 'verbas_rescisorias',
         competencia,
-        descricao: 'Saldo de Salário',
-        formula: `(${salarioBase} ÷ 30) × ${diaRescisao} dias`,
+        descricao: `Saldo de Salário (${diasParaCalculo} dias${diaRescisao >= ultimoDiaMes ? ' - mês integral Art.64 CLT' : ''})`,
+        formula: `(${salarioBase} ÷ 30) × ${diasParaCalculo} dias`,
         valor_bruto: saldoSalario,
       });
       

@@ -26,25 +26,30 @@ export class SaldoSalario extends Rubrica {
     const dataDemissao = this.ctx.contrato.data_demissao;
     if (!dataDemissao) return [];
     
+    // Art. 64 CLT: para mensalistas, o mês = 30 dias sempre.
+    // Se trabalhou o mês inteiro (último dia do mês), saldo = salário integral.
     const diaRescisao = dataDemissao.getDate();
+    const ultimoDiaMes = new Date(dataDemissao.getFullYear(), dataDemissao.getMonth() + 1, 0).getDate();
+    const diasParaCalculo = (diaRescisao >= ultimoDiaMes) ? 30 : diaRescisao;
+    
     const competencia = `${dataDemissao.getFullYear()}-${String(dataDemissao.getMonth() + 1).padStart(2, '0')}`;
     const salarioBase = this.getSalarioBase(competencia);
     const salarioDia = salarioBase.div(30);
     
     this.registrarPasso(
       'Cálculo do salário diário',
-      'Salário Base ÷ 30',
+      'Salário Base ÷ 30 (Art. 64, CLT — mensalista)',
       { salario_base: salarioBase.toNumber(), divisor: 30 },
       salarioDia,
-      'Art. 457, CLT'
+      'Art. 64, CLT'
     );
     
-    const saldo = salarioDia.times(diaRescisao);
+    const saldo = salarioDia.times(diasParaCalculo);
     
     this.registrarPasso(
-      'Saldo de salário',
+      `Saldo de salário (${diasParaCalculo} dias${diaRescisao >= ultimoDiaMes ? ' — mês integral' : ''})`,
       'Salário Diário × Dias Trabalhados',
-      { salario_dia: salarioDia.toNumber(), dias: diaRescisao },
+      { salario_dia: salarioDia.toNumber(), dias: diasParaCalculo, dia_rescisao_real: diaRescisao, ultimo_dia_mes: ultimoDiaMes },
       saldo,
       'Art. 477, CLT'
     );
@@ -59,16 +64,18 @@ export class SaldoSalario extends Rubrica {
       periodo_inicio: new Date(dataDemissao.getFullYear(), dataDemissao.getMonth(), 1),
       periodo_fim: dataDemissao,
       base_calculo: salarioDia,
-      quantidade: toDecimal(diaRescisao),
+      quantidade: toDecimal(diasParaCalculo),
       valor_bruto: valorFinal,
       memoria: [...this.memorias],
       dependencias: [],
       lineage: this.criarLineage(
         [
           { campo: 'salario_base', valor: salarioBase.toNumber(), tipo: 'money' },
-          { campo: 'dias_trabalhados', valor: diaRescisao, tipo: 'number' },
+          { campo: 'dias_trabalhados', valor: diasParaCalculo, tipo: 'number' },
+          { campo: 'dia_real', valor: diaRescisao, tipo: 'number' },
+          { campo: 'ultimo_dia_mes', valor: ultimoDiaMes, tipo: 'number' },
         ],
-        `(${salarioBase} ÷ 30) × ${diaRescisao}`,
+        `(${salarioBase} ÷ 30) × ${diasParaCalculo}`,
         valorFinal
       ),
     })];
