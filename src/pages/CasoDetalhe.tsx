@@ -84,7 +84,7 @@ export default function CasoDetalhe() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   
-  const [activeTab, setActiveTab] = useState("resumo");
+  const [activeTab, setActiveTab] = useState("documentos");
   const [selectedProfile, setSelectedProfile] = useState("");
   const [isExtractingFacts, setIsExtractingFacts] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
@@ -242,12 +242,12 @@ export default function CasoDetalhe() {
   // WORKFLOW STEPS (simplified to 6)
   // =====================================================
   const workflowSteps = [
-    {
+    ...(snapshotsCount > 0 ? [{
       id: "resumo", label: "Resumo", icon: FileText,
       completed: documents.length > 0 && facts.length > 0,
       active: activeTab === "resumo",
       tooltip: "Visão geral do caso",
-    },
+    }] : []),
     {
       id: "documentos", label: "Documentos", icon: FileStack,
       completed: documents.length > 0,
