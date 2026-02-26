@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MainLayoutPremium } from "@/components/layout/MainLayoutPremium";
@@ -102,10 +102,18 @@ export default function CasoDetalhe() {
   const [isExtractingFacts, setIsExtractingFacts] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [isReviewing, setIsReviewing] = useState(false);
+  const [reviewElapsed, setReviewElapsed] = useState(0);
   const [reviewResult, setReviewResult] = useState<any>(null);
   const [showReviewDialog, setShowReviewDialog] = useState(false);
   const [createCriticalKeyRequest, setCreateCriticalKeyRequest] = useState<string | null>(null);
   const [createCriticalNonce, setCreateCriticalNonce] = useState(0);
+
+  // Timer for review elapsed time
+  useEffect(() => {
+    if (!isReviewing) return;
+    const interval = setInterval(() => setReviewElapsed(prev => prev + 1), 1000);
+    return () => clearInterval(interval);
+  }, [isReviewing]);
 
   // =====================================================
   // DATA FETCHING
@@ -362,6 +370,7 @@ export default function CasoDetalhe() {
     }
 
     setIsReviewing(true);
+    setReviewElapsed(0);
     try {
       const { data, error } = await supabase.functions.invoke("pre-calc-review", {
         body: { case_id: id },
@@ -835,7 +844,9 @@ export default function CasoDetalhe() {
                   </div>
                   <Button onClick={runPreCalcReview} disabled={!selectedProfile || !canCalculate || isCalculating || isReviewing} className="w-full sm:w-auto">
                     {isReviewing ? <Search className="h-4 w-4 mr-2 animate-pulse" /> : isCalculating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
-                    {isReviewing ? "Revisando documentos..." : isCalculating ? "Calculando..." : "Revisar e Calcular"}
+                    {isReviewing 
+                      ? `Revisando documentos... ${reviewElapsed}s ~${Math.max(30 - reviewElapsed, 5)}s restantes`
+                      : isCalculating ? "Calculando..." : "Revisar e Calcular"}
                   </Button>
                 </div>
                 {!canCalculate && (
