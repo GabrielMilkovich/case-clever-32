@@ -30,7 +30,7 @@ import { ValidationViewV2 } from "@/components/cases/ValidationViewV2";
 import { CalculatorSuggestions } from "@/components/cases/CalculatorSuggestions";
 import { DocumentsManager } from "@/components/cases/DocumentsManager";
 import { ProcessingMonitorPanel } from "@/components/cases/ProcessingMonitorPanel";
-import { SnapshotViewer } from "@/components/cases/SnapshotViewer";
+import { CalculationDetailView } from "@/components/cases/CalculationDetailView";
 import { PetitionGenerator } from "@/components/cases/PetitionGenerator";
 import { PremissasEditor } from "@/components/cases/PremissasEditor";
 import { RiskAnalysisPanel } from "@/components/cases/pericial/RiskAnalysisPanel";
@@ -699,8 +699,7 @@ export default function CasoDetalhe() {
               </CardContent>
             </Card>
 
-            <CalculatorSuggestions facts={facts} onSelectionChange={() => {}} />
-            <SnapshotViewer caseId={id!} onExecuteCalc={executeCalculation} />
+            <CalculationDetailView caseId={id!} facts={facts} onExecuteCalc={executeCalculation} />
           </div>
         );
 
