@@ -243,6 +243,26 @@ export class CalculationEngineV2 {
   // =====================================================
   
   execute(): EngineOutput {
+    // 0. Analisar situação do caso
+    const analyzer = new SituationAnalyzer(
+      this.input.contrato,
+      this.ctx.dadosMensais,
+      this.ctx.validacoes,
+    );
+    this.analise = analyzer.analisar();
+    
+    // Registrar situações como warnings para visibilidade
+    for (const sit of this.analise.situacoes) {
+      if (sit.severidade === 'critico') {
+        this.warnings.push({
+          tipo: 'atencao',
+          codigo: `SITUACAO_${sit.id}`,
+          mensagem: `${sit.titulo}: ${sit.impacto_calculo}`,
+          sugestao: sit.ressalva || undefined,
+        });
+      }
+    }
+    
     // 1. Validar inputs
     this.validarInputs();
     
@@ -257,13 +277,32 @@ export class CalculationEngineV2 {
       });
     }
     
-    // 3. Executar rubricas
-    this.executarRubricas();
+    // 3. Coletar rubricas bloqueadas pelas situações detectadas
+    const rubricasBloqueadas = new Set<string>();
+    for (const sit of this.analise.situacoes) {
+      for (const bloq of sit.rubricas_bloqueadas) {
+        rubricasBloqueadas.add(bloq);
+      }
+    }
     
-    // 4. Consolidar resultados
+    // Registrar bloqueios como warnings
+    for (const bloq of rubricasBloqueadas) {
+      const sit = this.analise.situacoes.find(s => s.rubricas_bloqueadas.includes(bloq));
+      this.warnings.push({
+        tipo: 'info',
+        codigo: `RUBRICA_BLOQUEADA_${bloq}`,
+        mensagem: `Rubrica ${bloq} não calculada: ${sit?.titulo || 'situação detectada'}`,
+        sugestao: sit?.ressalva || undefined,
+      });
+    }
+    
+    // 4. Executar rubricas (respeitando bloqueios)
+    this.executarRubricas(rubricasBloqueadas);
+    
+    // 5. Consolidar resultados
     const resultadoBruto = this.consolidarResultados();
     
-    // 5. Gerar hash do ruleset
+    // 6. Gerar hash do ruleset
     const rulesetHash = hashObject({
       perfil: this.input.perfil.id,
       regras: Array.from(this.ctx.regras.values()).map(r => ({
@@ -272,12 +311,12 @@ export class CalculationEngineV2 {
       })),
     });
     
-    // 6. Montar snapshot
+    // 7. Montar snapshot
     const snapshot: CalcSnapshot = {
       id: crypto.randomUUID(),
       case_id: this.input.case_id,
       profile_id: this.input.perfil.id,
-      versao: 1, // Será incrementado ao salvar
+      versao: 1,
       engine_version: ENGINE_VERSION,
       ruleset_hash: rulesetHash,
       status: 'gerado',
@@ -300,11 +339,17 @@ export class CalculationEngineV2 {
       created_at: new Date(),
     };
     
+    // 8. Gerar relatório completo
+    const reportGen = new ReportGenerator(snapshot, this.analise, this.input.contrato);
+    const relatorio = reportGen.gerar();
+    
     return {
       snapshot,
       items: this.items,
       warnings: this.warnings,
       alertas: this.alertas,
+      analise: this.analise,
+      relatorio,
     };
   }
 }
