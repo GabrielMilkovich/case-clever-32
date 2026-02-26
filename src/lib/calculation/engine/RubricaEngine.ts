@@ -958,6 +958,7 @@ import {
   FeriasVencidas,
   FeriasProporcionais,
   DecimoTerceiroProporcional,
+  FGTSRescisorio,
 } from './RubricasRescisao';
 
 export const RUBRICAS_REGISTRY: Map<string, new () => Rubrica> = new Map([
@@ -976,6 +977,7 @@ export const RUBRICAS_REGISTRY: Map<string, new () => Rubrica> = new Map([
   ['FERIAS_VENC', FeriasVencidas],
   ['FERIAS_PROP', FeriasProporcionais],
   ['DECIMO_PROP', DecimoTerceiroProporcional],
+  ['FGTS_RESC', FGTSRescisorio],
 ]);
 
 // Ordem de execução (DAG respeitada)
@@ -985,5 +987,6 @@ export const ORDEM_EXECUCAO = [
   'REFL_FERIAS', 'REFL_13',
   'FGTS', 'MULTA_FGTS',
   'SALDO_SAL', 'AVISO_PREVIO', 'FERIAS_VENC', 'FERIAS_PROP', 'DECIMO_PROP',
+  'FGTS_RESC',
   'INSS', 'IRRF',
 ];
