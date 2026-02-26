@@ -736,19 +736,52 @@ export function FactValidationView({
     };
   }, [blobUrl]);
 
-  const fetchAndCreateBlobUrl = async (signedUrl: string, mimeType?: string | null) => {
+  const fetchPreviewBlobFromBackend = async (documentId: string, mimeType?: string | null) => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (!token) throw new Error("Sessão inválida para preview");
+
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-signed-document-url`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ document_id: documentId, mode: "blob" }),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error(`Backend preview failed (${response.status})`);
+    }
+
+    const blob = await response.blob();
+    const type = mimeType || blob.type || "application/pdf";
+    return new Blob([blob], { type });
+  };
+
+  const fetchAndCreateBlobUrl = async (documentId: string, signedUrl: string, mimeType?: string | null) => {
     setBlobLoading(true);
     try {
-      const response = await fetch(signedUrl, { cache: "no-store" });
-      if (!response.ok) throw new Error("Fetch failed");
-      const blob = await response.blob();
-      const type = mimeType || blob.type || "application/pdf";
-      const newBlob = new Blob([blob], { type });
+      // Caminho principal (definitivo): baixar bytes via backend para evitar bloqueio em iframe
+      let finalBlob: Blob;
+      try {
+        finalBlob = await fetchPreviewBlobFromBackend(documentId, mimeType);
+      } catch (backendErr) {
+        console.error("Backend blob preview failed, trying signed URL:", backendErr);
+        const response = await fetch(signedUrl, { cache: "no-store" });
+        if (!response.ok) throw new Error("Signed URL fetch failed");
+        const blob = await response.blob();
+        const type = mimeType || blob.type || "application/pdf";
+        finalBlob = new Blob([blob], { type });
+      }
+
       if (blobUrl) URL.revokeObjectURL(blobUrl);
-      const url = URL.createObjectURL(newBlob);
+      const url = URL.createObjectURL(finalBlob);
       setBlobUrl(url);
     } catch (e) {
-      console.error("Blob fetch failed:", e);
+      console.error("Blob preview failed:", e);
       setBlobUrl(null);
     } finally {
       setBlobLoading(false);
@@ -847,7 +880,7 @@ export function FactValidationView({
               mime_type: resolvedMimeType,
             }
       );
-      await fetchAndCreateBlobUrl(res.signedUrl, resolvedMimeType);
+      await fetchAndCreateBlobUrl(documentId, res.signedUrl, resolvedMimeType);
       return;
     } catch (e) {
       console.error(e);
@@ -857,7 +890,7 @@ export function FactValidationView({
     if (sourceDoc?.arquivo_url) {
       setSelectedDoc(sourceDoc);
       setSelectedDocUrl(buildPreviewUrl(sourceDoc.arquivo_url, sourceDoc.mime_type ?? null, pageNumber));
-      await fetchAndCreateBlobUrl(sourceDoc.arquivo_url, sourceDoc.mime_type);
+      await fetchAndCreateBlobUrl(documentId, sourceDoc.arquivo_url, sourceDoc.mime_type);
       toast.warning("Usando link existente do documento. Se falhar, abra em nova aba.");
       return;
     }
@@ -1398,7 +1431,7 @@ export function FactValidationView({
                   </div>
                 </div>
 
-                {/* Inline preview: prioriza blob (evita bloqueios), com fallback para URL assinada direta */}
+                {/* Inline preview: renderiza SOMENTE blob local para evitar bloqueio de iframe pelo navegador */}
                 {blobLoading ? (
                   <div className="h-[600px] rounded-lg border-2 border-dashed flex items-center justify-center bg-muted/20">
                     <div className="text-center text-muted-foreground">
@@ -1406,20 +1439,24 @@ export function FactValidationView({
                       <p className="font-medium">Carregando documento…</p>
                     </div>
                   </div>
-                ) : (
+                ) : blobUrl ? (
                   <div className="h-[600px] rounded-lg overflow-hidden border">
                     <iframe
-                      src={blobUrl ? blobUrl + (selectedPageNumber ? `#page=${selectedPageNumber}` : "") : selectedDocUrl}
+                      src={blobUrl + (selectedPageNumber ? `#page=${selectedPageNumber}` : "")}
                       className="w-full h-full"
                       title="Document Preview"
                     />
                   </div>
-                )}
-
-                {!blobLoading && !blobUrl && (
-                  <p className="text-xs text-muted-foreground">
-                    Prévia em modo compatível. Se não renderizar no painel, use <span className="text-foreground">"Abrir em nova aba"</span>.
-                  </p>
+                ) : (
+                  <div className="h-[600px] rounded-lg border-2 border-dashed flex items-center justify-center bg-muted/20 px-6">
+                    <div className="text-center text-muted-foreground">
+                      <AlertTriangle className="h-8 w-8 mx-auto mb-3 text-yellow-600" />
+                      <p className="font-medium">Não foi possível renderizar no painel</p>
+                      <p className="text-sm mt-1">
+                        Use <span className="text-foreground">"Abrir em nova aba"</span> ou <span className="text-foreground">"Baixar"</span> acima.
+                      </p>
+                    </div>
+                  </div>
                 )}
               </div>
             ) : (
