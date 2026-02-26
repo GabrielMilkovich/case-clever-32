@@ -255,6 +255,19 @@ export class CalculationEngine {
         accumulatedInputs.total_reflexo_ferias = result.outputs.total_bruto;
       } else if (nome === 'fgts') {
         accumulatedInputs.total_fgts = result.outputs.total_bruto;
+      } else if (nome === 'verbas_rescisorias') {
+        // Extrair base INSS tributável (apenas saldo salário + aviso prévio)
+        // Férias indenizadas: isentas (Art. 28, §9º, "d", Lei 8.212/91)
+        // FGTS: não incide INSS
+        const VERBAS_TRIBUTAVEIS_INSS = ['SALDO_SAL', 'AVISO_PREVIO'];
+        const baseINSS = result.outputs.verbas
+          .filter(v => VERBAS_TRIBUTAVEIS_INSS.includes(v.codigo))
+          .reduce((sum, v) => sum + v.valor_bruto, 0);
+        accumulatedInputs.base_inss_rescisoria = baseINSS;
+        
+        // 13º proporcional: tributação isolada (Art. 214, §6º, RPS)
+        const decimo = result.outputs.verbas.find(v => v.codigo === 'DECIMO_PROP');
+        accumulatedInputs.base_inss_13_isolado = decimo?.valor_bruto || 0;
       }
 
       // Acumular valores por competência para INSS/atualização monetária

@@ -24,6 +24,8 @@ interface INSSInputs extends CalculatorInputs {
   competencia?: string;
   verbas_por_competencia?: Record<string, number>;
   total_bruto?: number;
+  base_inss_rescisoria?: number;
+  base_inss_13_isolado?: number;
 }
 
 // Regras configuráveis
@@ -199,6 +201,98 @@ class INSSCalculator implements Calculator {
     const dataAdmissao = parseFactAsDate(ctx.facts['data_admissao']);
     const dataDemissao = parseFactAsDate(ctx.facts['data_demissao']) || ctx.dataReferencia;
 
+    // ═══ MODO 2a: Base rescisória tributável (verbas rescisórias) ═══
+    // Quando há base_inss_rescisoria, calcular INSS apenas sobre verbas tributáveis
+    // Art. 28, Lei 8.212/91 — Férias indenizadas isentas (§9º, "d")
+    const baseRescisoria = inputs.base_inss_rescisoria || 0;
+    const base13Isolado = inputs.base_inss_13_isolado || 0;
+    
+    if (baseRescisoria > 0 || base13Isolado > 0) {
+      // INSS sobre verbas rescisórias tributáveis (Saldo Salário + Aviso Prévio)
+      if (baseRescisoria > 0) {
+        const tabela = this.getTabelaVigente(ctx.taxTables, dataDemissao);
+        if (!tabela) {
+          warnings.push({ tipo: 'atencao', codigo: 'TABELA_INSS_NAO_ENCONTRADA', mensagem: 'Tabela INSS não encontrada para data de demissão' });
+        } else {
+          const { desconto, aliquota_efetiva, detalhes } = this.rules.tipo === 'progressivo'
+            ? this.calcularDescontoProgressivo(baseRescisoria, tabela)
+            : { ...this.calcularDescontoSimples(baseRescisoria, tabela), detalhes: [] };
+
+          if (this.rules.tipo === 'progressivo' && detalhes) {
+            for (const det of detalhes) {
+              auditLines.push({
+                linha: ++linhaAtual, calculadora: 'inss',
+                descricao: `INSS Rescisão — Faixa até R$ ${det.faixa.toFixed(2)} (${(det.aliquota * 100).toFixed(1)}%)`,
+                formula: `R$ ${det.base.toFixed(2)} × ${(det.aliquota * 100).toFixed(1)}% = R$ ${det.valor.toFixed(2)}`,
+                valor_liquido: arredondarMoeda(-det.valor),
+                metadata: { faixa: det.faixa, aliquota: det.aliquota, tipo: 'rescisoria' },
+              });
+            }
+          }
+
+          auditLines.push({
+            linha: ++linhaAtual, calculadora: 'inss',
+            descricao: `INSS s/ Verbas Rescisórias (alíq. efetiva ${(aliquota_efetiva * 100).toFixed(2)}%)`,
+            formula: `Base R$ ${baseRescisoria.toFixed(2)} (Saldo Salário + Aviso Prévio) → Desconto R$ ${desconto.toFixed(2)}`,
+            valor_bruto: arredondarMoeda(desconto),
+            valor_liquido: arredondarMoeda(-desconto),
+            metadata: { base: baseRescisoria, aliquota_efetiva, fundamento: 'Art. 28, Lei 8.212/91' },
+          });
+
+          verbas.push({
+            codigo: 'INSS_DESCONTO',
+            descricao: 'Desconto INSS',
+            valor_bruto: 0,
+            valor_liquido: arredondarMoeda(-desconto),
+          });
+        }
+      }
+      
+      // INSS sobre 13º proporcional (tributação isolada — Art. 214, §6º, RPS)
+      if (base13Isolado > 0) {
+        const tabela = this.getTabelaVigente(ctx.taxTables, dataDemissao);
+        if (tabela) {
+          const { desconto, aliquota_efetiva } = this.rules.tipo === 'progressivo'
+            ? this.calcularDescontoProgressivo(base13Isolado, tabela)
+            : this.calcularDescontoSimples(base13Isolado, tabela);
+
+          auditLines.push({
+            linha: ++linhaAtual, calculadora: 'inss',
+            descricao: `INSS s/ 13º Proporcional (tributação isolada — Art. 214, §6º, RPS)`,
+            formula: `Base R$ ${base13Isolado.toFixed(2)} → Desconto R$ ${desconto.toFixed(2)}`,
+            valor_bruto: arredondarMoeda(desconto),
+            valor_liquido: arredondarMoeda(-desconto),
+            metadata: { base: base13Isolado, aliquota_efetiva, fundamento: 'Art. 214, §6º, Decreto 3.048/99' },
+          });
+          
+          const existingVerba = verbas.find(v => v.codigo === 'INSS_DESCONTO');
+          if (existingVerba) {
+            existingVerba.valor_liquido = arredondarMoeda((existingVerba.valor_liquido || 0) - desconto);
+          } else {
+            verbas.push({
+              codigo: 'INSS_DESCONTO', descricao: 'Desconto INSS',
+              valor_bruto: 0, valor_liquido: arredondarMoeda(-desconto),
+            });
+          }
+        }
+      }
+
+      const totalDesconto = verbas.reduce((sum, v) => sum + Math.abs(v.valor_liquido || 0), 0);
+      
+      auditLines.push({
+        linha: ++linhaAtual, calculadora: 'inss',
+        descricao: 'TOTAL DESCONTO INSS',
+        valor_bruto: arredondarMoeda(totalDesconto),
+        valor_liquido: arredondarMoeda(-totalDesconto),
+      });
+
+      return {
+        calculadoraId: this.id, calculadoraNome: this.nome, versao: this.version,
+        outputs: { total_bruto: 0, total_liquido: arredondarMoeda(-totalDesconto), verbas },
+        auditLines, warnings,
+      };
+    }
+
     if (Object.keys(verbasCompetencia).length === 0) {
       const totalBruto = inputs.total_bruto || 0;
       
@@ -241,7 +335,7 @@ class INSSCalculator implements Calculator {
       verbas.push({
         codigo: 'INSS_DESCONTO',
         descricao: 'Desconto INSS',
-        valor_bruto: 0,
+        valor_bruto: arredondarMoeda(desconto),
         valor_liquido: arredondarMoeda(-desconto),
       });
 

@@ -284,10 +284,22 @@ export function CalculationDetailView({ caseId, facts, onExecuteCalc }: Calculat
   const resultadoBruto = (latestRun.resultado_bruto as any) || {};
   const resultadoLiquido = (latestRun.resultado_liquido as any) || {};
   const warnings = ((latestRun.warnings as any[]) || []);
-  const porVerba = resultadoBruto.por_verba || {};
+  const porVerbaBruto = resultadoBruto.por_verba || {};
+  const porVerbaLiquido = resultadoLiquido.por_verba || {};
   const totalBruto = resultadoBruto.total || 0;
   const totalLiquido = resultadoLiquido.total || totalBruto;
-  const descontos = totalBruto - totalLiquido;
+  const descontos = Math.abs(totalBruto - totalLiquido);
+  
+  // Merge verbas: usar bruto para créditos, líquido para descontos (INSS)
+  const porVerba = { ...porVerbaBruto };
+  // Se INSS está no líquido com valor negativo, exibir como desconto positivo
+  if (porVerbaLiquido['INSS_DESCONTO'] && (!porVerba['INSS_DESCONTO'] || porVerba['INSS_DESCONTO'].valor === 0)) {
+    porVerba['INSS_DESCONTO'] = {
+      ...porVerbaLiquido['INSS_DESCONTO'],
+      descricao: porVerbaLiquido['INSS_DESCONTO']?.descricao || 'Desconto INSS',
+      valor: Math.abs(porVerbaLiquido['INSS_DESCONTO'].valor),
+    };
+  }
 
   // Group audit lines by calculator
   const auditByCalc: Record<string, AuditLineRow[]> = {};
