@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import {
   Select,
   SelectContent,
@@ -264,12 +265,7 @@ export default function CasoDetalhe() {
       count: facts.filter(f => !f.confirmado).length || undefined,
       tooltip: "Extração e validação de fatos",
     },
-    {
-      id: "premissas", label: "Premissas", icon: Settings2,
-      completed: false,
-      active: activeTab === "premissas",
-      tooltip: "Cenários e premissas jurídicas",
-    },
+    // Premissas mesclada com Cálculo
     {
       id: "calculo", label: "Cálculo", icon: Calculator,
       completed: snapshotsCount > 0,
@@ -750,17 +746,35 @@ export default function CasoDetalhe() {
           </div>
         );
 
-      case "premissas":
-        return (
-          <div className="space-y-5">
-            <ScenarioManager caseId={id!} />
-            <PremissasEditor caseId={id!} />
-          </div>
-        );
+      // premissas merged into calculo
 
       case "calculo":
         return (
           <div className="space-y-5">
+            {/* Premissas colapsável */}
+            <Collapsible>
+              <Card className="bg-card/80">
+                <CardContent className="p-4">
+                  <CollapsibleTrigger className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <Settings2 className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="text-left">
+                        <div className="text-sm font-semibold">Premissas & Cenários</div>
+                        <div className="text-xs text-muted-foreground">Defina divisor, método de HE, correção monetária e prescrição</div>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform duration-200 [[data-state=open]>&]:rotate-90" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-4 space-y-4">
+                    <ScenarioManager caseId={id!} />
+                    <PremissasEditor caseId={id!} />
+                  </CollapsibleContent>
+                </CardContent>
+              </Card>
+            </Collapsible>
+
             {/* Calc Controls */}
             <Card className="bg-card/80">
               <CardContent className="p-4">
