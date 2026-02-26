@@ -26,11 +26,12 @@ serve(async (req) => {
       controversies,
       case_info,
       contract_info,
+      document_chunks,
     } = await req.json();
 
-    if (!facts || !calculation_result) {
+    if (!facts && !document_chunks) {
       return new Response(
-        JSON.stringify({ error: "facts and calculation_result are required" }),
+        JSON.stringify({ error: "facts or document_chunks are required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -50,13 +51,15 @@ serve(async (req) => {
       `- ${d.file_name || d.tipo || 'Documento'} (tipo: ${d.tipo}, status: ${d.status}, OCR: ${d.ocr_confidence ?? 'N/A'}%)`
     ).join("\n") || "Nenhum documento listado.";
 
+    const calcResult = calculation_result || { resultado_bruto: { total: 0, por_verba: {} }, resultado_liquido: { total: 0, por_verba: {} } };
+
     const resultText = `
-Total Bruto: R$ ${calculation_result.resultado_bruto?.total?.toFixed(2) || '0.00'}
-Total Líquido: R$ ${calculation_result.resultado_liquido?.total?.toFixed(2) || '0.00'}
-Diferença (descontos): R$ ${((calculation_result.resultado_bruto?.total || 0) - (calculation_result.resultado_liquido?.total || 0)).toFixed(2)}
+Total Bruto: R$ ${calcResult.resultado_bruto?.total?.toFixed(2) || '0.00'}
+Total Líquido: R$ ${calcResult.resultado_liquido?.total?.toFixed(2) || '0.00'}
+Diferença (descontos): R$ ${((calcResult.resultado_bruto?.total || 0) - (calcResult.resultado_liquido?.total || 0)).toFixed(2)}
 
 Verbas calculadas:
-${Object.entries(calculation_result.resultado_bruto?.por_verba || {}).map(([codigo, data]: [string, any]) => 
+${Object.entries(calcResult.resultado_bruto?.por_verba || {}).map(([codigo, data]: [string, any]) => 
   `  - ${data.descricao || codigo}: R$ ${data.valor?.toFixed(2) || '0.00'}`
 ).join("\n")}
 `;
