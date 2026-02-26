@@ -442,13 +442,13 @@ export function runCrossValidation(facts: FactMap): CrossValidationResult {
 export function applyCorrections(facts: FactMap, corrections: CrossValidationCorrection[]): FactMap {
   const corrected = { ...facts };
   for (const c of corrections) {
-    if (corrected[c.campo]) {
-      corrected[c.campo] = {
-        ...corrected[c.campo],
-        valor: c.valor_corrigido,
-        confianca: c.confianca,
-      };
-    }
+    const current = corrected[c.campo];
+    corrected[c.campo] = {
+      valor: c.valor_corrigido,
+      tipo: current?.tipo ?? inferFactType(c.campo, c.valor_corrigido),
+      confianca: c.confianca,
+      confirmado: current?.confirmado ?? false,
+    };
   }
   return corrected;
 }
@@ -457,7 +457,36 @@ export function applyCorrections(facts: FactMap, corrections: CrossValidationCor
 // HELPERS
 // =====================================================
 function parseNumber(val: string): number {
-  return parseFloat(val.replace(/[^\d.,\-]/g, '').replace(',', '.')) || 0;
+  const cleaned = val.replace(/[^\d.,\-]/g, '').trim();
+  if (!cleaned) return 0;
+
+  const hasComma = cleaned.includes(',');
+  const hasDot = cleaned.includes('.');
+
+  if (hasComma && hasDot) {
+    // Usa o último separador como decimal e remove o outro como milhar
+    const lastComma = cleaned.lastIndexOf(',');
+    const lastDot = cleaned.lastIndexOf('.');
+    if (lastComma > lastDot) {
+      return parseFloat(cleaned.replace(/\./g, '').replace(',', '.')) || 0;
+    }
+    return parseFloat(cleaned.replace(/,/g, '')) || 0;
+  }
+
+  if (hasComma) {
+    return parseFloat(cleaned.replace(/\./g, '').replace(',', '.')) || 0;
+  }
+
+  return parseFloat(cleaned.replace(/,/g, '')) || 0;
+}
+
+function inferFactType(campo: string, valor: string): FactMap[string]["tipo"] {
+  const campoNorm = campo.toLowerCase();
+  if (campoNorm.includes('data')) return 'data';
+  if (campoNorm.includes('salario') || campoNorm.includes('valor') || campoNorm.includes('fgts')) return 'moeda';
+  if (campoNorm.includes('hora') || campoNorm.includes('quantidade') || campoNorm.includes('percentual')) return 'numero';
+  if (valor === 'true' || valor === 'false') return 'booleano';
+  return 'texto';
 }
 
 function normalizeTipoDemissao(value: string): string {
