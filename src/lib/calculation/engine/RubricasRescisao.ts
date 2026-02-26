@@ -442,6 +442,67 @@ export class DecimoTerceiroProporcional extends Rubrica {
 }
 
 // =====================================================
+// RUBRICA: FGTS SOBRE VERBAS RESCISÓRIAS (8%)
+// Art. 15, Lei 8.036/90
+// =====================================================
+
+export class FGTSRescisorio extends Rubrica {
+  codigo = 'FGTS_RESC';
+  nome = 'FGTS sobre Verbas Rescisórias';
+  categoria = 'rescisao';
+  dependencias = ['SALDO_SAL', 'AVISO_PREVIO', 'DECIMO_PROP'];
+  
+  calcular(): CalcResultItem[] {
+    const aliquota = this.ctx.perfil.parametros.aliquota_fgts; // 0.08
+    
+    const saldoSal = this.getResultadoRubrica('SALDO_SAL');
+    const aviso = this.getResultadoRubrica('AVISO_PREVIO');
+    const decimo = this.getResultadoRubrica('DECIMO_PROP');
+    
+    const baseCalculo = saldoSal.plus(aviso).plus(decimo);
+    if (baseCalculo.isZero()) return [];
+    
+    const fgts = baseCalculo.times(aliquota);
+    
+    this.registrarPasso(
+      'FGTS sobre verbas rescisórias',
+      '(Saldo + Aviso + 13º) × 8%',
+      { saldo: saldoSal.toNumber(), aviso: aviso.toNumber(), decimo: decimo.toNumber(), aliquota },
+      fgts,
+      'Art. 15, Lei 8.036/90'
+    );
+    
+    const valorFinal = this.arredondar(fgts);
+    const dataDemissao = this.ctx.contrato.data_demissao;
+    const competencia = dataDemissao 
+      ? `${dataDemissao.getFullYear()}-${String(dataDemissao.getMonth() + 1).padStart(2, '0')}`
+      : 'rescisao';
+    
+    return [this.criarResultItem({
+      id: `${this.codigo}-total`,
+      rubrica_codigo: this.codigo,
+      rubrica_nome: this.nome,
+      competencia,
+      base_calculo: baseCalculo,
+      quantidade: new Decimal(1),
+      percentual: toDecimal(aliquota),
+      valor_bruto: valorFinal,
+      memoria: [...this.memorias],
+      dependencias: this.dependencias,
+      lineage: this.criarLineage(
+        [
+          { campo: 'saldo_salario', valor: saldoSal.toNumber(), tipo: 'money' },
+          { campo: 'aviso_previo', valor: aviso.toNumber(), tipo: 'money' },
+          { campo: 'decimo_prop', valor: decimo.toNumber(), tipo: 'money' },
+        ],
+        `(${saldoSal} + ${aviso} + ${decimo}) × ${aliquota}`,
+        valorFinal
+      ),
+    })];
+  }
+}
+
+// =====================================================
 // EXPORTAR RUBRICAS PARA REGISTRY
 // =====================================================
 
@@ -451,4 +512,5 @@ export const RUBRICAS_RESCISAO = {
   FERIAS_VENC: FeriasVencidas,
   FERIAS_PROP: FeriasProporcionais,
   DECIMO_PROP: DecimoTerceiroProporcional,
+  FGTS_RESC: FGTSRescisorio,
 };
