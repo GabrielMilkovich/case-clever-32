@@ -363,6 +363,7 @@ export default function CasoDetalhe() {
     }
 
     setIsReviewing(true);
+    setReviewElapsed(0);
     try {
       const { data, error } = await supabase.functions.invoke("pre-calc-review", {
         body: { case_id: id },
