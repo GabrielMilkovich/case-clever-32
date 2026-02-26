@@ -209,7 +209,7 @@ export class CalculationEngine {
     const results: CalcResult[] = [];
     const calculatorsUsed: CalculatorUsed[] = [];
 
-    // Ordem de execução (verbas base primeiro, depois reflexos, depois rescisão)
+    // Ordem de execução (verbas base primeiro, depois reflexos, rescisão, descontos e atualização)
     const executionOrder = [
       'horas_extras',
       'reflexos_13',
@@ -220,37 +220,55 @@ export class CalculationEngine {
       'atualizacao_monetaria',
     ];
 
-    // Reset totais
+    // Reset de estado para execução limpa
     this.totalBruto = 0;
     this.totalLiquido = 0;
+    this.allAuditLines = [];
+    this.allWarnings = [];
 
     // Acumuladores para passar entre calculadoras
+    const verbasPorCompetencia: Record<string, number> = {};
     let accumulatedInputs: CalculatorInputs = {};
 
     // Executar na ordem
     for (const nome of executionOrder) {
-      if (this.calculators.has(nome)) {
-        const calculator = this.calculators.get(nome)!;
-        const result = this.executeCalculator(nome, accumulatedInputs);
-        if (result) {
-          results.push(result);
-          calculatorsUsed.push({
-            calculator_id: calculator.id,
-            nome: calculator.nome,
-            versao: calculator.version,
-            vigencia: this.dataReferencia.toISOString().split('T')[0],
-          });
+      if (!this.calculators.has(nome)) continue;
 
-          // Acumular totais para próximas calculadoras
-          if (nome === 'horas_extras') {
-            accumulatedInputs.total_horas_extras = result.outputs.total_bruto;
-          } else if (nome === 'reflexos_13') {
-            accumulatedInputs.total_reflexo_13 = result.outputs.total_bruto;
-          } else if (nome === 'reflexos_ferias') {
-            accumulatedInputs.total_reflexo_ferias = result.outputs.total_bruto;
-          }
+      const calculator = this.calculators.get(nome)!;
+      const result = this.executeCalculator(nome, accumulatedInputs);
+      if (!result) continue;
+
+      results.push(result);
+      calculatorsUsed.push({
+        calculator_id: calculator.id,
+        nome: calculator.nome,
+        versao: calculator.version,
+        vigencia: this.dataReferencia.toISOString().split('T')[0],
+      });
+
+      // Acumular totais para calculadoras dependentes
+      if (nome === 'horas_extras') {
+        accumulatedInputs.total_horas_extras = result.outputs.total_bruto;
+      } else if (nome === 'reflexos_13') {
+        accumulatedInputs.total_reflexo_13 = result.outputs.total_bruto;
+      } else if (nome === 'reflexos_ferias') {
+        accumulatedInputs.total_reflexo_ferias = result.outputs.total_bruto;
+      } else if (nome === 'fgts') {
+        accumulatedInputs.total_fgts = result.outputs.total_bruto;
+      }
+
+      // Acumular valores por competência para INSS/atualização monetária
+      for (const verba of result.outputs.verbas) {
+        for (const comp of verba.competencias || []) {
+          const valorComp = comp.valor_bruto ?? 0;
+          verbasPorCompetencia[comp.competencia] =
+            (verbasPorCompetencia[comp.competencia] || 0) + valorComp;
         }
       }
+
+      accumulatedInputs.total_bruto = this.totalBruto;
+      accumulatedInputs.total_liquido = this.totalLiquido;
+      accumulatedInputs.verbas_por_competencia = { ...verbasPorCompetencia };
     }
 
     // Calcular totais consolidados

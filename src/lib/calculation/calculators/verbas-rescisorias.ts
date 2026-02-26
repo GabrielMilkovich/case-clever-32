@@ -14,6 +14,7 @@ import {
   AuditLine,
   Warning,
   arredondarMoeda,
+  parseFactAsNumber,
 } from '../types';
 
 interface RescisaoParams {
@@ -28,6 +29,38 @@ function parseData(value: unknown): Date | null {
   if (value instanceof Date) return value;
   const d = new Date(String(value));
   return isNaN(d.getTime()) ? null : d;
+}
+
+function normalizarTipoDemissao(value: string): RescisaoParams['tipo_demissao'] {
+  const normalizado = value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+
+  if (normalizado.includes('sem_justa_causa') ||
+      (normalizado.includes('sem') && normalizado.includes('justa')) ||
+      normalizado.includes('imotivada')) {
+    return 'sem_justa_causa';
+  }
+
+  if (normalizado.includes('rescisao_indireta') || normalizado.includes('indireta')) {
+    return 'rescisao_indireta';
+  }
+
+  if (normalizado.includes('pedido_demissao') || normalizado.includes('pedido')) {
+    return 'pedido_demissao';
+  }
+
+  if (normalizado.includes('acordo')) {
+    return 'acordo';
+  }
+
+  if (normalizado.includes('justa')) {
+    return 'justa_causa';
+  }
+
+  return 'sem_justa_causa';
 }
 
 function anosDeServico(admissao: Date, demissao: Date): number {
@@ -59,14 +92,24 @@ export function createVerbasRescisoriasCalculator(rules: CalculatorRules): Calcu
       let lineNum = 1;
       
       // Extrair parâmetros dos fatos
-      const tipoDemissao = String(ctx.facts['tipo_demissao']?.valor || inputs.tipo_demissao || 'sem_justa_causa') as RescisaoParams['tipo_demissao'];
+      const rawTipoDemissao = String(
+        ctx.facts['tipo_demissao']?.valor ||
+        ctx.facts['motivo_demissao']?.valor ||
+        inputs.tipo_demissao ||
+        'sem_justa_causa'
+      );
+      const tipoDemissao = normalizarTipoDemissao(rawTipoDemissao);
       const dataAdmissaoFact = ctx.facts['data_admissao']?.valor || inputs.data_admissao;
       const dataDemissaoFact = ctx.facts['data_demissao']?.valor || inputs.data_demissao;
       const dataAdmissao = parseData(dataAdmissaoFact);
       const dataDemissao = parseData(dataDemissaoFact);
       
       const salarioFact = ctx.facts['salario_mensal'] || ctx.facts['salario_base'];
-      const salarioBase = salarioFact ? Number(salarioFact.valor) : Number(inputs.salario_base || 0);
+      const salarioFromFacts = parseFactAsNumber(salarioFact);
+      const salarioFromInput = typeof inputs.salario_base === 'number'
+        ? inputs.salario_base
+        : Number(inputs.salario_base || 0);
+      const salarioBase = salarioFromFacts > 0 ? salarioFromFacts : salarioFromInput;
       
       if (!dataAdmissao || !dataDemissao) {
         warnings.push({
