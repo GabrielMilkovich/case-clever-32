@@ -242,7 +242,7 @@ class INSSCalculator implements Calculator {
           verbas.push({
             codigo: 'INSS_DESCONTO',
             descricao: 'Desconto INSS',
-            valor_bruto: arredondarMoeda(desconto),
+            valor_bruto: 0,
             valor_liquido: arredondarMoeda(-desconto),
           });
         }
@@ -267,18 +267,17 @@ class INSSCalculator implements Calculator {
           
           const existingVerba = verbas.find(v => v.codigo === 'INSS_DESCONTO');
           if (existingVerba) {
-            existingVerba.valor_bruto = arredondarMoeda((existingVerba.valor_bruto || 0) + desconto);
             existingVerba.valor_liquido = arredondarMoeda((existingVerba.valor_liquido || 0) - desconto);
           } else {
             verbas.push({
               codigo: 'INSS_DESCONTO', descricao: 'Desconto INSS',
-              valor_bruto: arredondarMoeda(desconto), valor_liquido: arredondarMoeda(-desconto),
+              valor_bruto: 0, valor_liquido: arredondarMoeda(-desconto),
             });
           }
         }
       }
 
-      const totalDesconto = verbas.reduce((sum, v) => sum + (v.valor_bruto || 0), 0);
+      const totalDesconto = verbas.reduce((sum, v) => sum + Math.abs(v.valor_liquido || 0), 0);
       
       auditLines.push({
         linha: ++linhaAtual, calculadora: 'inss',
