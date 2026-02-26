@@ -83,10 +83,12 @@ export const FUNDAMENTOS_LEGAIS: Record<string, FundamentoLegal[]> = {
   FERIAS_PROP: [
     { dispositivo: 'Art. 146, parágrafo único, CLT', descricao: 'Férias proporcionais na rescisão', norma: 'CLT', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452.htm#art146' },
     { dispositivo: 'Súmula 171, TST', descricao: 'Férias proporcionais devidas mesmo com menos de 1 ano', norma: 'TST', status: 'vigente', url_oficial: 'https://www.tst.jus.br/sumulas' },
+    { dispositivo: 'Art. 142, §§ 1º a 3º, CLT', descricao: 'Comissionista: férias calculadas pela média dos últimos 12 meses', norma: 'CLT', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452.htm#art142' },
   ],
   DECIMO_PROP: [
     { dispositivo: 'Art. 1º, Lei 4.090/62', descricao: '13º proporcional aos meses trabalhados', norma: 'Lei 4.090/62', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/leis/l4090.htm' },
     { dispositivo: 'Art. 3º, Lei 4.090/62', descricao: 'Fração ≥ 15 dias = mês integral', norma: 'Lei 4.090/62', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/leis/l4090.htm' },
+    { dispositivo: 'Art. 2º, Decreto 57.155/65', descricao: 'Comissionista: 13º calculado pela média das comissões dos últimos 12 meses', norma: 'Decreto 57.155/65', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/decreto/1950-1969/d57155.htm' },
   ],
   INSS: [
     { dispositivo: 'EC 103/2019', descricao: 'Alíquotas progressivas de INSS', norma: 'EC 103/2019', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/constituicao/emendas/emc/emc103.htm' },
@@ -280,6 +282,93 @@ export abstract class Rubrica {
     let total = salario;
     for (const [, valor] of Object.entries(dados.adicionais)) { total = total.plus(valor); }
     return total;
+  }
+
+  /**
+   * Calcula a média de remuneração variável dos últimos 12 meses (ou período trabalhado se menor).
+   * Art. 142, §§ 1º a 3º, CLT (férias de comissionista)
+   * Art. 2º, Decreto 57.155/65 (13º de comissionista)
+   * 
+   * Retorna null se não há remuneração variável (trabalhador fixo).
+   */
+  protected getMediaVariavel12Meses(dataRef: Date): { media: Decimal; mesesUsados: number; temVariavel: boolean } {
+    const competencias: string[] = [];
+    const current = new Date(dataRef.getFullYear(), dataRef.getMonth(), 1);
+    
+    // Coletar até 12 meses anteriores à data de referência
+    for (let i = 0; i < 12; i++) {
+      current.setMonth(current.getMonth() - (i === 0 ? 0 : 1));
+      const comp = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
+      
+      // Só incluir se estiver dentro do período do contrato
+      const compDate = new Date(current);
+      if (compDate >= this.ctx.contrato.data_admissao) {
+        competencias.push(comp);
+      }
+      if (i === 0) {
+        current.setMonth(current.getMonth() - 1);
+        // Reset to collect previous months from here
+        continue;
+      }
+    }
+
+    // Recoletar de forma mais limpa
+    const comps: string[] = [];
+    const ref = new Date(dataRef.getFullYear(), dataRef.getMonth(), 1);
+    for (let i = 0; i < 12; i++) {
+      const m = new Date(ref.getFullYear(), ref.getMonth() - i, 1);
+      if (m < this.ctx.contrato.data_admissao) break;
+      comps.push(`${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}`);
+    }
+
+    if (comps.length === 0) {
+      return { media: this.getRemuneracaoBase(`${dataRef.getFullYear()}-${String(dataRef.getMonth() + 1).padStart(2, '0')}`), mesesUsados: 1, temVariavel: false };
+    }
+
+    // Verificar se há remuneração variável (comissões, adicionais variáveis, HE habituais)
+    let somaTotal = new Decimal(0);
+    let temVariavel = false;
+    let mesesComDados = 0;
+
+    for (const comp of comps) {
+      const dados = this.ctx.dadosMensais.get(comp);
+      if (dados) {
+        mesesComDados++;
+        let remMes = dados.salario_base;
+        for (const [, valor] of Object.entries(dados.adicionais)) {
+          remMes = remMes.plus(valor);
+          if (!valor.isZero()) temVariavel = true;
+        }
+        // Comissões e HE habituais são variáveis
+        if (!dados.horas_extras_50.isZero() || !dados.horas_extras_100.isZero()) {
+          temVariavel = true;
+        }
+        somaTotal = somaTotal.plus(remMes);
+      } else {
+        // Se não tem dados mensais, usar salário base do histórico
+        mesesComDados++;
+        somaTotal = somaTotal.plus(this.getSalarioBase(comp));
+      }
+    }
+
+    const meses = mesesComDados || 1;
+    return { media: somaTotal.div(meses), mesesUsados: meses, temVariavel };
+  }
+
+  /**
+   * Retorna a remuneração para fins de férias e 13º:
+   * - Para salário fixo: remuneração da competência
+   * - Para comissionista/variável: média dos últimos 12 meses (Art. 142, CLT)
+   */
+  protected getRemuneracaoFeriasOu13(competencia: string): { valor: Decimal; usouMedia: boolean; mesesMedia: number } {
+    const dataRef = new Date(competencia + '-01');
+    const { media, mesesUsados, temVariavel } = this.getMediaVariavel12Meses(dataRef);
+    
+    if (temVariavel) {
+      return { valor: media, usouMedia: true, mesesMedia: mesesUsados };
+    }
+    
+    return { valor: this.getRemuneracaoBase(competencia), usouMedia: false, mesesMedia: 0 };
   }
   
   protected getSalarioHora(competencia: string): Decimal {
