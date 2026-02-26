@@ -225,22 +225,32 @@ export class FeriasVencidas extends Rubrica {
       const periodoFim = new Date(periodoInicio);
       periodoFim.setFullYear(periodoFim.getFullYear() + 1);
       
-      const limiteGozo = new Date(periodoFim);
-      limiteGozo.setFullYear(limiteGozo.getFullYear() + 1);
-      
-      if (limiteGozo <= dataDemissao) {
+      // Art. 146, caput, CLT: na cessação do contrato, são devidas férias
+      // de qualquer período aquisitivo COMPLETO, independente do período concessivo.
+      // A dobra (Art. 137) só se aplica se o período concessivo também expirou.
+      if (periodoFim <= dataDemissao) {
         periodoNum++;
+        
+        const limiteGozo = new Date(periodoFim);
+        limiteGozo.setFullYear(limiteGozo.getFullYear() + 1);
+        const emDobro = limiteGozo <= dataDemissao;
         
         const ferias = remuneracao;
         const terco = ferias.div(3);
-        const total = ferias.plus(terco);
+        const total = emDobro ? ferias.plus(terco).times(2) : ferias.plus(terco);
+        
+        const descPeriodo = emDobro 
+          ? `Férias vencidas EM DOBRO - Período ${periodoNum} (concessivo expirado)`
+          : `Férias vencidas - Período ${periodoNum}`;
         
         this.registrarPasso(
-          `Férias vencidas - Período ${periodoNum}`,
-          'Remuneração + 1/3 Constitucional',
-          { remuneracao: remuneracao.toNumber(), terco: terco.toNumber() },
+          descPeriodo,
+          emDobro 
+            ? 'Remuneração + 1/3 Constitucional × 2 (dobra Art. 137, CLT)'
+            : 'Remuneração + 1/3 Constitucional',
+          { remuneracao: remuneracao.toNumber(), terco: terco.toNumber(), em_dobro: emDobro },
           total,
-          'Art. 137, CLT + Art. 7º, XVII, CF/88'
+          emDobro ? 'Art. 137, CLT + Art. 7º, XVII, CF/88' : 'Art. 146, caput, CLT + Art. 7º, XVII, CF/88'
         );
         
         const valorFinal = this.arredondar(total);
