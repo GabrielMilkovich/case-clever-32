@@ -108,6 +108,13 @@ export default function CasoDetalhe() {
   const [createCriticalKeyRequest, setCreateCriticalKeyRequest] = useState<string | null>(null);
   const [createCriticalNonce, setCreateCriticalNonce] = useState(0);
 
+  // Timer for review elapsed time
+  React.useEffect(() => {
+    if (!isReviewing) return;
+    const interval = setInterval(() => setReviewElapsed(prev => prev + 1), 1000);
+    return () => clearInterval(interval);
+  }, [isReviewing]);
+
   // =====================================================
   // DATA FETCHING
   // =====================================================
