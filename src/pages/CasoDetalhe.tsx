@@ -594,7 +594,6 @@ export default function CasoDetalhe() {
       case "documentos":
         return (
           <div className="space-y-5">
-            <ProcessingMonitorPanel documents={documents as any} stats={processingStats as any} totalChunks={chunksCount || undefined} />
             <DocumentsManager caseId={id!} documents={documents as any} onDocumentsChange={() => queryClient.invalidateQueries({ queryKey: ["documents", id] })} />
           </div>
         );
