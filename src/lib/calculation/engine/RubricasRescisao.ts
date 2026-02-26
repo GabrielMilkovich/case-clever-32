@@ -26,15 +26,40 @@ export class SaldoSalario extends Rubrica {
     const dataDemissao = this.ctx.contrato.data_demissao;
     if (!dataDemissao) return [];
     
-    // Art. 64 CLT: para mensalistas, o mês = 30 dias sempre.
-    // Se trabalhou o mês inteiro (último dia do mês), saldo = salário integral.
-    const diaRescisao = dataDemissao.getDate();
-    const ultimoDiaMes = new Date(dataDemissao.getFullYear(), dataDemissao.getMonth() + 1, 0).getDate();
-    const diasParaCalculo = (diaRescisao >= ultimoDiaMes) ? 30 : diaRescisao;
+    // Interpretação inteligente: se dia=1, último dia trabalhado = último dia mês anterior
+    const dia = dataDemissao.getDate();
+    let competencia: string;
+    let diasParaCalculo: number;
+    let explicacao: string;
     
-    const competencia = `${dataDemissao.getFullYear()}-${String(dataDemissao.getMonth() + 1).padStart(2, '0')}`;
+    if (dia === 1) {
+      // Data CTPS dia 1 = primeiro dia fora → mês anterior integral
+      const mesAnterior = new Date(dataDemissao.getFullYear(), dataDemissao.getMonth() - 1, 1);
+      competencia = `${mesAnterior.getFullYear()}-${String(mesAnterior.getMonth() + 1).padStart(2, '0')}`;
+      diasParaCalculo = 30; // Mês integral Art. 64
+      explicacao = `Data CTPS ${dataDemissao.toISOString().split('T')[0]} → mês anterior integral (Art. 64, CLT)`;
+    } else {
+      const ultimoDiaMes = new Date(dataDemissao.getFullYear(), dataDemissao.getMonth() + 1, 0).getDate();
+      competencia = `${dataDemissao.getFullYear()}-${String(dataDemissao.getMonth() + 1).padStart(2, '0')}`;
+      if (dia >= ultimoDiaMes) {
+        diasParaCalculo = 30;
+        explicacao = `Trabalhou até último dia do mês — mês integral (Art. 64, CLT)`;
+      } else {
+        diasParaCalculo = dia;
+        explicacao = `${dia} dias trabalhados no mês da rescisão`;
+      }
+    }
+    
     const salarioBase = this.getSalarioBase(competencia);
     const salarioDia = salarioBase.div(30);
+    
+    this.registrarPasso(
+      'Interpretação da data de demissão',
+      explicacao,
+      { data_demissao: dataDemissao.toISOString().split('T')[0], dia_original: dia, dias_calculados: diasParaCalculo },
+      toDecimal(diasParaCalculo),
+      'Art. 64, CLT'
+    );
     
     this.registrarPasso(
       'Cálculo do salário diário',
@@ -47,9 +72,9 @@ export class SaldoSalario extends Rubrica {
     const saldo = salarioDia.times(diasParaCalculo);
     
     this.registrarPasso(
-      `Saldo de salário (${diasParaCalculo} dias${diaRescisao >= ultimoDiaMes ? ' — mês integral' : ''})`,
+      `Saldo de salário (${diasParaCalculo} dias${diasParaCalculo === 30 ? ' — mês integral' : ''})`,
       'Salário Diário × Dias Trabalhados',
-      { salario_dia: salarioDia.toNumber(), dias: diasParaCalculo, dia_rescisao_real: diaRescisao, ultimo_dia_mes: ultimoDiaMes },
+      { salario_dia: salarioDia.toNumber(), dias: diasParaCalculo },
       saldo,
       'Art. 477, CLT'
     );
@@ -72,8 +97,7 @@ export class SaldoSalario extends Rubrica {
         [
           { campo: 'salario_base', valor: salarioBase.toNumber(), tipo: 'money' },
           { campo: 'dias_trabalhados', valor: diasParaCalculo, tipo: 'number' },
-          { campo: 'dia_real', valor: diaRescisao, tipo: 'number' },
-          { campo: 'ultimo_dia_mes', valor: ultimoDiaMes, tipo: 'number' },
+          { campo: 'dia_original_ctps', valor: dia, tipo: 'number' },
         ],
         `(${salarioBase} ÷ 30) × ${diasParaCalculo}`,
         valorFinal
