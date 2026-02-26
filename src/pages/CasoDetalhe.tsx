@@ -344,6 +344,15 @@ export default function CasoDetalhe() {
 
     setIsCalculating(true);
     try {
+      // Sempre recarregar fatos do banco antes de cada cálculo (evita estado stale)
+      const { data: currentFacts, error: factsError } = await supabase
+        .from("facts")
+        .select("*")
+        .eq("case_id", id)
+        .order("criado_em", { ascending: false });
+      if (factsError) throw factsError;
+      const factsForRun = (currentFacts || []) as Fact[];
+
       // Load profile + calculators + indices + tables
       const { data: profile } = await supabase.from("calculation_profiles").select("*").eq("id", selectedProfile).single();
       if (!profile) throw new Error("Perfil não encontrado");
@@ -365,8 +374,8 @@ export default function CasoDetalhe() {
         })
         .filter(Boolean) as { nome: string; rules: CalculatorRules }[];
 
-      const adm = facts.find(f => f.chave === "data_admissao")?.valor;
-      const dem = facts.find(f => f.chave === "data_demissao")?.valor;
+      const adm = factsForRun.find(f => f.chave === "data_admissao")?.valor;
+      const dem = factsForRun.find(f => f.chave === "data_demissao")?.valor;
 
       // Fix definitivo: garante cálculo de verbas rescisórias quando há vínculo encerrado,
       // mesmo que o perfil ainda não tenha essa calculadora vinculada no admin.
@@ -397,7 +406,7 @@ export default function CasoDetalhe() {
 
       // ═══ VALIDAÇÃO CRUZADA DE FATOS ═══
       // Detecta inconsistências entre documentos (ex: código FGTS vs tipo_demissao do OCR)
-      const rawFactMap = mapFactsToEngine(facts);
+      const rawFactMap = mapFactsToEngine(factsForRun);
       const crossValidation = runCrossValidation(rawFactMap);
 
       // Mostrar alertas ao advogado
@@ -417,14 +426,36 @@ export default function CasoDetalhe() {
 
       // Persistir correções no banco se houver
       if (crossValidation.corrections.length > 0) {
-        for (const correction of crossValidation.corrections) {
-          const factToUpdate = facts.find(f => f.chave === correction.campo);
+        await Promise.all(crossValidation.corrections.map(async (correction) => {
+          const aliasKeys = correction.campo === "tipo_demissao"
+            ? ["tipo_demissao", "motivo_demissao"]
+            : [correction.campo];
+
+          const factToUpdate = factsForRun.find(f => aliasKeys.includes(f.chave));
+
           if (factToUpdate) {
-            await supabase.from("facts").update({
-              valor: correction.valor_corrigido,
-            }).eq("id", factToUpdate.id);
+            const { error: updateError } = await supabase
+              .from("facts")
+              .update({
+                valor: correction.valor_corrigido,
+                confianca: correction.confianca,
+              })
+              .eq("id", factToUpdate.id);
+            if (updateError) throw updateError;
+            return;
           }
-        }
+
+          const { error: insertError } = await supabase.from("facts").insert({
+            case_id: id,
+            chave: correction.campo,
+            valor: correction.valor_corrigido,
+            tipo: "texto",
+            origem: "ia_extracao",
+            confianca: correction.confianca,
+            confirmado: false,
+          } as any);
+          if (insertError) throw insertError;
+        }));
         // Criar controvérsia para registro
         for (const alert of crossValidation.alerts) {
           await supabase.from("case_controversies").insert({
@@ -500,8 +531,11 @@ export default function CasoDetalhe() {
       }
 
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["facts", id] }),
         queryClient.invalidateQueries({ queryKey: ["calculation_runs", id] }),
         queryClient.invalidateQueries({ queryKey: ["calc_snapshots", id] }),
+        queryClient.invalidateQueries({ queryKey: ["latest_calc_run", id] }),
+        queryClient.invalidateQueries({ queryKey: ["audit_lines_detail"] }),
       ]);
       toast.success(`Cálculo executado! Snapshot v${nextVersion} gerado.`);
       updateStatusMutation.mutate("calculado");
