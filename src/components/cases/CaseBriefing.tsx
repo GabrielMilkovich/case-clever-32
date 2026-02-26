@@ -298,7 +298,7 @@ export function CaseBriefing({ caseId, caseInfo }: CaseBriefingProps) {
     } finally {
       setIsGenerating(false);
     }
-  }, [facts, documents, latestRun, auditLines, controversies, caseInfo, contract, savedBriefing]);
+  }, [facts, documents, latestRun, auditLines, controversies, caseInfo, contract, savedBriefing, documentChunks]);
 
   const exportAsText = () => {
     if (!briefing) return;
