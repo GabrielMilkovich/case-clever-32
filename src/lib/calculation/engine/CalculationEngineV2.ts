@@ -154,7 +154,7 @@ export class CalculationEngineV2 {
   // EXECUÇÃO DAS RUBRICAS
   // =====================================================
   
-  private executarRubricas(): void {
+  private executarRubricas(rubricasBloqueadas: Set<string> = new Set()): void {
     const rubricasAtivas = this.input.perfil.rubricas_ativas;
     
     for (const codigo of ORDEM_EXECUCAO) {
