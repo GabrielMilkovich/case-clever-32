@@ -295,6 +295,141 @@ export function runCrossValidation(facts: FactMap): CrossValidationResult {
           recomendacao: 'Confirme admissão e demissão nos documentos originais.',
         });
       }
+      // Data futura
+      const hoje = new Date();
+      if (dem > hoje) {
+        alerts.push({
+          tipo: 'dado_inconsistente',
+          severidade: 'alta',
+          titulo: 'Data de Demissão no futuro',
+          descricao: `A data de demissão (${dem.toLocaleDateString('pt-BR')}) está no futuro. Pode ser erro de OCR.`,
+          campo_afetado: 'data_demissao',
+          valor_documento_a: dem.toLocaleDateString('pt-BR'),
+          valor_documento_b: hoje.toLocaleDateString('pt-BR'),
+          recomendacao: 'Confira o ano da data de demissão nos documentos.',
+        });
+      }
+    }
+  }
+
+  // ─── REGRA 4: SALÁRIO vs SALÁRIO MÍNIMO ───
+  const salarioFact = facts['salario_base'] || facts['salario_mensal'];
+  if (salarioFact) {
+    const salario = parseNumber(String(salarioFact.valor));
+    // Salário mínimo atual (2025): R$ 1.518,00
+    const SALARIO_MINIMO = 1518;
+    if (salario > 0 && salario < SALARIO_MINIMO) {
+      alerts.push({
+        tipo: 'dado_inconsistente',
+        severidade: 'alta',
+        titulo: 'Salário abaixo do mínimo vigente',
+        descricao: `Salário extraído (R$ ${salario.toFixed(2)}) está abaixo do salário mínimo (R$ ${SALARIO_MINIMO.toFixed(2)}). Pode indicar erro de OCR ou valor parcial.`,
+        campo_afetado: 'salario_base',
+        valor_documento_a: `R$ ${salario.toFixed(2)}`,
+        valor_documento_b: `R$ ${SALARIO_MINIMO.toFixed(2)} (mínimo)`,
+        recomendacao: 'Confirme o valor do salário nos holerites/CTPS. Verifique se não é valor diário ou parcial.',
+      });
+    }
+    // Salário absurdamente alto (> R$ 200k) — possível erro de OCR
+    if (salario > 200000) {
+      alerts.push({
+        tipo: 'dado_inconsistente',
+        severidade: 'alta',
+        titulo: 'Salário excepcionalmente alto',
+        descricao: `Salário extraído (R$ ${salario.toFixed(2)}) parece anormalmente alto. Verifique se não houve erro de OCR (ponto/vírgula trocados).`,
+        campo_afetado: 'salario_base',
+        valor_documento_a: `R$ ${salario.toFixed(2)}`,
+        valor_documento_b: 'Verificar formatação',
+        recomendacao: 'Confirme se a pontuação decimal está correta (ex: 1.500,00 vs 150.000).',
+      });
+    }
+  }
+
+  // ─── REGRA 5: AVISO PRÉVIO vs TIPO DEMISSÃO ───
+  const avisoPrevioFact = facts['aviso_previo'];
+  if (avisoPrevioFact && tipoDemissaoFact) {
+    const avisoPrevio = String(avisoPrevioFact.valor).toLowerCase();
+    const tipoDem = normalizeTipoDemissao(String(tipoDemissaoFact.valor));
+    
+    // Pedido de demissão não gera aviso prévio indenizado pelo empregador
+    if (tipoDem === 'pedido_demissao' && avisoPrevio === 'indenizado') {
+      alerts.push({
+        tipo: 'dado_inconsistente',
+        severidade: 'alta',
+        titulo: 'Aviso Prévio Indenizado incompatível com Pedido de Demissão',
+        descricao: 'Em pedido de demissão, o aviso prévio indenizado geralmente não se aplica (o empregado é quem deve avisar). Verifique se o tipo de demissão está correto.',
+        campo_afetado: 'aviso_previo',
+        valor_documento_a: 'Indenizado',
+        valor_documento_b: 'Pedido de Demissão',
+        recomendacao: 'Confirme o tipo de demissão e o aviso prévio nos documentos rescisórios (TRCT).',
+      });
+    }
+  }
+
+  // ─── REGRA 6: CÓDIGO FGTS SEM TIPO DEMISSÃO (inferir automaticamente) ───
+  if (fgtsCode && !tipoDemissaoFact) {
+    const fgtsInfo = FGTS_MOVEMENT_CODES[fgtsCode];
+    if (fgtsInfo) {
+      corrections.push({
+        campo: 'tipo_demissao',
+        valor_original: '(não informado)',
+        valor_corrigido: fgtsInfo.tipo_demissao,
+        motivo: `Tipo de demissão inferido do código FGTS "${fgtsCode}" (${fgtsInfo.descricao}). Nenhum fato "tipo_demissao" foi extraído dos documentos.`,
+        fonte: `Extrato FGTS — Código de Movimentação ${fgtsCode} (CEF/eSocial)`,
+        confianca: 0.90,
+      });
+      warnings.push({
+        tipo: 'atencao',
+        codigo: 'TIPO_DEMISSAO_INFERIDO_FGTS',
+        mensagem: `Tipo de demissão definido como "${fgtsInfo.tipo_demissao}" com base no código FGTS "${fgtsCode}".`,
+        sugestao: 'Confirme o tipo de demissão no TRCT ou documentos rescisórios.',
+      });
+    }
+  }
+
+  // ─── REGRA 7: JORNADA SEM CARTÃO DE PONTO ───
+  const horasExtrasFact = facts['horas_extras_mensais'] || facts['horas_extras'] || facts['media_horas_extras'];
+  if (horasExtrasFact) {
+    const horas = parseNumber(String(horasExtrasFact.valor));
+    if (horas > 100) {
+      alerts.push({
+        tipo: 'dado_inconsistente',
+        severidade: 'alta',
+        titulo: 'Quantidade de horas extras anormalmente alta',
+        descricao: `Foram extraídas ${horas}h extras/mês. Acima de 100h/mês é altamente improvável e pode indicar erro de OCR.`,
+        campo_afetado: 'horas_extras_mensais',
+        valor_documento_a: `${horas}h/mês`,
+        valor_documento_b: 'Máximo razoável: ~80h/mês',
+        recomendacao: 'Confirme a quantidade de horas extras nos cartões de ponto ou documentos de jornada.',
+      });
+    }
+  }
+
+  // ─── REGRA 8: CARGO / FUNÇÃO VAZIO ───
+  if (!facts['cargo'] && !facts['funcao']) {
+    warnings.push({
+      tipo: 'atencao',
+      codigo: 'CARGO_NAO_INFORMADO',
+      mensagem: 'Cargo/função do reclamante não foi extraído dos documentos.',
+      sugestao: 'Adicione manualmente o cargo para contextualizar o cálculo e fundamentar pedidos.',
+    });
+  }
+
+  // ─── REGRA 9: MOTIVO DEMISSÃO GENÉRICO (OCR pode ler texto ambíguo) ───
+  if (tipoDemissaoFact && !fgtsCode) {
+    const val = String(tipoDemissaoFact.valor).toLowerCase();
+    // Se OCR extraiu texto genérico tipo "rescisão" sem qualificador
+    if (val === 'rescisao' || val === 'rescisão' || val === 'demissao' || val === 'demissão') {
+      alerts.push({
+        tipo: 'dado_inconsistente',
+        severidade: 'critica',
+        titulo: 'Tipo de demissão ambíguo — sem qualificação',
+        descricao: `O OCR extraiu "${tipoDemissaoFact.valor}" sem especificar se é justa causa, sem justa causa, pedido, etc. Sem código FGTS para validar.`,
+        campo_afetado: 'tipo_demissao',
+        valor_documento_a: String(tipoDemissaoFact.valor),
+        valor_documento_b: '(código FGTS ausente)',
+        recomendacao: 'URGENTE: Verifique o TRCT, extrato FGTS ou carta de demissão para determinar o tipo correto. Isso afeta aviso prévio, multa FGTS e férias.',
+      });
     }
   }
 

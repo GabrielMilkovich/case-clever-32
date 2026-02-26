@@ -16,6 +16,7 @@ import {
   arredondarMoeda,
   parseFactAsNumber,
 } from '../types';
+import { FGTS_MOVEMENT_CODES } from '../cross-validation';
 
 interface RescisaoParams {
   tipo_demissao: 'sem_justa_causa' | 'justa_causa' | 'pedido_demissao' | 'rescisao_indireta' | 'acordo';
@@ -98,7 +99,36 @@ export function createVerbasRescisoriasCalculator(rules: CalculatorRules): Calcu
         inputs.tipo_demissao ||
         'sem_justa_causa'
       );
-      const tipoDemissao = normalizarTipoDemissao(rawTipoDemissao);
+      let tipoDemissao = normalizarTipoDemissao(rawTipoDemissao);
+
+      // ── OVERRIDE: código FGTS/eSocial prevalece sobre OCR ──
+      const fgtsCodeFact = ctx.facts['codigo_afastamento_fgts'] ||
+                            ctx.facts['codigo_movimentacao_fgts'] ||
+                            ctx.facts['codigo_afastamento'];
+      let fgtsInfo: typeof FGTS_MOVEMENT_CODES[string] | null = null;
+
+      if (fgtsCodeFact) {
+        const rawCode = String(fgtsCodeFact.valor).trim().toUpperCase();
+        // Extrair código de padrão "DD/MM/YYYY-X"
+        const match = rawCode.match(/([A-Z]\d?)\s*$/i) ||
+                      rawCode.match(/\d{2}\/\d{2}\/\d{4}-([A-Z]\d?)/i);
+        const code = match ? match[1].toUpperCase() : rawCode;
+        
+        if (FGTS_MOVEMENT_CODES[code]) {
+          fgtsInfo = FGTS_MOVEMENT_CODES[code];
+          const tipoPeloCodigo = fgtsInfo.tipo_demissao as RescisaoParams['tipo_demissao'];
+          
+          if (tipoPeloCodigo !== tipoDemissao) {
+            warnings.push({
+              tipo: 'erro',
+              codigo: 'TIPO_DEMISSAO_CORRIGIDO_FGTS',
+              mensagem: `Tipo de demissão corrigido de "${tipoDemissao}" para "${tipoPeloCodigo}" com base no código FGTS "${code}" (${fgtsInfo.descricao}). O código oficial prevalece.`,
+              sugestao: 'Verifique o extrato FGTS para confirmar.',
+            });
+          }
+          tipoDemissao = tipoPeloCodigo;
+        }
+      }
       const dataAdmissaoFact = ctx.facts['data_admissao']?.valor || inputs.data_admissao;
       const dataDemissaoFact = ctx.facts['data_demissao']?.valor || inputs.data_demissao;
       const dataAdmissao = parseData(dataAdmissaoFact);
