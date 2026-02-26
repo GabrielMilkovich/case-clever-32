@@ -3,7 +3,7 @@
 // Upload drag-drop, filtros, reprocessamento, classificação
 // =====================================================
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -150,6 +150,13 @@ export function DocumentsManager({
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Batch processing state
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+  const [batchQueue, setBatchQueue] = useState<string[]>([]);
+  const [batchCurrentIndex, setBatchCurrentIndex] = useState(0);
+  const [batchResults, setBatchResults] = useState<Record<string, "pending" | "processing" | "done" | "error">>({});
+  const batchAbortRef = useRef(false);
+
   // Filtrar documentos
   const filteredDocuments = documents.filter(doc => {
     if (filterType !== "all" && doc.tipo !== filterType) return false;
@@ -265,7 +272,7 @@ export function DocumentsManager({
     }
   }, [onDocumentsChange]);
 
-  // Processar todos os pendentes - modo assíncrono em fila
+  // Processar todos os pendentes — sequencial com progresso visual
   const processAllPending = useCallback(async () => {
     const pendingDocs = documents.filter(d => 
       !d.status || d.status === "uploaded" || d.status === "failed"
@@ -276,30 +283,61 @@ export function DocumentsManager({
       return;
     }
 
-    toast.info(`Enfileirando ${pendingDocs.length} documento(s) para processamento assíncrono...`);
+    const docIds = pendingDocs.map(d => d.id);
+    const initialResults: Record<string, "pending" | "processing" | "done" | "error"> = {};
+    docIds.forEach(id => { initialResults[id] = "pending"; });
 
-    try {
-      // Usar nova edge function de processamento assíncrono em lote
-      const { data, error } = await supabase.functions.invoke("process-document-async", {
-        body: { case_id: caseId, mode: "queue" },
-      });
+    setBatchQueue(docIds);
+    setBatchCurrentIndex(0);
+    setBatchResults(initialResults);
+    setIsBatchProcessing(true);
+    batchAbortRef.current = false;
 
-      if (error) throw error;
+    let successCount = 0;
+    let errorCount = 0;
 
-      toast.success(`${data?.queued || pendingDocs.length} documento(s) enfileirados! O processamento continua em background.`);
-      
-      // Atualizar a lista para mostrar status
-      onDocumentsChange();
-    } catch (err) {
-      console.error("Queue error:", err);
-      // Fallback: processar sequencialmente
-      toast.warning("Processando sequencialmente...");
-      for (const doc of pendingDocs) {
-        await processDocument(doc.id);
+    for (let i = 0; i < docIds.length; i++) {
+      if (batchAbortRef.current) break;
+
+      const docId = docIds[i];
+      setBatchCurrentIndex(i);
+      setBatchResults(prev => ({ ...prev, [docId]: "processing" }));
+      setProcessingDocId(docId);
+
+      try {
+        const { data, error } = await supabase.functions.invoke("process-document", {
+          body: { document_id: docId },
+        });
+
+        if (error) throw error;
+
+        setBatchResults(prev => ({ ...prev, [docId]: "done" }));
+        successCount++;
+      } catch (err) {
+        console.error(`Processing error for ${docId}:`, err);
+        setBatchResults(prev => ({ ...prev, [docId]: "error" }));
+        errorCount++;
       }
-      toast.success("Processamento concluído!");
+
+      setProcessingDocId(null);
+      onDocumentsChange();
     }
-  }, [documents, processDocument, caseId, onDocumentsChange]);
+
+    setIsBatchProcessing(false);
+    setProcessingDocId(null);
+
+    if (errorCount === 0) {
+      toast.success(`Todos os ${successCount} documento(s) processados com sucesso!`);
+    } else {
+      toast.warning(`${successCount} processado(s), ${errorCount} com erro.`);
+    }
+    onDocumentsChange();
+  }, [documents, caseId, onDocumentsChange]);
+
+  const cancelBatchProcessing = useCallback(() => {
+    batchAbortRef.current = true;
+    toast.info("Cancelando processamento em lote...");
+  }, []);
 
   // Atualizar tipo de documento
   const updateDocType = useCallback(async (documentId: string, newType: string) => {
@@ -428,6 +466,103 @@ export function DocumentsManager({
         </CardContent>
       </Card>
 
+      {/* Batch Processing Progress Panel */}
+      {isBatchProcessing && batchQueue.length > 0 && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                Processando documentos
+              </CardTitle>
+              <Button variant="outline" size="sm" onClick={cancelBatchProcessing}>
+                Cancelar
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Overall progress */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Progresso geral</span>
+                <span className="font-medium text-foreground">
+                  {Object.values(batchResults).filter(s => s === "done" || s === "error").length} / {batchQueue.length}
+                </span>
+              </div>
+              <Progress
+                value={
+                  (Object.values(batchResults).filter(s => s === "done" || s === "error").length / batchQueue.length) * 100
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                {Math.round(
+                  (Object.values(batchResults).filter(s => s === "done" || s === "error").length / batchQueue.length) * 100
+                )}% concluído
+              </p>
+            </div>
+
+            {/* Per-document status */}
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {batchQueue.map((docId, idx) => {
+                const doc = documents.find(d => d.id === docId);
+                const status = batchResults[docId] || "pending";
+                return (
+                  <div
+                    key={docId}
+                    className={`flex items-center justify-between p-2.5 rounded-lg border transition-colors ${
+                      status === "processing"
+                        ? "bg-primary/10 border-primary/30"
+                        : status === "done"
+                        ? "bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800"
+                        : status === "error"
+                        ? "bg-destructive/10 border-destructive/30"
+                        : "bg-muted/30 border-border"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 flex items-center justify-center">
+                        {status === "processing" ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        ) : status === "done" ? (
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                        ) : status === "error" ? (
+                          <XCircle className="h-4 w-4 text-destructive" />
+                        ) : (
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </div>
+                      <span className="text-sm font-medium truncate max-w-[250px]">
+                        {doc?.file_name || `Documento ${idx + 1}`}
+                      </span>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={`text-xs ${
+                        status === "processing"
+                          ? "text-primary border-primary/40"
+                          : status === "done"
+                          ? "text-green-700 border-green-300"
+                          : status === "error"
+                          ? "text-destructive border-destructive/40"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {status === "processing"
+                        ? "OCR + Indexação..."
+                        : status === "done"
+                        ? "Concluído ✓"
+                        : status === "error"
+                        ? "Erro"
+                        : "Na fila"}
+                    </Badge>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Estatísticas e Filtros */}
       {documents.length > 0 && (
         <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
@@ -498,9 +633,13 @@ export function DocumentsManager({
               </SelectContent>
             </Select>
             {stats.pending > 0 && (
-              <Button onClick={processAllPending} variant="default" className="gap-2">
-                <Cpu className="h-4 w-4" />
-                Processar Todos ({stats.pending})
+              <Button onClick={processAllPending} variant="default" className="gap-2" disabled={isBatchProcessing}>
+                {isBatchProcessing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Cpu className="h-4 w-4" />
+                )}
+                {isBatchProcessing ? "Processando..." : `Processar Todos (${stats.pending})`}
               </Button>
             )}
           </div>
