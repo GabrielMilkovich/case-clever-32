@@ -24,11 +24,13 @@ import {
   RUBRICAS_REGISTRY,
   ORDEM_EXECUCAO,
 } from './RubricaEngine';
+import { SituationAnalyzer, AnaliseResult } from './SituationAnalyzer';
+import { ReportGenerator, RelatorioCompleto } from './ReportGenerator';
 
 // Configuração de precisão
 Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
 
-const ENGINE_VERSION = '2.0.0';
+const ENGINE_VERSION = '2.1.0';
 
 // =====================================================
 // INTERFACE DO MOTOR
@@ -49,6 +51,8 @@ export interface EngineOutput {
   items: CalcResultItem[];
   warnings: CalcWarning[];
   alertas: ConsistencyAlert[];
+  analise: AnaliseResult;
+  relatorio: RelatorioCompleto;
 }
 
 // =====================================================
