@@ -26,11 +26,12 @@ serve(async (req) => {
       controversies,
       case_info,
       contract_info,
+      document_chunks,
     } = await req.json();
 
-    if (!facts || !calculation_result) {
+    if (!facts && !document_chunks) {
       return new Response(
-        JSON.stringify({ error: "facts and calculation_result are required" }),
+        JSON.stringify({ error: "facts or document_chunks are required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -50,13 +51,15 @@ serve(async (req) => {
       `- ${d.file_name || d.tipo || 'Documento'} (tipo: ${d.tipo}, status: ${d.status}, OCR: ${d.ocr_confidence ?? 'N/A'}%)`
     ).join("\n") || "Nenhum documento listado.";
 
+    const calcResult = calculation_result || { resultado_bruto: { total: 0, por_verba: {} }, resultado_liquido: { total: 0, por_verba: {} } };
+
     const resultText = `
-Total Bruto: R$ ${calculation_result.resultado_bruto?.total?.toFixed(2) || '0.00'}
-Total Líquido: R$ ${calculation_result.resultado_liquido?.total?.toFixed(2) || '0.00'}
-Diferença (descontos): R$ ${((calculation_result.resultado_bruto?.total || 0) - (calculation_result.resultado_liquido?.total || 0)).toFixed(2)}
+Total Bruto: R$ ${calcResult.resultado_bruto?.total?.toFixed(2) || '0.00'}
+Total Líquido: R$ ${calcResult.resultado_liquido?.total?.toFixed(2) || '0.00'}
+Diferença (descontos): R$ ${((calcResult.resultado_bruto?.total || 0) - (calcResult.resultado_liquido?.total || 0)).toFixed(2)}
 
 Verbas calculadas:
-${Object.entries(calculation_result.resultado_bruto?.por_verba || {}).map(([codigo, data]: [string, any]) => 
+${Object.entries(calcResult.resultado_bruto?.por_verba || {}).map(([codigo, data]: [string, any]) => 
   `  - ${data.descricao || codigo}: R$ ${data.valor?.toFixed(2) || '0.00'}`
 ).join("\n")}
 `;
@@ -79,7 +82,16 @@ ${Object.entries(calculation_result.resultado_bruto?.por_verba || {}).map(([codi
     const contractText = contract_info ?
       `Admissão: ${contract_info.data_admissao}\nDemissão: ${contract_info.data_demissao || 'Em aberto'}\nTipo demissão: ${contract_info.tipo_demissao || 'Não informado'}\nSalário inicial: R$ ${contract_info.salario_inicial || 'N/A'}\nFunção: ${contract_info.funcao || 'N/A'}` : "";
 
+    // Build raw document text from chunks
+    const chunksText = (document_chunks || []).map((c: any, i: number) =>
+      `--- Chunk ${i + 1} (Doc: ${c.doc_type || 'desconhecido'}, Pág: ${c.page_number || '?'}) ---\n${c.content}`
+    ).join("\n\n") || "Nenhum texto de documento disponível.";
+
     const systemPrompt = `Você é um assistente jurídico trabalhista sênior. Sua tarefa é produzir um ROTEIRO COMPLETO E DETALHADO do caso para que o advogado entenda absolutamente tudo antes de ir a uma audiência ou redigir peças processuais.
+
+IMPORTANTE: Você receberá tanto fatos estruturados já extraídos quanto o TEXTO BRUTO dos documentos (OCR). 
+Você DEVE analisar AMBOS. Muitas informações cruciais podem estar apenas no texto bruto e não nos fatos extraídos.
+Leia cada chunk de documento com atenção e extraia TODAS as informações relevantes que encontrar.
 
 O roteiro deve ser estruturado nas seguintes seções (use Markdown com headers ##):
 
@@ -88,45 +100,63 @@ O roteiro deve ser estruturado nas seguintes seções (use Markdown com headers 
 
 ## 2. DADOS DO VÍNCULO EMPREGATÍCIO
 - Datas, função, salário, tipo de rescisão, jornada.
+- CNPJ do empregador, CPF do empregado se disponíveis.
 - Destaque qualquer inconsistência ou dado faltante.
 
 ## 3. DOCUMENTOS ANALISADOS
 - Liste cada documento, seu tipo e qualidade (OCR).
 - Indique documentos ausentes que seriam importantes.
+- Resuma os principais dados encontrados em CADA documento.
 
 ## 4. FATOS EXTRAÍDOS E VALIDADOS
-- Liste os fatos críticos e se estão confirmados ou não.
+- Liste TODOS os fatos críticos e se estão confirmados ou não.
 - Destaque fatos com baixa confiança ou divergência entre fontes.
+- Inclua fatos que você encontrou no texto bruto mas NÃO estavam nos fatos estruturados.
 
-## 5. CONTROVÉRSIAS IDENTIFICADAS
+## 5. INFORMAÇÕES ADICIONAIS DOS DOCUMENTOS
+- Analise o texto bruto dos documentos e liste QUALQUER informação relevante que não foi capturada nos fatos estruturados.
+- Verbas de holerites, valores de TRCT, depósitos FGTS, marcações de ponto, cláusulas contratuais, etc.
+- Esta seção é CRÍTICA — o advogado precisa de TUDO.
+
+## 6. CONTROVÉRSIAS IDENTIFICADAS
 - Liste cada controvérsia, sua implicação financeira e recomendação.
 
-## 6. RESULTADO DO CÁLCULO
+## 7. RESULTADO DO CÁLCULO
 - Apresente cada verba calculada de forma clara e didática.
 - Explique a lógica de cada verba de forma resumida.
+- Se não houver cálculo, indique que o cálculo ainda não foi realizado.
 
-## 7. ALERTAS E RISCOS
+## 8. ALERTAS E RISCOS
 - Liste todos os alertas do sistema.
 - Classifique cada risco (baixo/médio/alto) e sugira mitigações.
+- Inclua riscos que você identificou na leitura dos documentos.
 
-## 8. PONTOS DE ATENÇÃO PARA O ADVOGADO
+## 9. PONTOS DE ATENÇÃO PARA O ADVOGADO
 - Fragilidades probatórias.
 - Teses que podem ser contestadas.
 - Documentos que deveriam ser solicitados à parte adversa.
 - Estratégias processuais recomendadas.
+- Verbas que podem estar sendo pagas incorretamente.
+- Diferenças entre o que consta nos documentos e o que foi calculado.
 
-## 9. RECOMENDAÇÕES FINAIS
+## 10. CRONOLOGIA DOS EVENTOS
+- Monte uma linha do tempo com todas as datas relevantes encontradas nos documentos e fatos.
+
+## 11. RECOMENDAÇÕES FINAIS
 - Valor de proposta de acordo sugerido (faixa).
 - Próximos passos concretos.
+- Documentos adicionais a solicitar.
 
 REGRAS:
 - Seja PRECISO: use apenas os dados fornecidos, não invente.
+- Seja EXAUSTIVO: analise CADA chunk de documento, CADA fato, CADA número.
 - Seja DIDÁTICO: o advogado pode ser júnior.
 - Use linguagem jurídica mas acessível.
 - Quando dados estiverem faltando, diga EXPLICITAMENTE o que falta.
-- NÃO recalcule nada. Narre e analise o que foi calculado.`;
+- NÃO recalcule nada. Narre e analise o que foi calculado.
+- Se encontrar dados nos documentos que contradizem os fatos estruturados, DESTAQUE isso.`;
 
-    const userPrompt = `Analise o seguinte caso trabalhista e produza o roteiro completo:
+    const userPrompt = `Analise o seguinte caso trabalhista e produza o roteiro completo. LEIA ATENTAMENTE todo o texto bruto dos documentos — ele contém informações que podem não estar nos fatos estruturados.
 
 ═══ DADOS DO CASO ═══
 ${caseText}
@@ -137,7 +167,7 @@ ${contractText}
 ═══ DOCUMENTOS DO CASO ═══
 ${docsText}
 
-═══ FATOS EXTRAÍDOS ═══
+═══ FATOS EXTRAÍDOS (ESTRUTURADOS) ═══
 ${factsText}
 
 ═══ CONTROVÉRSIAS ═══
@@ -152,7 +182,10 @@ ${auditSummary}
 ═══ ALERTAS DO SISTEMA ═══
 ${warningsText}
 
-Produza o roteiro completo e detalhado para o advogado.`;
+═══ TEXTO BRUTO DOS DOCUMENTOS (OCR) — ANALISE TUDO ═══
+${chunksText}
+
+Produza o roteiro completo, exaustivo e detalhado para o advogado. Não omita NENHUMA informação dos documentos.`;
 
     console.log("Calling Lovable AI for case briefing...");
 

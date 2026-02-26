@@ -129,6 +129,21 @@ export function CaseBriefing({ caseId, caseInfo }: CaseBriefingProps) {
     },
   });
 
+  // Fetch raw document chunks for comprehensive AI analysis
+  const { data: documentChunks = [] } = useQuery({
+    queryKey: ["document_chunks_briefing", caseId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("document_chunks")
+        .select("content, page_number, doc_type, chunk_index, document_id")
+        .eq("case_id", caseId)
+        .order("document_id")
+        .order("chunk_index")
+        .limit(80);
+      return data || [];
+    },
+  });
+
   const saveBriefing = async (content: string) => {
     try {
       const { data: session } = await supabase.auth.getSession();
@@ -188,6 +203,11 @@ export function CaseBriefing({ caseId, caseInfo }: CaseBriefingProps) {
             salario_inicial: contract.salario_inicial,
             funcao: contract.funcao,
           } : null,
+          document_chunks: documentChunks.map((c: any) => ({
+            content: c.content,
+            page_number: c.page_number,
+            doc_type: c.doc_type,
+          })),
         }),
       });
 
@@ -278,7 +298,7 @@ export function CaseBriefing({ caseId, caseInfo }: CaseBriefingProps) {
     } finally {
       setIsGenerating(false);
     }
-  }, [facts, documents, latestRun, auditLines, controversies, caseInfo, contract, savedBriefing]);
+  }, [facts, documents, latestRun, auditLines, controversies, caseInfo, contract, savedBriefing, documentChunks]);
 
   const exportAsText = () => {
     if (!briefing) return;
@@ -356,7 +376,7 @@ export function CaseBriefing({ caseId, caseInfo }: CaseBriefingProps) {
           {[
             { label: "Fatos", value: facts.length },
             { label: "Documentos", value: documents.length },
-            { label: "Linhas de Auditoria", value: auditLines.length },
+            { label: "Chunks (texto)", value: documentChunks.length },
             { label: "Controvérsias", value: controversies.length },
           ].map((s) => (
             <Card key={s.label} className="bg-card/80">
