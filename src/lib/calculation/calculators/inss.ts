@@ -24,6 +24,8 @@ interface INSSInputs extends CalculatorInputs {
   competencia?: string;
   verbas_por_competencia?: Record<string, number>;
   total_bruto?: number;
+  base_inss_rescisoria?: number;
+  base_inss_13_isolado?: number;
 }
 
 // Regras configuráveis
