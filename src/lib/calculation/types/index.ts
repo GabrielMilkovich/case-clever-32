@@ -215,6 +215,15 @@ export interface CalcResultItem {
   
   // Lineage
   lineage: CalcLineage;
+
+  // Narrativa para o advogado (gerada automaticamente)
+  narrativa?: string;
+
+  // Observações de risco por rubrica
+  riscos?: RubricaRisco[];
+
+  // Premissas usadas
+  premissas?: Record<string, string | number>;
 }
 
 export interface FundamentoLegal {
@@ -222,6 +231,9 @@ export interface FundamentoLegal {
   descricao: string;      // "Adicional de no mínimo 50% sobre a hora normal"
   norma: string;          // "CLT" | "CF/88" | "Lei 8.036/90" etc.
   status?: 'vigente' | 'cancelada' | 'modulada' | 'historica' | 'controversa';
+  url_oficial?: string;   // URL oficial obrigatória (planalto/tst/stf/gov.br)
+  vigencia_inicio?: string;
+  vigencia_fim?: string;
 }
 
 export interface MemoriaCalculo {
@@ -321,6 +333,13 @@ export interface ConsistencyAlert {
   valor_encontrado?: string;
   valor_esperado?: string;
   severidade: 'baixa' | 'media' | 'alta' | 'critica';
+}
+
+export interface RubricaRisco {
+  nivel: 'baixo' | 'medio' | 'alto';
+  motivo: string;
+  impacto: string;
+  recomendacao: string;
 }
 
 // =====================================================
