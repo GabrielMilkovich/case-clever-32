@@ -242,6 +242,7 @@ Para CADA fato extraído, você DEVE:
 ❌ Inferir dados de contexto
 ❌ Presumir datas não escritas
 ❌ Usar chunk_id de um chunk diferente do que contém a informação
+❌ Preencher horas extras sem quantidade explícita e citação literal de documento de jornada/ponto
 
 ## CHAVES ESPERADAS ##
 - data_admissao (YYYY-MM-DD)
@@ -267,7 +268,7 @@ Se encontrar no extrato FGTS uma linha com "DATA E CÓDIGO DE AFASTAMENTO" segui
 - Use tipo "texto" e confiança 1.0
 
 - adicional_noturno (percentual ou valor)
-- horas_extras (quantidade mensal se explícita)
+- horas_extras_mensais (quantidade mensal explícita; não inferir)
 - motivo_demissao (justa_causa/sem_justa_causa/pedido_demissao)
 - aviso_previo (trabalhado/indenizado)
 - ferias_vencidas (número de períodos)
@@ -464,18 +465,22 @@ Liste inconsistências em "alertas".`;
     console.log(`Extracted ${facts.length} facts, ${validFacts.length} valid`);
 
     // Preparar fatos para inserção
-    const factsToInsert = validFacts.map((fact) => ({
-      case_id,
-      chave: fact.chave,
-      valor: fact.valor,
-      tipo: fact.tipo === "boolean" ? "boolean" : fact.tipo,
-      origem: "ia_extracao" as const,
-      confianca: fact.confianca,
-      confirmado: false,
-      citacao: `CHUNK_ID:${fact.chunk_id}\n${fact.citacao_literal}`,
-      pagina: fact.pagina || null,
-      chunk_id: null,
-    }));
+    const factsToInsert = validFacts.map((fact) => {
+      const canonicalKey = fact.chave === "horas_extras" ? "horas_extras_mensais" : fact.chave;
+
+      return {
+        case_id,
+        chave: canonicalKey,
+        valor: fact.valor,
+        tipo: fact.tipo === "boolean" ? "boolean" : fact.tipo,
+        origem: "ia_extracao" as const,
+        confianca: fact.confianca,
+        confirmado: false,
+        citacao: `CHUNK_ID:${fact.chunk_id}\n${fact.citacao_literal}`,
+        pagina: fact.pagina || null,
+        chunk_id: null,
+      };
+    });
 
     // Adicionar salário mensal calculado se existir
     if (calculatedMonthlySalary) {

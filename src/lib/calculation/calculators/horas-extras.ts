@@ -64,22 +64,29 @@ export function createHorasExtrasCalculator(rulesData: CalculatorRules): Calcula
       const dataAdmissao = parseFactAsDate(ctx.facts['data_admissao']);
       const dataDemissao = parseFactAsDate(ctx.facts['data_demissao']) || ctx.dataReferencia;
       
-      // Média de horas extras mensais - pode vir de premissas ou fatos extraídos
+      // Média de horas extras mensais - aceita chaves legadas e atuais
       let horasMensais = parseFactAsNumber(ctx.facts['horas_extras_mensais']) || 
                           parseFactAsNumber(ctx.facts['media_horas_extras']) ||
+                          parseFactAsNumber(ctx.facts['horas_extras']) ||
                           (inputs.horas_extras_mensais as number) || 0;
 
-      // FALLBACK: Se não há fato de horas extras, estimar com base na jornada
-      // Muitos casos trabalhistas alegam horas extras sem registro de ponto
+      // REGRA PROBATÓRIA: sem prova documental explícita, não estimar horas extras
       if (horasMensais <= 0) {
-        // Estimativa conservadora: 2h extras por dia útil (~44h/mês)
-        horasMensais = 44;
         warnings.push({
           tipo: 'atencao',
-          codigo: 'HE_ESTIMADAS',
-          mensagem: 'Horas extras estimadas em 44h/mês (2h/dia útil). Nenhum fato "horas_extras_mensais" encontrado.',
-          sugestao: 'Adicione o fato "horas_extras_mensais" com o valor real para maior precisão.',
+          codigo: 'HE_SEM_PROVA_DOCUMENTAL',
+          mensagem: 'Horas extras não apuradas por ausência de prova documental explícita da quantidade mensal.',
+          sugestao: 'Confirme o fato "horas_extras_mensais" (ou "horas_extras") com citação literal de documento de jornada/cartão de ponto.',
         });
+
+        return {
+          calculadoraId: 'horas_extras',
+          calculadoraNome: 'Horas Extras',
+          versao: this.version,
+          outputs: { total_bruto: 0, verbas: [] },
+          auditLines,
+          warnings,
+        };
       }
 
       const percentualDomingosFeriados = parseFactAsNumber(ctx.facts['percentual_domingos_feriados']) || 0.2;
