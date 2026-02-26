@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MainLayout } from "@/components/layout/MainLayout";
+import { MainLayoutPremium } from "@/components/layout/MainLayoutPremium";
 import { CaseCard } from "@/components/cases/CaseCard";
 import { CreateCaseDialog } from "@/components/cases/CreateCaseDialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Loader2, Filter } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Search, Loader2, Filter, Briefcase } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 
@@ -22,16 +23,6 @@ export default function Casos() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        navigate("/auth");
-      }
-    };
-    checkAuth();
-  }, [navigate]);
-
   const { data: cases = [], isLoading } = useQuery({
     queryKey: ["cases"],
     queryFn: async () => {
@@ -39,7 +30,6 @@ export default function Casos() {
         .from("cases")
         .select("*")
         .order("criado_em", { ascending: false });
-      
       if (error) throw error;
       return data as Case[];
     },
@@ -53,79 +43,85 @@ export default function Casos() {
     return matchesSearch && matchesStatus;
   });
 
+  const statusCounts = {
+    all: cases.length,
+    rascunho: cases.filter((c) => c.status === "rascunho").length,
+    em_analise: cases.filter((c) => c.status === "em_analise").length,
+    calculado: cases.filter((c) => c.status === "calculado").length,
+    revisado: cases.filter((c) => c.status === "revisado").length,
+  };
+
   return (
-    <MainLayout>
-      <div className="space-y-6">
+    <MainLayoutPremium
+      breadcrumbs={[{ label: "Casos" }]}
+      title="Casos"
+    >
+      <div className="space-y-5 animate-fade-in">
         {/* Header */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Casos</h1>
-            <p className="text-muted-foreground">
-              Gerencie todos os seus casos trabalhistas
+            <h1 className="text-xl font-bold text-foreground">Casos Trabalhistas</h1>
+            <p className="text-sm text-muted-foreground">
+              {cases.length} caso{cases.length !== 1 ? "s" : ""} cadastrado{cases.length !== 1 ? "s" : ""}
             </p>
           </div>
           <CreateCaseDialog />
         </div>
 
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1 max-w-md">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Buscar por cliente ou processo..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 h-9 text-sm"
             />
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-48">
-              <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Filtrar por status" />
+            <SelectTrigger className="w-44 h-9 text-sm">
+              <Filter className="h-3.5 w-3.5 mr-2" />
+              <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos os status</SelectItem>
-              <SelectItem value="rascunho">Rascunho</SelectItem>
-              <SelectItem value="em_analise">Em Análise</SelectItem>
-              <SelectItem value="calculado">Calculado</SelectItem>
-              <SelectItem value="revisado">Revisado</SelectItem>
+              <SelectItem value="all">Todos ({statusCounts.all})</SelectItem>
+              <SelectItem value="rascunho">Rascunho ({statusCounts.rascunho})</SelectItem>
+              <SelectItem value="em_analise">Em Análise ({statusCounts.em_analise})</SelectItem>
+              <SelectItem value="calculado">Calculado ({statusCounts.calculado})</SelectItem>
+              <SelectItem value="revisado">Revisado ({statusCounts.revisado})</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        {/* Cases Grid */}
+        {/* Grid */}
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : filteredCases.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">
-              {cases.length === 0
-                ? "Nenhum caso cadastrado. Crie seu primeiro caso!"
-                : "Nenhum caso encontrado com esses filtros."}
+          <div className="text-center py-16">
+            <Briefcase className="h-12 w-12 text-muted-foreground/20 mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground">
+              {cases.length === 0 ? "Nenhum caso cadastrado. Crie seu primeiro caso!" : "Nenhum caso encontrado com esses filtros."}
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredCases.map((caseItem, index) => (
-              <div
-                key={caseItem.id}
-                className="animate-slide-up"
-                style={{ animationDelay: `${index * 50}ms` }}
-              >
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {filteredCases.map((c, i) => (
+              <div key={c.id} className="animate-slide-up" style={{ animationDelay: `${i * 40}ms` }}>
                 <CaseCard
-                  id={caseItem.id}
-                  cliente={caseItem.cliente}
-                  numeroProcesso={caseItem.numero_processo}
-                  status={caseItem.status}
-                  criadoEm={caseItem.criado_em}
+                  id={c.id}
+                  cliente={c.cliente}
+                  numeroProcesso={c.numero_processo}
+                  status={c.status}
+                  criadoEm={c.criado_em}
                 />
               </div>
             ))}
           </div>
         )}
       </div>
-    </MainLayout>
+    </MainLayoutPremium>
   );
 }
