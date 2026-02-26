@@ -44,3 +44,9 @@ verify_jwt = false
 
 [functions.generate-petition]
 verify_jwt = false
+
+[functions.pre-calc-review]
+verify_jwt = false
+
+[functions.generate-case-briefing]
+verify_jwt = false
