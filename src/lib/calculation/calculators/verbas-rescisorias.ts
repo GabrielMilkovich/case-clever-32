@@ -348,19 +348,28 @@ export function createVerbasRescisoriasCalculator(rules: CalculatorRules): Calcu
         const periodoFim = new Date(periodoInicio);
         periodoFim.setFullYear(periodoFim.getFullYear() + 1);
         
-        const limiteGozo = new Date(periodoFim);
-        limiteGozo.setFullYear(limiteGozo.getFullYear() + 1);
-        
-        if (limiteGozo <= dataDemissao) {
+        // Art. 146, caput, CLT: na cessação do contrato, são devidas férias
+        // de qualquer período aquisitivo COMPLETO, independente do período concessivo.
+        if (periodoFim <= dataDemissao) {
           periodoNum++;
           temFeriasVencidas = true;
+          
+          // Verificar se o período concessivo também expirou (dobra - Art. 137, CLT)
+          const limiteGozo = new Date(periodoFim);
+          limiteGozo.setFullYear(limiteGozo.getFullYear() + 1);
+          const emDobro = limiteGozo <= dataDemissao;
+          
           const valorFerias = salarioBase;
           const terco = valorFerias / 3;
-          const totalFerias = arredondarMoeda(valorFerias + terco);
+          const totalFerias = emDobro 
+            ? arredondarMoeda((valorFerias + terco) * 2)
+            : arredondarMoeda(valorFerias + terco);
           
           verbas.push({
             codigo: 'FERIAS_VENC',
-            descricao: `Férias Vencidas + 1/3 (${periodoNum}º período)`,
+            descricao: emDobro 
+              ? `Férias Vencidas EM DOBRO + 1/3 (${periodoNum}º período)`
+              : `Férias Vencidas + 1/3 (${periodoNum}º período)`,
             valor_bruto: totalFerias,
             competencias: [{ competencia, valor_bruto: totalFerias }],
           });
@@ -369,14 +378,19 @@ export function createVerbasRescisoriasCalculator(rules: CalculatorRules): Calcu
             linha: lineNum++,
             calculadora: calculatorId,
             competencia,
-            descricao: `✅ Férias Vencidas ${periodoNum}º período + 1/3`,
-            formula: `R$ ${salarioBase.toFixed(2)} + (R$ ${salarioBase.toFixed(2)} ÷ 3) = R$ ${totalFerias.toFixed(2)}`,
+            descricao: emDobro
+              ? `✅ Férias Vencidas ${periodoNum}º período EM DOBRO + 1/3 (Art. 137, CLT)`
+              : `✅ Férias Vencidas ${periodoNum}º período + 1/3`,
+            formula: emDobro
+              ? `(R$ ${salarioBase.toFixed(2)} + R$ ${salarioBase.toFixed(2)} ÷ 3) × 2 = R$ ${totalFerias.toFixed(2)}`
+              : `R$ ${salarioBase.toFixed(2)} + (R$ ${salarioBase.toFixed(2)} ÷ 3) = R$ ${totalFerias.toFixed(2)}`,
             valor_bruto: totalFerias,
             metadata: { 
-              fundamento: 'Art. 137, CLT + Art. 7º, XVII, CF/88',
+              fundamento: emDobro ? 'Art. 137, CLT + Art. 7º, XVII, CF/88' : 'Art. 146, caput, CLT + Art. 7º, XVII, CF/88',
               periodo_inicio: periodoInicio.toISOString().split('T')[0],
               periodo_fim: periodoFim.toISOString().split('T')[0],
-              nota: 'Devida em QUALQUER tipo de demissão, inclusive justa causa',
+              em_dobro: emDobro,
+              nota: 'Art. 146, CLT: devida em QUALQUER tipo de demissão, inclusive justa causa',
             },
           });
           
