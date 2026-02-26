@@ -203,6 +203,11 @@ export function CaseBriefing({ caseId, caseInfo }: CaseBriefingProps) {
             salario_inicial: contract.salario_inicial,
             funcao: contract.funcao,
           } : null,
+          document_chunks: documentChunks.map((c: any) => ({
+            content: c.content,
+            page_number: c.page_number,
+            doc_type: c.doc_type,
+          })),
         }),
       });
 
