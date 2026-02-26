@@ -258,12 +258,21 @@ Se encontrar extrato FGTS com depósitos mensais (ex: "115-DEPOSITO JANEIRO 2024
 - Extraia cada depósito como: deposito_fgts_YYYY_MM (ex: deposito_fgts_2024_01)
 - O valor deve ser o número decimal (ex: 200.00)
 - Use tipo "moeda"
+
+## CÓDIGO DE AFASTAMENTO FGTS — CRÍTICO ##
+Se encontrar no extrato FGTS uma linha com "DATA E CÓDIGO DE AFASTAMENTO" seguida de uma data e código (ex: "01/02/2025-J"):
+- Extraia como chave "codigo_afastamento_fgts" com o valor sendo APENAS a letra/código (ex: "J", "I1", "I2", "K", "I5")
+- ESTA INFORMAÇÃO TEM PRIORIDADE sobre qualquer outra extração de motivo_demissao
+- Códigos conhecidos: I1=Sem Justa Causa, I2=Justa Causa, J=Pedido Demissão, K=Rescisão Indireta, I5=Acordo Mútuo
+- Use tipo "texto" e confiança 1.0
+
 - adicional_noturno (percentual ou valor)
 - horas_extras (quantidade mensal se explícita)
 - motivo_demissao (justa_causa/sem_justa_causa/pedido_demissao)
 - aviso_previo (trabalhado/indenizado)
 - ferias_vencidas (número de períodos)
 - fgts_depositado (sim/nao/parcial)
+- codigo_afastamento_fgts (letra/código do extrato FGTS, ex: J, I1, I2, K)
 
 ## NÍVEIS DE CONFIANÇA ##
 - 1.0: Valor explícito e claro

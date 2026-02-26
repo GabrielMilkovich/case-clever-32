@@ -43,6 +43,7 @@ import {
   type IndexSeries,
   type TaxTable,
 } from "@/lib/calculation";
+import { runCrossValidation, applyCorrections, type CrossValidationResult } from "@/lib/calculation/cross-validation";
 
 // =====================================================
 // TYPES
@@ -394,10 +395,60 @@ export default function CasoDetalhe() {
       const indices: IndexSeries[] = (indexRes.data || []).map((r: any) => ({ nome: r.nome, competencia: new Date(r.competencia), valor: Number(r.valor), fonte: r.fonte ?? undefined }));
       const taxTables: TaxTable[] = (taxRes.data || []).map((t: any) => ({ id: t.id, tipo: t.tipo, vigencia_inicio: new Date(t.vigencia_inicio), vigencia_fim: t.vigencia_fim ? new Date(t.vigencia_fim) : undefined, faixas: Array.isArray(t.faixas) ? t.faixas : [] }));
 
-      // Execute engine
-      const engine = new CalculationEngine({ id: profile.id, nome: profile.nome, config: profile.config ?? {}, calculadoras_incluidas: profile.calculadoras_incluidas ?? [] } as any, indices, taxTables, mapFactsToEngine(facts));
+      // ═══ VALIDAÇÃO CRUZADA DE FATOS ═══
+      // Detecta inconsistências entre documentos (ex: código FGTS vs tipo_demissao do OCR)
+      const rawFactMap = mapFactsToEngine(facts);
+      const crossValidation = runCrossValidation(rawFactMap);
+
+      // Mostrar alertas ao advogado
+      if (crossValidation.alerts.length > 0) {
+        for (const alert of crossValidation.alerts) {
+          toast.warning(alert.titulo, {
+            description: alert.recomendacao,
+            duration: 10000,
+          });
+        }
+      }
+
+      // Aplicar correções automáticas (ex: código FGTS prevalece)
+      const correctedFactMap = crossValidation.corrections.length > 0
+        ? applyCorrections(rawFactMap, crossValidation.corrections)
+        : rawFactMap;
+
+      // Persistir correções no banco se houver
+      if (crossValidation.corrections.length > 0) {
+        for (const correction of crossValidation.corrections) {
+          const factToUpdate = facts.find(f => f.chave === correction.campo);
+          if (factToUpdate) {
+            await supabase.from("facts").update({
+              valor: correction.valor_corrigido,
+            }).eq("id", factToUpdate.id);
+          }
+        }
+        // Criar controvérsia para registro
+        for (const alert of crossValidation.alerts) {
+          await supabase.from("case_controversies").insert({
+            case_id: id,
+            campo: alert.campo_afetado,
+            descricao: alert.descricao,
+            status: 'resolvido',
+            valor_escolhido: crossValidation.corrections.find(c => c.campo === alert.campo_afetado)?.valor_corrigido || null,
+            justificativa: alert.recomendacao,
+            fundamentacao_legal: `Código FGTS/eSocial — Manual CEF`,
+            prioridade: alert.severidade === 'critica' ? 'alta' : 'media',
+          } as any);
+        }
+        await queryClient.invalidateQueries({ queryKey: ["facts", id] });
+        toast.info(`${crossValidation.corrections.length} fato(s) corrigido(s) pela validação cruzada documental.`);
+      }
+
+      // Execute engine with corrected facts
+      const engine = new CalculationEngine({ id: profile.id, nome: profile.nome, config: profile.config ?? {}, calculadoras_incluidas: profile.calculadoras_incluidas ?? [] } as any, indices, taxTables, correctedFactMap);
       engine.loadCalculators(calculatorsWithRules);
       const result = engine.executeAll();
+
+      // Inject cross-validation warnings into result
+      result.warnings.push(...crossValidation.warnings);
 
       // Persist
       const { data: session } = await supabase.auth.getSession();
