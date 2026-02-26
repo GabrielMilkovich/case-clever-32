@@ -262,14 +262,71 @@ Para CADA fato extraído, você DEVE:
 ❌ Preencher horas extras sem quantidade explícita e citação literal de documento de jornada/ponto
 
 ## CHAVES ESPERADAS ##
+### Dados do Vínculo ###
 - data_admissao (YYYY-MM-DD)
 - data_demissao (YYYY-MM-DD)
 - salario_base (número decimal OU texto "variavel" se for comissão/variável)
 - salario_mensal (número decimal - valor médio mensal se disponível)
 - jornada_contratual (formato HH:MM-HH:MM ou horas semanais)
 - cargo (texto exato)
+- local_trabalho (endereço ou cidade)
+- cnpj_empregador (texto)
+- razao_social_empregador (texto)
+- cpf_empregado (texto)
+- nome_empregado (texto completo)
+
+### Rescisão ###
+- motivo_demissao (justa_causa/sem_justa_causa/pedido_demissao/acordo_mutuo/rescisao_indireta)
+- aviso_previo (trabalhado/indenizado/nao_cumprido)
+- aviso_previo_dias (número de dias)
+- data_aviso_previo (YYYY-MM-DD)
+- codigo_afastamento_fgts (letra/código do extrato FGTS, ex: J, I1, I2, K, I5)
+- saldo_salario_dias (número de dias)
+- multa_art_477 (valor ou "devida"/"paga")
+- multa_art_467 (valor ou "devida"/"paga")
+
+### Adicionais ###
 - adicional_insalubridade (percentual ou valor)
 - adicional_periculosidade (percentual ou valor)
+- adicional_noturno (percentual ou valor)
+- adicional_transferencia (percentual ou valor)
+- comissoes_media (valor médio mensal)
+
+### Jornada ###
+- horas_extras_mensais (quantidade mensal explícita; não inferir)
+- horas_extras_percentual (50%, 100%, etc.)
+- intervalo_intrajornada (tempo concedido, ex: "30min", "1h")
+- intervalo_suprimido (sim/nao/parcial)
+- banco_horas (sim/nao, saldo se disponível)
+- trabalho_noturno (sim/nao, horário)
+
+### FGTS ###
+- fgts_depositado (sim/nao/parcial)
+- fgts_saldo (valor do saldo)
+- multa_fgts_40 (valor ou "devida")
+
+### Férias ###
+- ferias_vencidas (número de períodos)
+- ferias_proporcionais (fração, ex: "8/12")
+- ferias_em_dobro (sim/nao)
+
+### 13º Salário ###
+- decimo_terceiro_proporcional (fração, ex: "3/12")
+
+### Verbas TRCT ###
+- saldo_salario (valor)
+- total_bruto_trct (valor total bruto do TRCT)
+- total_liquido_trct (valor total líquido do TRCT)
+- total_descontos_trct (valor total de descontos)
+
+### Outros ###
+- seguro_desemprego_guias (entregues/nao_entregues)
+- piso_salarial_categoria (valor do piso da CCT)
+- sindicato_categoria (nome do sindicato)
+- equiparacao_salarial_paradigma (nome do paradigma)
+- acidente_trabalho (sim/nao, descrição)
+- estabilidade_provisoria (tipo e período)
+- dsr_sobre_extras (valor ou referência)
 
 ## EXTRAÇÃO DE DEPÓSITOS FGTS ##
 Se encontrar extrato FGTS com depósitos mensais (ex: "115-DEPOSITO JANEIRO 2024 R$ 200,00"):
@@ -284,13 +341,11 @@ Se encontrar no extrato FGTS uma linha com "DATA E CÓDIGO DE AFASTAMENTO" segui
 - Códigos conhecidos: I1=Sem Justa Causa, I2=Justa Causa, J=Pedido Demissão, K=Rescisão Indireta, I5=Acordo Mútuo
 - Use tipo "texto" e confiança 1.0
 
-- adicional_noturno (percentual ou valor)
-- horas_extras_mensais (quantidade mensal explícita; não inferir)
-- motivo_demissao (justa_causa/sem_justa_causa/pedido_demissao)
-- aviso_previo (trabalhado/indenizado)
-- ferias_vencidas (número de períodos)
-- fgts_depositado (sim/nao/parcial)
-- codigo_afastamento_fgts (letra/código do extrato FGTS, ex: J, I1, I2, K)
+## EXTRAÇÃO DE VERBAS DE HOLERITES ##
+Se encontrar holerites/contracheques com múltiplas verbas:
+- Extraia cada verba significativa como: verba_CODIGO (ex: verba_0001, verba_0040)
+- Inclua descrição e valor no campo valor (ex: "Salário Base: R$ 1.500,00")
+- Isto é CRÍTICO para que o roteiro do advogado tenha a visão completa
 
 ## NÍVEIS DE CONFIANÇA ##
 - 1.0: Valor explícito e claro
