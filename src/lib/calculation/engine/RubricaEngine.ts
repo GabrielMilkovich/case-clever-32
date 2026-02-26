@@ -93,6 +93,8 @@ export const FUNDAMENTOS_LEGAIS: Record<string, FundamentoLegal[]> = {
   INSS: [
     { dispositivo: 'EC 103/2019', descricao: 'Alíquotas progressivas de INSS', norma: 'EC 103/2019', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/constituicao/emendas/emc/emc103.htm' },
     { dispositivo: 'Art. 28, Lei 8.212/91', descricao: 'Base de cálculo da contribuição previdenciária', norma: 'Lei 8.212/91', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/leis/l8212cons.htm' },
+    { dispositivo: 'Art. 28, §9º, "d", Lei 8.212/91', descricao: 'Férias indenizadas isentas de contribuição previdenciária', norma: 'Lei 8.212/91', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/leis/l8212cons.htm' },
+    { dispositivo: 'Art. 214, §6º, Decreto 3.048/99', descricao: '13º salário tributado em separado', norma: 'RPS', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/decreto/d3048.htm' },
   ],
   IRRF: [
     { dispositivo: 'Lei 7.713/88', descricao: 'Imposto de Renda na Fonte sobre rendimentos do trabalho', norma: 'Lei 7.713/88', status: 'vigente', url_oficial: 'https://www.planalto.gov.br/ccivil_03/leis/l7713.htm' },
