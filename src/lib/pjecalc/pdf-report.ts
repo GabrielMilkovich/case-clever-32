@@ -131,7 +131,7 @@ export function gerarRelatorioPDF(
     <thead><tr><th>Componente</th><th style="text-align:right;width:140px">Valor (R$)</th></tr></thead>
     <tbody>
       <tr><td>Depósitos (8%)</td><td class="num">${fmt(result.fgts.total_depositos)}</td></tr>
-      <tr><td>Multa (${fmtPct(result.fgts.multa_percentual)})</td><td class="num">${fmt(result.fgts.multa_valor)}</td></tr>
+      <tr><td>Multa FGTS</td><td class="num">${fmt(result.fgts.multa_valor)}</td></tr>
       ${result.fgts.lc110_10 > 0 ? `<tr><td>LC 110/01 (10%)</td><td class="num">${fmt(result.fgts.lc110_10)}</td></tr>` : ""}
       ${result.fgts.lc110_05 > 0 ? `<tr><td>LC 110/01 (0,5%)</td><td class="num">${fmt(result.fgts.lc110_05)}</td></tr>` : ""}
       <tr class="total"><td><strong>Total FGTS</strong></td><td class="num"><strong>${fmt(result.fgts.total_fgts)}</strong></td></tr>

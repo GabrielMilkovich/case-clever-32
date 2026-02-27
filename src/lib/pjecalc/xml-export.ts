@@ -52,13 +52,13 @@ ${result.verbas.map(v => `      <verba id="${escapeXml(v.verba_id)}" nome="${esc
         <total_juros>${fmtNum(v.total_juros)}</total_juros>
         <total_final>${fmtNum(v.total_final)}</total_final>
         <ocorrencias>
-${v.ocorrencias.map(o => `          <ocorrencia competencia="${o.competencia}" devido="${fmtNum(o.devido)}" pago="${fmtNum(o.pago)}" diferenca="${fmtNum(o.diferenca)}" corrigido="${fmtNum(o.corrigido)}" juros="${fmtNum(o.juros)}" />`).join("\n")}
+${v.ocorrencias.map(o => `          <ocorrencia competencia="${o.competencia}" devido="${fmtNum(o.devido)}" pago="${fmtNum(o.pago)}" diferenca="${fmtNum(o.diferenca)}" corrigido="${fmtNum(o.valor_corrigido)}" juros="${fmtNum(o.juros)}" />`).join("\n")}
         </ocorrencias>
       </verba>`).join("\n")}
     </verbas>
     <fgts>
       <total_depositos>${fmtNum(result.fgts.total_depositos)}</total_depositos>
-      <multa_percentual>${fmtNum(result.fgts.multa_percentual)}</multa_percentual>
+      <multa_valor>${fmtNum(result.fgts.multa_valor)}</multa_valor>
       <multa_valor>${fmtNum(result.fgts.multa_valor)}</multa_valor>
       <lc110_10>${fmtNum(result.fgts.lc110_10)}</lc110_10>
       <lc110_05>${fmtNum(result.fgts.lc110_05)}</lc110_05>
