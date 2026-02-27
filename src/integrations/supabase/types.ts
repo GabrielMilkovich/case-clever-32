@@ -3135,6 +3135,36 @@ export type Database = {
           },
         ]
       }
+      pjecalc_inss_faixas: {
+        Row: {
+          aliquota: number
+          competencia_fim: string | null
+          competencia_inicio: string
+          created_at: string | null
+          faixa: number
+          id: string
+          valor_ate: number
+        }
+        Insert: {
+          aliquota: number
+          competencia_fim?: string | null
+          competencia_inicio: string
+          created_at?: string | null
+          faixa: number
+          id?: string
+          valor_ate: number
+        }
+        Update: {
+          aliquota?: number
+          competencia_fim?: string | null
+          competencia_inicio?: string
+          created_at?: string | null
+          faixa?: number
+          id?: string
+          valor_ate?: number
+        }
+        Relationships: []
+      }
       pjecalc_ir_config: {
         Row: {
           aposentado_65: boolean | null
@@ -3200,6 +3230,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pjecalc_ir_faixas: {
+        Row: {
+          aliquota: number
+          competencia_fim: string | null
+          competencia_inicio: string
+          created_at: string | null
+          deducao: number
+          deducao_dependente: number
+          faixa: number
+          id: string
+          valor_ate: number
+        }
+        Insert: {
+          aliquota: number
+          competencia_fim?: string | null
+          competencia_inicio: string
+          created_at?: string | null
+          deducao?: number
+          deducao_dependente?: number
+          faixa: number
+          id?: string
+          valor_ate: number
+        }
+        Update: {
+          aliquota?: number
+          competencia_fim?: string | null
+          competencia_inicio?: string
+          created_at?: string | null
+          deducao?: number
+          deducao_dependente?: number
+          faixa?: number
+          id?: string
+          valor_ate?: number
+        }
+        Relationships: []
       }
       pjecalc_juros_mora: {
         Row: {

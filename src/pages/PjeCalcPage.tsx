@@ -38,8 +38,10 @@ import { ModuloMultasCLT } from "@/components/cases/pjecalc/ModuloMultasCLT";
 import { ModuloSalarioFamilia } from "@/components/cases/pjecalc/ModuloSalarioFamilia";
 import { ModuloPensaoAlimenticia } from "@/components/cases/pjecalc/ModuloPensaoAlimenticia";
 import { ModuloOcorrencias } from "@/components/cases/pjecalc/ModuloOcorrencias";
+import { ModuloDadosProcesso } from "@/components/cases/pjecalc/ModuloDadosProcesso";
 
 const MODULOS = [
+  { id: 'dados_processo', label: 'Dados do Processo', icon: Briefcase, desc: 'Identificação processual' },
   { id: 'parametros', label: 'Parâmetros', icon: Calendar, desc: 'Dados do cálculo' },
   { id: 'faltas', label: 'Faltas', icon: Clock, desc: 'Registros de ausência' },
   { id: 'ferias', label: 'Férias', icon: Calendar, desc: 'Períodos aquisitivos' },
@@ -258,6 +260,8 @@ export default function PjeCalcPage() {
     }
 
     switch (activeModule) {
+      case 'dados_processo':
+        return <ModuloDadosProcesso caseId={caseId!} />;
       case 'parametros':
         return renderParametros();
       case 'faltas':
