@@ -775,7 +775,7 @@ export default function PjeCalcPage() {
                       status === 'pending' && "text-muted-foreground hover:bg-muted/50",
                     )}
                   >
-                    {status === 'done' && status !== 'active' ? (
+                    {status === 'done' ? (
                       <Check className="h-3.5 w-3.5 text-[hsl(var(--success))]" />
                     ) : (
                       <mod.icon className="h-3.5 w-3.5" />

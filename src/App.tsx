@@ -16,6 +16,7 @@ import AdminIndices from "./pages/admin/Indices";
 import AdminTestes from "./pages/admin/Testes";
 
 import RegrasTabelas from "./pages/RegrasTabelas";
+import PjeCalcPage from "./pages/PjeCalcPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
