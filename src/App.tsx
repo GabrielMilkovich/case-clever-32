@@ -16,7 +16,6 @@ import AdminIndices from "./pages/admin/Indices";
 import AdminTestes from "./pages/admin/Testes";
 
 import RegrasTabelas from "./pages/RegrasTabelas";
-import PjeCalc from "./pages/PjeCalc";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,7 +36,6 @@ const App = () => (
           <Route path="/configuracoes" element={<Configuracoes />} />
           {/* Novo Cálculo removido — fluxo unificado dentro de Casos */}
           <Route path="/regras-tabelas" element={<RegrasTabelas />} />
-          <Route path="/pjecalc/:caseId" element={<PjeCalc />} />
           <Route path="/admin/calculadoras" element={<AdminCalculadoras />} />
           <Route path="/admin/perfis" element={<AdminPerfis />} />
           <Route path="/admin/indices" element={<AdminIndices />} />
