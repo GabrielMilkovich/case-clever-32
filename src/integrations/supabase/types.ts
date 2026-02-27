@@ -2478,6 +2478,42 @@ export type Database = {
           },
         ]
       }
+      pjecalc_custas_config: {
+        Row: {
+          apurar: boolean | null
+          assistencia_judiciaria: boolean | null
+          case_id: string
+          created_at: string
+          id: string
+          isento: boolean | null
+          percentual: number | null
+          valor_maximo: number | null
+          valor_minimo: number | null
+        }
+        Insert: {
+          apurar?: boolean | null
+          assistencia_judiciaria?: boolean | null
+          case_id: string
+          created_at?: string
+          id?: string
+          isento?: boolean | null
+          percentual?: number | null
+          valor_maximo?: number | null
+          valor_minimo?: number | null
+        }
+        Update: {
+          apurar?: boolean | null
+          assistencia_judiciaria?: boolean | null
+          case_id?: string
+          created_at?: string
+          id?: string
+          isento?: boolean | null
+          percentual?: number | null
+          valor_maximo?: number | null
+          valor_minimo?: number | null
+        }
+        Relationships: []
+      }
       pjecalc_custas_judiciais: {
         Row: {
           agravo_instrumento: number | null
@@ -3361,6 +3397,39 @@ export type Database = {
           created_at?: string
           id?: string
           valor?: number
+        }
+        Relationships: []
+      }
+      pjecalc_seguro_config: {
+        Row: {
+          apurar: boolean | null
+          case_id: string
+          created_at: string
+          id: string
+          observacoes: string | null
+          parcelas: number | null
+          recebeu: boolean | null
+          valor_parcela: number | null
+        }
+        Insert: {
+          apurar?: boolean | null
+          case_id: string
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          parcelas?: number | null
+          recebeu?: boolean | null
+          valor_parcela?: number | null
+        }
+        Update: {
+          apurar?: boolean | null
+          case_id?: string
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          parcelas?: number | null
+          recebeu?: boolean | null
+          valor_parcela?: number | null
         }
         Relationships: []
       }

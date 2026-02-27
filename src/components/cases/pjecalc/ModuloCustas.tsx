@@ -16,9 +16,9 @@ export function ModuloCustas({ caseId }: Props) {
   const [saving, setSaving] = useState(false);
 
   const { data } = useQuery({
-    queryKey: ["pjecalc_custas", caseId],
+    queryKey: ["pjecalc_custas_config", caseId],
     queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_custas" as any).select("*").eq("case_id", caseId).maybeSingle();
+      const { data } = await supabase.from("pjecalc_custas_config" as any).select("*").eq("case_id", caseId).maybeSingle();
       return data as any;
     },
   });
@@ -44,9 +44,14 @@ export function ModuloCustas({ caseId }: Props) {
         percentual: Number(form.percentual), valor_minimo: Number(form.valor_minimo),
         valor_maximo: form.valor_maximo ? parseFloat(form.valor_maximo) : null,
       };
-      if (data?.id) await supabase.from("pjecalc_custas" as any).update(payload).eq("id", data.id);
-      else await supabase.from("pjecalc_custas" as any).insert(payload);
-      qc.invalidateQueries({ queryKey: ["pjecalc_custas", caseId] });
+      if (data?.id) {
+        const { error } = await supabase.from("pjecalc_custas_config" as any).update(payload).eq("id", data.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("pjecalc_custas_config" as any).insert(payload);
+        if (error) throw error;
+      }
+      qc.invalidateQueries({ queryKey: ["pjecalc_custas_config", caseId] });
       toast.success("Custas salvas!");
     } catch (e) { toast.error((e as Error).message); }
     finally { setSaving(false); }
@@ -63,7 +68,7 @@ export function ModuloCustas({ caseId }: Props) {
       <Card>
         <CardHeader className="pb-3"><CardTitle className="text-sm">Custas Processuais</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          <div className="flex items-center gap-2"><Checkbox checked={form.apurar} onCheckedChange={v => setForm(p => ({ ...p, apurar: !!v }))} /><Label className="text-xs">Apurar Custas (Art. 789 CLT)</Label></div>
+          <div className="flex items-center gap-2"><Checkbox checked={form.apurar} onCheckedChange={v => setForm(p => ({ ...p, apurar: !!v }))} /><Label className="text-xs">Apurar Custas (Art. 789 CLT — 2% sobre valor da condenação)</Label></div>
           <div className="flex items-center gap-2"><Checkbox checked={form.isento} onCheckedChange={v => setForm(p => ({ ...p, isento: !!v }))} /><Label className="text-xs">Isento de Custas (beneficiário da justiça gratuita)</Label></div>
           <div className="grid grid-cols-3 gap-3">
             <div><Label className="text-xs">Percentual (%)</Label><Input type="number" step="0.1" value={form.percentual} onChange={e => setForm(p => ({ ...p, percentual: parseFloat(e.target.value) || 2 }))} className="mt-1 h-8 text-xs" /></div>
