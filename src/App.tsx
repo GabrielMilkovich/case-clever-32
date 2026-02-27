@@ -19,6 +19,7 @@ import RegrasTabelas from "./pages/RegrasTabelas";
 import PjeCalcPage from "./pages/PjeCalcPage";
 import NotFound from "./pages/NotFound";
 
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -36,6 +37,7 @@ const App = () => (
           <Route path="/busca" element={<Busca />} />
           <Route path="/configuracoes" element={<Configuracoes />} />
           {/* Novo Cálculo removido — fluxo unificado dentro de Casos */}
+          <Route path="/pjecalc/:id" element={<PjeCalcPage />} />
           <Route path="/regras-tabelas" element={<RegrasTabelas />} />
           <Route path="/admin/calculadoras" element={<AdminCalculadoras />} />
           <Route path="/admin/perfis" element={<AdminPerfis />} />
