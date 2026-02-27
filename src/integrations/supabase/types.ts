@@ -2157,6 +2157,48 @@ export type Database = {
           },
         ]
       }
+      pjecalc_audit_log: {
+        Row: {
+          acao: string
+          campo: string | null
+          case_id: string
+          created_at: string | null
+          id: string
+          justificativa: string | null
+          metadata: Json | null
+          modulo: string
+          user_id: string | null
+          valor_anterior: string | null
+          valor_novo: string | null
+        }
+        Insert: {
+          acao: string
+          campo?: string | null
+          case_id: string
+          created_at?: string | null
+          id?: string
+          justificativa?: string | null
+          metadata?: Json | null
+          modulo: string
+          user_id?: string | null
+          valor_anterior?: string | null
+          valor_novo?: string | null
+        }
+        Update: {
+          acao?: string
+          campo?: string | null
+          case_id?: string
+          created_at?: string | null
+          id?: string
+          justificativa?: string | null
+          metadata?: Json | null
+          modulo?: string
+          user_id?: string | null
+          valor_anterior?: string | null
+          valor_novo?: string | null
+        }
+        Relationships: []
+      }
       pjecalc_cartao_ponto: {
         Row: {
           adicional_noturno_pct: number | null
@@ -3396,6 +3438,39 @@ export type Database = {
           },
         ]
       }
+      pjecalc_metricas: {
+        Row: {
+          case_id: string
+          created_at: string | null
+          duracao_ms: number | null
+          evento: string
+          id: string
+          metadata: Json | null
+          modulo: string | null
+          user_id: string | null
+        }
+        Insert: {
+          case_id: string
+          created_at?: string | null
+          duracao_ms?: number | null
+          evento: string
+          id?: string
+          metadata?: Json | null
+          modulo?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          case_id?: string
+          created_at?: string | null
+          duracao_ms?: number | null
+          evento?: string
+          id?: string
+          metadata?: Json | null
+          modulo?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       pjecalc_multas_config: {
         Row: {
           apurar_467: boolean | null
@@ -3446,6 +3521,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pjecalc_observacoes: {
+        Row: {
+          case_id: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          modulo: string
+          texto: string
+          tipo: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          case_id: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          modulo: string
+          texto: string
+          tipo?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          case_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          modulo?: string
+          texto?: string
+          tipo?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       pjecalc_parametros: {
         Row: {
