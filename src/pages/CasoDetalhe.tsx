@@ -303,10 +303,10 @@ export default function CasoDetalhe() {
     //   tooltip: "Geração de petição inicial",
     // },
     {
-      id: "roteiro", label: "Roteiro", icon: BookOpen,
+      id: "roteiro", label: "Diagnóstico", icon: BookOpen,
       completed: false,
       active: activeTab === "roteiro",
-      tooltip: "Roteiro completo do caso gerado por IA",
+      tooltip: "Diagnóstico completo do caso gerado por IA",
     },
   ];
 

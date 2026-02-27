@@ -1,5 +1,5 @@
 // =====================================================
-// ROTEIRO DO CASO PARA O ADVOGADO — Gerado por IA
+// DIAGNÓSTICO DO CASO — Gerado por IA
 // Salva automaticamente após geração. Gera independente de cálculo.
 // =====================================================
 
@@ -291,10 +291,10 @@ export function CaseBriefing({ caseId, caseInfo }: CaseBriefingProps) {
       }
 
       setGeneratedAt(new Date());
-      toast.success("Roteiro gerado e salvo com sucesso!");
+      toast.success("Diagnóstico gerado e salvo com sucesso!");
     } catch (e) {
       console.error(e);
-      toast.error("Falha ao gerar roteiro: " + (e as Error).message);
+      toast.error("Falha ao gerar diagnóstico: " + (e as Error).message);
     } finally {
       setIsGenerating(false);
     }
@@ -306,7 +306,7 @@ export function CaseBriefing({ caseId, caseInfo }: CaseBriefingProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `roteiro-${caseInfo.cliente.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.md`;
+    a.download = `diagnostico-${caseInfo.cliente.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.md`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -330,7 +330,7 @@ export function CaseBriefing({ caseId, caseInfo }: CaseBriefingProps) {
                 <BookOpen className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <div className="text-sm font-semibold">Roteiro do Advogado</div>
+                <div className="text-sm font-semibold">Diagnóstico do Caso</div>
                 <div className="text-xs text-muted-foreground">
                   Análise completa do caso por IA — fatos, cálculos, riscos e recomendações
                 </div>
@@ -356,7 +356,7 @@ export function CaseBriefing({ caseId, caseInfo }: CaseBriefingProps) {
                 ) : (
                   <Sparkles className="h-3.5 w-3.5" />
                 )}
-                {isGenerating ? "Analisando..." : briefing ? "Regenerar" : "Gerar Roteiro"}
+                {isGenerating ? "Analisando..." : briefing ? "Regenerar" : "Gerar Diagnóstico"}
               </Button>
             </div>
           </div>
@@ -364,7 +364,7 @@ export function CaseBriefing({ caseId, caseInfo }: CaseBriefingProps) {
           {savedBriefing && !isGenerating && (
             <div className="flex items-center gap-2 mt-3 p-2 rounded-md bg-primary/5 border border-primary/10 text-xs text-muted-foreground">
               <CheckCircle2 className="h-3 w-3 text-primary" />
-              Roteiro salvo automaticamente
+              Diagnóstico salvo automaticamente
             </div>
           )}
         </CardContent>
@@ -396,7 +396,7 @@ export function CaseBriefing({ caseId, caseInfo }: CaseBriefingProps) {
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <BookOpen className="h-5 w-5 text-primary" />
-                Roteiro Completo
+                Diagnóstico Completo
               </CardTitle>
               {generatedAt && (
                 <Badge variant="outline" className="gap-1 text-xs font-normal">
