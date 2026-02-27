@@ -49,6 +49,7 @@ import { RiskAnalysisPanel } from "@/components/cases/pericial/RiskAnalysisPanel
 import { ControversyManager } from "@/components/cases/pericial/ControversyManager";
 import { ScenarioManager } from "@/components/cases/pericial/ScenarioManager";
 import { PjeCalcSummaryWidget } from "@/components/cases/PjeCalcSummaryWidget";
+import { PjeCalcInline } from "@/components/cases/PjeCalcInline";
 import {
   CalculationEngine,
   type CalculatorRules,
