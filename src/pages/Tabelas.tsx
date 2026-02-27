@@ -1,13 +1,16 @@
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MainLayoutPremium } from "@/components/layout/MainLayoutPremium";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Search, Upload, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download } from "lucide-react";
+import {
+  Loader2, Search, Upload, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+  Download, RefreshCw, CheckCircle, AlertTriangle, XCircle, Clock, FileText, History
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
@@ -31,20 +34,20 @@ const TRTS: Record<string, string> = {
 
 const PAGE_SIZE = 24;
 
-const TABELA_CONFIG: Record<string, { title: string; description: string }> = {
-  "salario-minimo": { title: "Salário Mínimo", description: "Valores históricos do salário mínimo nacional" },
-  "pisos-salariais": { title: "Pisos Salariais", description: "Pisos salariais por categoria profissional" },
-  "salario-familia": { title: "Salário-família", description: "Tabela de cotas do salário-família" },
-  "seguro-desemprego": { title: "Seguro-desemprego", description: "Faixas de cálculo do seguro-desemprego" },
-  "vale-transporte": { title: "Vale-transporte", description: "Valores de passagens por linha/município" },
-  "feriados": { title: "Feriados e Pontos Facultativos", description: "Calendário de feriados nacionais, estaduais e municipais" },
-  "verbas": { title: "Verbas", description: "Cadastro de verbas trabalhistas padrão" },
-  "contribuicao-social": { title: "Contribuição Social", description: "Tabelas de alíquotas do INSS (segurado e empregador)" },
-  "imposto-renda": { title: "Imposto de Renda", description: "Tabela progressiva do IRRF e deduções" },
-  "custas-judiciais": { title: "Custas Judiciais", description: "Tabelas de custas por tribunal" },
-  "correcao-monetaria": { title: "Correção Monetária", description: "Índices IPCA-E, INPC, TR e SELIC" },
-  "juros-mora": { title: "Juros de Mora", description: "Tabelas de juros conforme ADC 58/59 STF" },
-  "atualizacao-indices": { title: "Atualização de Tabelas e Índices", description: "Gestão e importação de séries de índices" },
+const TABELA_CONFIG: Record<string, { title: string; description: string; slug: string }> = {
+  "salario-minimo": { title: "Salário Mínimo", description: "Valores históricos do salário mínimo nacional", slug: "salario_minimo" },
+  "pisos-salariais": { title: "Pisos Salariais", description: "Pisos salariais por categoria profissional", slug: "pisos_salariais" },
+  "salario-familia": { title: "Salário-família", description: "Tabela de cotas do salário-família", slug: "salario_familia" },
+  "seguro-desemprego": { title: "Seguro-desemprego", description: "Faixas de cálculo do seguro-desemprego", slug: "seguro_desemprego" },
+  "vale-transporte": { title: "Vale-transporte", description: "Valores de passagens por linha/município", slug: "vale_transporte" },
+  "feriados": { title: "Feriados e Pontos Facultativos", description: "Calendário de feriados nacionais, estaduais e municipais", slug: "feriados" },
+  "verbas": { title: "Verbas", description: "Cadastro de verbas trabalhistas padrão", slug: "verbas" },
+  "contribuicao-social": { title: "Contribuição Social", description: "Tabelas de alíquotas do INSS (segurado e empregador)", slug: "contribuicao_social" },
+  "imposto-renda": { title: "Imposto de Renda", description: "Tabela progressiva do IRRF e deduções", slug: "imposto_renda" },
+  "custas-judiciais": { title: "Custas Judiciais", description: "Tabelas de custas por tribunal", slug: "custas_judiciais" },
+  "correcao-monetaria": { title: "Correção Monetária", description: "Índices IPCA-E, INPC, TR e SELIC", slug: "correcao_monetaria" },
+  "juros-mora": { title: "Juros de Mora", description: "Tabelas de juros conforme ADC 58/59 STF", slug: "juros_mora" },
+  "atualizacao-indices": { title: "Atualização de Tabelas e Índices", description: "Gestão e importação de séries de índices", slug: "" },
 };
 
 function fmt(v: number | null | undefined) {
@@ -63,38 +66,181 @@ function fmtDate(d: string) {
 }
 
 // ============================================
+// Health Dashboard (Visão Geral)
+// ============================================
+function HealthDashboard() {
+  const { data: registry, isLoading } = useQuery({
+    queryKey: ["reference_table_registry"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("reference_table_registry" as any).select("*").order("name");
+      if (error) throw error;
+      return (data || []) as any[];
+    },
+  });
+
+  const { data: importRuns } = useQuery({
+    queryKey: ["reference_import_runs_recent"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("reference_import_runs" as any)
+        .select("*").order("started_at", { ascending: false }).limit(20);
+      if (error) throw error;
+      return (data || []) as any[];
+    },
+  });
+
+  const statusIcon = (status: string) => {
+    switch (status) {
+      case "ok": return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case "warning": return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+      case "broken": return <XCircle className="h-4 w-4 text-red-500" />;
+      default: return <Clock className="h-4 w-4 text-muted-foreground" />;
+    }
+  };
+
+  const statusColor = (status: string) => {
+    switch (status) {
+      case "ok": return "border-green-500/30 bg-green-500/5";
+      case "warning": return "border-yellow-500/30 bg-yellow-500/5";
+      case "broken": return "border-red-500/30 bg-red-500/5";
+      default: return "border-border";
+    }
+  };
+
+  if (isLoading) return <LoadingSpinner />;
+
+  return (
+    <div className="space-y-6">
+      {/* Status cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        {(registry || []).map((r: any) => {
+          const urlKey = Object.entries(TABELA_CONFIG).find(([_, v]) => v.slug === r.slug)?.[0];
+          return (
+            <Link
+              key={r.id}
+              to={urlKey ? `/tabelas/${urlKey}` : "#"}
+              className={`block border rounded-lg p-3 transition-all hover:shadow-md ${statusColor(r.status)}`}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                {statusIcon(r.status)}
+                <span className="text-xs font-semibold truncate">{r.name}</span>
+              </div>
+              <div className="text-[10px] text-muted-foreground space-y-0.5">
+                <div>Frequência: <span className="font-medium">{r.update_frequency}</span></div>
+                <div>
+                  Última: <span className="font-medium">
+                    {r.last_import_at ? new Date(r.last_import_at).toLocaleDateString("pt-BR") : "Nunca"}
+                  </span>
+                </div>
+                <div className="flex gap-1 mt-1">
+                  {r.is_auto_importable && <Badge variant="secondary" className="text-[9px] h-4">Auto</Badge>}
+                  {r.requires_manual_input && <Badge variant="outline" className="text-[9px] h-4">Manual</Badge>}
+                </div>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* Recent import runs */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2"><History className="h-4 w-4" /> Histórico de Importações</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {(importRuns || []).length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-4">Nenhuma importação registrada.</p>
+          ) : (
+            <DataTable
+              headers={["Tabela", "Início", "Resultado", "Registros", "Trigger"]}
+              rows={(importRuns || []).map((r: any) => [
+                r.table_slug,
+                r.started_at ? new Date(r.started_at).toLocaleString("pt-BR") : "—",
+                r.result,
+                r.stats?.rows_inserted != null ? String(r.stats.rows_inserted) : "—",
+                r.trigger,
+              ])}
+              aligns={["left", "center", "center", "right", "center"]}
+            />
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ============================================
+// Auto Import Button
+// ============================================
+function AutoImportButton({ slug, onDone }: { slug: string; onDone: () => void }) {
+  const [importing, setImporting] = useState(false);
+
+  const handleImport = async () => {
+    setImporting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("import-reference-table", {
+        body: { table_slug: slug, trigger: "manual" },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success(`Importação concluída: ${data?.rows_inserted || 0} registros`);
+      onDone();
+    } catch (err: any) {
+      toast.error("Erro na importação: " + (err.message || "Falha"));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  return (
+    <Button variant="outline" size="sm" onClick={handleImport} disabled={importing}>
+      {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Download className="h-3.5 w-3.5 mr-1" />}
+      Importar Auto
+    </Button>
+  );
+}
+
+// ============================================
+// Export CSV Button
+// ============================================
+function ExportCsvButton({ data, filename }: { data: any[]; filename: string }) {
+  const handleExport = () => {
+    if (!data || data.length === 0) { toast.error("Sem dados para exportar"); return; }
+    const headers = Object.keys(data[0]);
+    const csv = [
+      headers.join(";"),
+      ...data.map(row => headers.map(h => String(row[h] ?? "")).join(";"))
+    ].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `${filename}.csv`; a.click();
+    URL.revokeObjectURL(url);
+    toast.success("CSV exportado");
+  };
+
+  return (
+    <Button variant="ghost" size="sm" onClick={handleExport}>
+      <FileText className="h-3.5 w-3.5 mr-1" /> CSV
+    </Button>
+  );
+}
+
+// ============================================
 // Pagination component
 // ============================================
 function Pagination({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (p: number) => void }) {
   if (totalPages <= 1) return null;
   const pages: number[] = [];
   for (let i = Math.max(1, page - 5); i <= Math.min(totalPages, page + 5); i++) pages.push(i);
-
   return (
     <div className="flex items-center justify-center gap-1 py-3">
-      <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => onPageChange(1)} disabled={page === 1}>
-        <ChevronsLeft className="h-3 w-3" />
-      </Button>
-      <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => onPageChange(page - 1)} disabled={page === 1}>
-        <ChevronLeft className="h-3 w-3" />
-      </Button>
+      <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => onPageChange(1)} disabled={page === 1}><ChevronsLeft className="h-3 w-3" /></Button>
+      <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => onPageChange(page - 1)} disabled={page === 1}><ChevronLeft className="h-3 w-3" /></Button>
       {pages.map((p) => (
-        <Button
-          key={p}
-          variant={p === page ? "default" : "outline"}
-          size="icon"
-          className="h-7 w-7 text-xs"
-          onClick={() => onPageChange(p)}
-        >
-          {p}
-        </Button>
+        <Button key={p} variant={p === page ? "default" : "outline"} size="icon" className="h-7 w-7 text-xs" onClick={() => onPageChange(p)}>{p}</Button>
       ))}
-      <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => onPageChange(page + 1)} disabled={page === totalPages}>
-        <ChevronRight className="h-3 w-3" />
-      </Button>
-      <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => onPageChange(totalPages)} disabled={page === totalPages}>
-        <ChevronsRight className="h-3 w-3" />
-      </Button>
+      <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => onPageChange(page + 1)} disabled={page === totalPages}><ChevronRight className="h-3 w-3" /></Button>
+      <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => onPageChange(totalPages)} disabled={page === totalPages}><ChevronsRight className="h-3 w-3" /></Button>
     </div>
   );
 }
@@ -131,7 +277,6 @@ function CsvImporter({ tipo, onImported }: { tipo: string; onImported: () => voi
           competencia: parseCompetencia(r["mes/ano"] || r["competencia"] || r["mes_ano"]),
           valor: parseNumBR(r["valor do salário"] || r["valor"] || r["valor_salario"]),
         })).filter(r => r.competencia && r.valor != null);
-        
         for (const rec of records) {
           const { error } = await supabase.from("pjecalc_salario_minimo" as any).upsert(rec as any, { onConflict: "competencia" });
           if (!error) inserted++;
@@ -144,7 +289,6 @@ function CsvImporter({ tipo, onImported }: { tipo: string; onImported: () => voi
           valor_final: parseNumBR(r["vl. final"] || r["valor_final"]),
           valor_cota: parseNumBR(r["vl. do salário"] || r["valor_cota"] || r["valor"]),
         })).filter(r => r.competencia && r.valor_cota != null);
-        
         for (const rec of records) {
           const { error } = await supabase.from("pjecalc_salario_familia" as any).upsert(rec as any, { onConflict: "competencia,faixa" });
           if (!error) inserted++;
@@ -160,13 +304,11 @@ function CsvImporter({ tipo, onImported }: { tipo: string; onImported: () => voi
           teto_maximo: parseNumBR(r["teto máx."] || r["teto_maximo"]),
           teto_beneficio: parseNumBR(r["teto ben."] || r["teto_beneficio"]),
         })).filter(r => r.competencia);
-        
         for (const rec of records) {
           const { error } = await supabase.from("pjecalc_contribuicao_social" as any).upsert(rec as any, { onConflict: "competencia,tipo,faixa" });
           if (!error) inserted++;
         }
       } else if (tipo === "imposto-renda") {
-        // Import deductions
         const compMap = new Map<string, { dep: number; apos: number }>();
         rows.forEach(r => {
           const comp = parseCompetencia(r["mes/ano"] || r["competencia"]);
@@ -177,9 +319,7 @@ function CsvImporter({ tipo, onImported }: { tipo: string; onImported: () => voi
         });
         for (const [comp, vals] of compMap) {
           const { error } = await supabase.from("pjecalc_imposto_renda" as any).upsert({
-            competencia: comp,
-            deducao_dependente: vals.dep,
-            deducao_aposentado_65: vals.apos,
+            competencia: comp, deducao_dependente: vals.dep, deducao_aposentado_65: vals.apos,
           } as any, { onConflict: "competencia" });
           if (!error) inserted++;
         }
@@ -200,7 +340,6 @@ function CsvImporter({ tipo, onImported }: { tipo: string; onImported: () => voi
           teto_custas_liquidacao: parseNumBR(r["teto - custas liquidação"] || r["teto_custas_liquidacao"]),
           teto_custas_autos: parseNumBR(r["teto - custas de autos"] || r["teto_custas_autos"]),
         })).filter(r => r.vigencia_inicio);
-        
         for (const rec of records) {
           const { error } = await supabase.from("pjecalc_custas_judiciais" as any).upsert(rec as any, { onConflict: "vigencia_inicio" });
           if (!error) inserted++;
@@ -213,7 +352,6 @@ function CsvImporter({ tipo, onImported }: { tipo: string; onImported: () => voi
           acumulado: parseNumBR(r["acumulado"]),
           fonte: r["fonte"] || null,
         })).filter(r => r.competencia && r.valor != null);
-        
         for (const rec of records) {
           const { error } = await supabase.from("pjecalc_correcao_monetaria" as any).upsert(rec as any, { onConflict: "competencia,indice" });
           if (!error) inserted++;
@@ -225,7 +363,6 @@ function CsvImporter({ tipo, onImported }: { tipo: string; onImported: () => voi
           taxa_mensal: parseNumBR(r["taxa"] || r["taxa_mensal"] || r["valor"]),
           acumulado: parseNumBR(r["acumulado"]),
         })).filter(r => r.competencia && r.taxa_mensal != null);
-        
         for (const rec of records) {
           const { error } = await supabase.from("pjecalc_juros_mora" as any).upsert(rec as any, { onConflict: "competencia,tipo" });
           if (!error) inserted++;
@@ -241,7 +378,6 @@ function CsvImporter({ tipo, onImported }: { tipo: string; onImported: () => voi
           valor_soma: parseNumBR(r["vl. da soma"] || r["valor_soma"]),
           valor_teto: parseNumBR(r["vl. teto"] || r["valor_teto"]),
         })).filter(r => r.competencia);
-        
         for (const rec of records) {
           const { error } = await supabase.from("pjecalc_seguro_desemprego" as any).upsert(rec as any, { onConflict: "competencia,faixa" });
           if (!error) inserted++;
@@ -255,7 +391,6 @@ function CsvImporter({ tipo, onImported }: { tipo: string; onImported: () => voi
           categoria: r["categoria"] || null,
           sindicato: r["sindicato"] || null,
         })).filter(r => r.competencia && r.nome && r.uf);
-        
         for (const rec of records) {
           const { error } = await supabase.from("pjecalc_pisos_salariais" as any).insert(rec as any);
           if (!error) inserted++;
@@ -269,7 +404,6 @@ function CsvImporter({ tipo, onImported }: { tipo: string; onImported: () => voi
           vigencia_inicio: parseDate(r["início"] || r["vigencia_inicio"] || r["data"]),
           vigencia_fim: parseDate(r["fim"] || r["vigencia_fim"]) || null,
         })).filter(r => r.linha && r.uf && r.vigencia_inicio);
-        
         for (const rec of records) {
           const { error } = await supabase.from("pjecalc_vale_transporte" as any).insert(rec as any);
           if (!error) inserted++;
@@ -285,12 +419,33 @@ function CsvImporter({ tipo, onImported }: { tipo: string; onImported: () => voi
           incidencia_cs: r["cs"]?.toLowerCase() === "sim",
           incidencia_irpf: r["irpf"]?.toLowerCase() === "sim",
         })).filter(r => r.nome);
-        
         for (const rec of records) {
           const { error } = await supabase.from("pjecalc_verbas_padrao" as any).insert(rec as any);
           if (!error) inserted++;
         }
+      } else if (tipo === "feriados") {
+        const records = rows.map(r => ({
+          data: parseDate(r["data"]),
+          nome: r["nome"],
+          scope: r["tipo"] || r["scope"] || "national",
+          uf: r["uf"] || r["estado"] || null,
+          municipio: r["municipio"] || r["município"] || null,
+          fonte: r["fonte"] || null,
+        })).filter(r => r.data && r.nome);
+        for (const rec of records) {
+          const { error } = await supabase.from("pjecalc_feriados" as any).insert(rec as any);
+          if (!error) inserted++;
+        }
       }
+
+      // Log import run
+      await supabase.from("reference_import_runs" as any).insert({
+        table_slug: tipo.replace(/-/g, "_"),
+        trigger: "manual",
+        result: inserted > 0 ? "success" : "failed",
+        stats: { rows_inserted: inserted, source: "csv", filename: file.name },
+        finished_at: new Date().toISOString(),
+      });
 
       toast.success(`${inserted} registro(s) importado(s) com sucesso`);
       onImported();
@@ -319,12 +474,10 @@ function CsvImporter({ tipo, onImported }: { tipo: string; onImported: () => voi
 function parseCompetencia(s: string | undefined): string | null {
   if (!s) return null;
   s = s.trim();
-  // mm/yyyy or mm/yy
   const m1 = s.match(/^(\d{1,2})\/(\d{4})$/);
   if (m1) return `${m1[2]}-${m1[1].padStart(2, "0")}-01`;
   const m2 = s.match(/^(\d{1,2})\/(\d{2})$/);
   if (m2) return `20${m2[2]}-${m2[1].padStart(2, "0")}-01`;
-  // yyyy-mm-dd
   if (/^\d{4}-\d{2}/.test(s)) return s.length === 7 ? s + "-01" : s;
   return null;
 }
@@ -341,6 +494,24 @@ function parseNumBR(s: string | undefined): number | null {
   s = s.trim().replace(/\./g, "").replace(",", ".");
   const n = parseFloat(s);
   return isNaN(n) ? null : n;
+}
+
+// ============================================
+// Table toolbar
+// ============================================
+function TableToolbar({ tipo, slug, data, onRefresh }: { tipo: string; slug: string; data: any[]; onRefresh: () => void }) {
+  const qc = useQueryClient();
+  const handleDone = () => { qc.invalidateQueries(); onRefresh(); };
+  const registryEntry = TABELA_CONFIG[tipo];
+  const isAutoImportable = ["salario_minimo", "contribuicao_social", "imposto_renda", "salario_familia", "seguro_desemprego", "feriados", "correcao_monetaria", "juros_mora"].includes(slug);
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      {isAutoImportable && <AutoImportButton slug={slug} onDone={handleDone} />}
+      <CsvImporter tipo={tipo} onImported={handleDone} />
+      <ExportCsvButton data={data} filename={`mrdcalc_${slug}_${new Date().toISOString().slice(0,10)}`} />
+    </div>
+  );
 }
 
 // ============================================
@@ -365,7 +536,7 @@ function SalarioMinimoView() {
   return (
     <div>
       <div className="flex justify-end mb-3">
-        <CsvImporter tipo="salario-minimo" onImported={() => qc.invalidateQueries({ queryKey: ["pjecalc_salario_minimo"] })} />
+        <TableToolbar tipo="salario-minimo" slug="salario_minimo" data={rows} onRefresh={() => qc.invalidateQueries({ queryKey: ["pjecalc_salario_minimo"] })} />
       </div>
       {isLoading ? <LoadingSpinner /> : rows.length === 0 ? <EmptyState /> : (
         <>
@@ -406,7 +577,7 @@ function SalarioFamiliaView() {
   return (
     <div>
       <div className="flex justify-end mb-3">
-        <CsvImporter tipo="salario-familia" onImported={() => qc.invalidateQueries({ queryKey: ["pjecalc_salario_familia"] })} />
+        <TableToolbar tipo="salario-familia" slug="salario_familia" data={data || []} onRefresh={() => qc.invalidateQueries({ queryKey: ["pjecalc_salario_familia"] })} />
       </div>
       {isLoading ? <LoadingSpinner /> : rows.length === 0 ? <EmptyState /> : (
         <>
@@ -450,7 +621,7 @@ function SeguroDesempregoView() {
   return (
     <div>
       <div className="flex justify-end mb-3">
-        <CsvImporter tipo="seguro-desemprego" onImported={() => qc.invalidateQueries({ queryKey: ["pjecalc_seguro_desemprego"] })} />
+        <TableToolbar tipo="seguro-desemprego" slug="seguro_desemprego" data={data || []} onRefresh={() => qc.invalidateQueries({ queryKey: ["pjecalc_seguro_desemprego"] })} />
       </div>
       {isLoading ? <LoadingSpinner /> : rows.length === 0 ? <EmptyState /> : (
         <>
@@ -503,7 +674,7 @@ function ContribuicaoSocialView() {
             <TabsTrigger value="empregado_domestico">Empregado Doméstico</TabsTrigger>
           </TabsList>
         </Tabs>
-        <CsvImporter tipo="contribuicao-social" onImported={() => qc.invalidateQueries({ queryKey: ["pjecalc_contribuicao_social"] })} />
+        <TableToolbar tipo="contribuicao-social" slug="contribuicao_social" data={data || []} onRefresh={() => qc.invalidateQueries({ queryKey: ["pjecalc_contribuicao_social"] })} />
       </div>
       {isLoading ? <LoadingSpinner /> : rows.length === 0 ? <EmptyState /> : (
         <>
@@ -543,17 +714,37 @@ function ImpostoRendaView() {
   return (
     <div>
       <div className="flex justify-end mb-3">
-        <CsvImporter tipo="imposto-renda" onImported={() => qc.invalidateQueries({ queryKey: ["pjecalc_imposto_renda"] })} />
+        <TableToolbar tipo="imposto-renda" slug="imposto_renda" data={rows} onRefresh={() => qc.invalidateQueries({ queryKey: ["pjecalc_imposto_renda"] })} />
       </div>
       {isLoading ? <LoadingSpinner /> : rows.length === 0 ? <EmptyState /> : (
         <>
-          <DataTable
-            headers={["Mês/Ano", "Dedução por Dependente", "Dedução por Aposentado Maior que 65 Anos", "Faixas"]}
-            rows={pageRows.map((r: any) => [
-              fmtComp(r.competencia), fmt(r.deducao_dependente), fmt(r.deducao_aposentado_65), "Exibir",
-            ])}
-            aligns={["center", "center", "center", "center"]}
-          />
+          {pageRows.map((r: any) => (
+            <Card key={r.id} className="mb-3">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold text-sm">Competência: {fmtComp(r.competencia)}</span>
+                  <div className="flex gap-4 text-xs text-muted-foreground">
+                    <span>Dedução Dependente: <strong>{fmt(r.deducao_dependente)}</strong></span>
+                    <span>Dedução Aposentado 65+: <strong>{fmt(r.deducao_aposentado_65)}</strong></span>
+                  </div>
+                </div>
+                {Array.isArray(r.faixas) && r.faixas.length > 0 ? (
+                  <DataTable
+                    headers={["De", "Até", "Alíquota", "Dedução"]}
+                    rows={r.faixas.map((f: any) => [
+                      fmt(f.faixa_inicio),
+                      f.faixa_fim ? fmt(f.faixa_fim) : "—",
+                      `${((f.aliquota || 0) * 100).toFixed(1)}%`,
+                      fmt(f.deducao),
+                    ])}
+                    aligns={["right", "right", "right", "right"]}
+                  />
+                ) : (
+                  <p className="text-xs text-muted-foreground">Faixas não cadastradas para esta competência.</p>
+                )}
+              </CardContent>
+            </Card>
+          ))}
           <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
         </>
       )}
@@ -575,22 +766,18 @@ function CustasJudiciaisView() {
   return (
     <div>
       <div className="flex justify-end mb-3">
-        <CsvImporter tipo="custas-judiciais" onImported={() => qc.invalidateQueries({ queryKey: ["pjecalc_custas_judiciais"] })} />
+        <TableToolbar tipo="custas-judiciais" slug="custas_judiciais" data={data || []} onRefresh={() => qc.invalidateQueries({ queryKey: ["pjecalc_custas_judiciais"] })} />
       </div>
       {isLoading ? <LoadingSpinner /> : (data || []).length === 0 ? <EmptyState /> : (
         <div className="overflow-x-auto">
           <DataTable
             headers={[
-              "Início", "Fim", "Atos Oficiais Zona Urbana", "Atos Oficiais Zona Rural",
-              "Agravo de Instrumento", "Agravo de Petição", "Impugnação à Sentença de Liquidação",
-              "Recurso de Revista", "Embargos à Arrematação", "Embargos à Execução",
-              "Embargos de Terceiros", "Piso - Custas Conhecimento", "Teto - Custas Liquidação", "Teto - Custas de Autos"
+              "Início", "Fim", "Atos Of. Urbana", "Atos Of. Rural", "Agravo Instr.", "Agravo Pet.", "Impugn. Sent.", "Rec. Revista", "Emb. Arrem.", "Emb. Exec.", "Emb. Terc.", "Piso Conhec.", "Teto Liq.", "Teto Autos"
             ]}
             rows={(data || []).map((r: any) => [
               fmtDate(r.vigencia_inicio), r.vigencia_fim ? fmtDate(r.vigencia_fim) : "",
-              fmt(r.atos_oficiais_urbana), fmt(r.atos_oficiais_rural),
-              fmt(r.agravo_instrumento), fmt(r.agravo_peticao), fmt(r.impugnacao_sentenca),
-              fmt(r.recurso_revista), fmt(r.embargos_arrematacao), fmt(r.embargos_execucao),
+              fmt(r.atos_oficiais_urbana), fmt(r.atos_oficiais_rural), fmt(r.agravo_instrumento), fmt(r.agravo_peticao),
+              fmt(r.impugnacao_sentenca), fmt(r.recurso_revista), fmt(r.embargos_arrematacao), fmt(r.embargos_execucao),
               fmt(r.embargos_terceiros), fmt(r.piso_custas_conhecimento), fmt(r.teto_custas_liquidacao), fmt(r.teto_custas_autos),
             ])}
             aligns={Array(14).fill("right").map((_, i) => i < 2 ? "center" : "right") as any}
@@ -624,17 +811,13 @@ function CorrecaoMonetariaView() {
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-muted-foreground">Índice:</span>
           <Select value={indice} onValueChange={(v) => { setIndice(v); setPage(1); }}>
-            <SelectTrigger className="w-40 h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
+            <SelectTrigger className="w-40 h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {["IPCA-E", "INPC", "TR", "SELIC", "IGP-M", "FACDT"].map(i => (
-                <SelectItem key={i} value={i}>{i}</SelectItem>
-              ))}
+              {["IPCA-E", "INPC", "TR", "SELIC", "IGP-M", "FACDT"].map(i => (<SelectItem key={i} value={i}>{i}</SelectItem>))}
             </SelectContent>
           </Select>
         </div>
-        <CsvImporter tipo="correcao-monetaria" onImported={() => qc.invalidateQueries({ queryKey: ["pjecalc_correcao_monetaria"] })} />
+        <TableToolbar tipo="correcao-monetaria" slug="correcao_monetaria" data={rows} onRefresh={() => qc.invalidateQueries({ queryKey: ["pjecalc_correcao_monetaria"] })} />
       </div>
       {isLoading ? <LoadingSpinner /> : rows.length === 0 ? <EmptyState /> : (
         <>
@@ -671,16 +854,14 @@ function JurosMoraView() {
     <div>
       <div className="flex items-center justify-between mb-3 gap-3">
         <Select value={tipoJuros} onValueChange={(v) => { setTipoJuros(v); setPage(1); }}>
-          <SelectTrigger className="w-40 h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
+          <SelectTrigger className="w-40 h-8 text-xs"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="trabalhista">Trabalhista</SelectItem>
             <SelectItem value="selic">SELIC</SelectItem>
             <SelectItem value="civil">Civil</SelectItem>
           </SelectContent>
         </Select>
-        <CsvImporter tipo="juros-mora" onImported={() => qc.invalidateQueries({ queryKey: ["pjecalc_juros_mora"] })} />
+        <TableToolbar tipo="juros-mora" slug="juros_mora" data={rows} onRefresh={() => qc.invalidateQueries({ queryKey: ["pjecalc_juros_mora"] })} />
       </div>
       {isLoading ? <LoadingSpinner /> : rows.length === 0 ? <EmptyState /> : (
         <>
@@ -741,10 +922,8 @@ function PisosSalariaisView() {
             </div>
           </div>
           <div className="flex gap-2 mt-3">
-            <Button size="sm" onClick={() => { setSearched(true); setPage(1); refetch(); }}>
-              <Search className="h-3.5 w-3.5 mr-1" /> Buscar
-            </Button>
-            <CsvImporter tipo="pisos-salariais" onImported={() => qc.invalidateQueries({ queryKey: ["pjecalc_pisos_salariais"] })} />
+            <Button size="sm" onClick={() => { setSearched(true); setPage(1); refetch(); }}><Search className="h-3.5 w-3.5 mr-1" /> Buscar</Button>
+            <TableToolbar tipo="pisos-salariais" slug="pisos_salariais" data={rows} onRefresh={() => qc.invalidateQueries({ queryKey: ["pjecalc_pisos_salariais"] })} />
           </div>
         </CardContent>
       </Card>
@@ -813,10 +992,8 @@ function ValeTransporteView() {
             </div>
           </div>
           <div className="flex gap-2 mt-3">
-            <Button size="sm" onClick={() => { setSearched(true); setPage(1); refetch(); }}>
-              <Search className="h-3.5 w-3.5 mr-1" /> Buscar
-            </Button>
-            <CsvImporter tipo="vale-transporte" onImported={() => qc.invalidateQueries({ queryKey: ["pjecalc_vale_transporte"] })} />
+            <Button size="sm" onClick={() => { setSearched(true); setPage(1); refetch(); }}><Search className="h-3.5 w-3.5 mr-1" /> Buscar</Button>
+            <TableToolbar tipo="vale-transporte" slug="vale_transporte" data={rows} onRefresh={() => qc.invalidateQueries({ queryKey: ["pjecalc_vale_transporte"] })} />
           </div>
         </CardContent>
       </Card>
@@ -836,78 +1013,55 @@ function ValeTransporteView() {
 
 function FeriadosView() {
   const [filterUf, setFilterUf] = useState("all");
-  const [filterMun, setFilterMun] = useState("");
-  const [filterNome, setFilterNome] = useState("");
-  const [searched, setSearched] = useState(false);
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ["calendars_feriados", filterUf, filterMun, filterNome],
+  const [filterAno, setFilterAno] = useState(String(new Date().getFullYear()));
+  const [page, setPage] = useState(1);
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ["pjecalc_feriados", filterUf, filterAno],
     queryFn: async () => {
-      let q = supabase.from("calendars").select("*").order("ano", { ascending: false });
-      if (filterUf !== "all") q = q.eq("uf", filterUf);
-      if (filterMun) q = q.ilike("municipio", `%${filterMun}%`);
-      if (filterNome) q = q.ilike("nome", `%${filterNome}%`);
+      let q = supabase.from("pjecalc_feriados" as any).select("*")
+        .gte("data", `${filterAno}-01-01`).lte("data", `${filterAno}-12-31`)
+        .order("data");
+      if (filterUf !== "all") q = q.or(`scope.eq.national,uf.eq.${filterUf}`);
       const { data, error } = await q;
       if (error) throw error;
       return (data || []) as any[];
     },
-    enabled: searched,
   });
+  const rows = data || [];
+  const totalPages = Math.ceil(rows.length / PAGE_SIZE);
+  const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div>
-      <Card className="mb-4">
-        <CardContent className="p-4">
-          <p className="text-sm font-semibold mb-3">Dados da Busca</p>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="text-xs text-muted-foreground">Nome</label>
-              <Input value={filterNome} onChange={e => setFilterNome(e.target.value)} className="h-8 text-sm" />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Estado</label>
-              <Select value={filterUf} onValueChange={setFilterUf}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {UFS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Município</label>
-              <Input value={filterMun} onChange={e => setFilterMun(e.target.value)} className="h-8 text-sm" />
-            </div>
-          </div>
-          <Button size="sm" className="mt-3" onClick={() => { setSearched(true); refetch(); }}>
-            <Search className="h-3.5 w-3.5 mr-1" /> Buscar
-          </Button>
-        </CardContent>
-      </Card>
-      {isLoading ? <LoadingSpinner /> : searched && (data || []).length === 0 ? <EmptyState msg="Nenhum calendário encontrado." /> : searched ? (
-        <div className="space-y-3">
-          {(data || []).map((c: any) => (
-            <Card key={c.id}>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="font-semibold text-sm">{c.nome}</span>
-                  <Badge variant="secondary" className="text-[10px]">{c.uf}</Badge>
-                  {c.municipio && <Badge variant="outline" className="text-[10px]">{c.municipio}</Badge>}
-                  <Badge variant="outline" className="text-[10px]">{c.ano}</Badge>
-                </div>
-                {Array.isArray(c.feriados) && c.feriados.length > 0 ? (
-                  <DataTable
-                    headers={["Data", "Nome", "Tipo"]}
-                    rows={c.feriados.map((f: any) => [f.data || "—", f.nome || "—", f.tipo || "—"])}
-                    aligns={["center", "left", "center"]}
-                  />
-                ) : (
-                  <p className="text-xs text-muted-foreground">Sem feriados cadastrados.</p>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+      <div className="flex items-center justify-between mb-3 gap-3">
+        <div className="flex items-center gap-2">
+          <Select value={filterAno} onValueChange={setFilterAno}>
+            <SelectTrigger className="w-24 h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {[2026, 2025, 2024, 2023].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={filterUf} onValueChange={setFilterUf}>
+            <SelectTrigger className="w-24 h-8 text-xs"><SelectValue placeholder="UF" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              {UFS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
-      ) : null}
+        <TableToolbar tipo="feriados" slug="feriados" data={rows} onRefresh={() => qc.invalidateQueries({ queryKey: ["pjecalc_feriados"] })} />
+      </div>
+      {isLoading ? <LoadingSpinner /> : rows.length === 0 ? <EmptyState msg="Nenhum feriado cadastrado para o período." /> : (
+        <>
+          <DataTable
+            headers={["Data", "Nome", "Abrangência", "UF", "Município"]}
+            rows={pageRows.map((r: any) => [fmtDate(r.data), r.nome, r.scope === "national" ? "Nacional" : r.scope === "state" ? "Estadual" : "Municipal", r.uf || "—", r.municipio || "—"])}
+            aligns={["center", "left", "center", "center", "left"]}
+          />
+          <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+        </>
+      )}
     </div>
   );
 }
@@ -971,10 +1125,8 @@ function VerbasView() {
             </div>
           </div>
           <div className="flex gap-2 mt-3">
-            <Button size="sm" onClick={() => { setSearched(true); setPage(1); refetch(); }}>
-              <Search className="h-3.5 w-3.5 mr-1" /> Buscar
-            </Button>
-            <CsvImporter tipo="verbas" onImported={() => qc.invalidateQueries({ queryKey: ["pjecalc_verbas_padrao"] })} />
+            <Button size="sm" onClick={() => { setSearched(true); setPage(1); refetch(); }}><Search className="h-3.5 w-3.5 mr-1" /> Buscar</Button>
+            <TableToolbar tipo="verbas" slug="verbas" data={rows} onRefresh={() => qc.invalidateQueries({ queryKey: ["pjecalc_verbas_padrao"] })} />
           </div>
         </CardContent>
       </Card>
@@ -999,21 +1151,18 @@ function AtualizacaoIndicesView() {
   const [selectedTrt, setSelectedTrt] = useState<string | null>(null);
   const [seeding, setSeeding] = useState(false);
   const [seedResult, setSeedResult] = useState<any>(null);
+  const [importingAll, setImportingAll] = useState(false);
   const qc = useQueryClient();
 
   const handleAutoImport = async (trt: string) => {
     setSelectedTrt(trt);
     setSeeding(true);
     setSeedResult(null);
-
     try {
-      const { data, error } = await supabase.functions.invoke("seed-pjecalc-tables", {
-        body: { trt },
-      });
+      const { data, error } = await supabase.functions.invoke("seed-pjecalc-tables", { body: { trt } });
       if (error) throw error;
       setSeedResult(data);
       toast.success(`Tabelas do ${trt} importadas com sucesso! ${data?.total_registros || 0} registros.`);
-      // Invalidate all table queries
       qc.invalidateQueries();
     } catch (err: any) {
       toast.error("Erro na importação automática: " + (err.message || "Falha"));
@@ -1023,18 +1172,53 @@ function AtualizacaoIndicesView() {
     }
   };
 
+  const handleImportAll = async () => {
+    setImportingAll(true);
+    const slugs = ["salario_minimo", "contribuicao_social", "imposto_renda", "salario_familia", "seguro_desemprego", "feriados", "correcao_monetaria", "juros_mora"];
+    let totalRows = 0;
+    let errors = 0;
+
+    for (const slug of slugs) {
+      try {
+        const { data, error } = await supabase.functions.invoke("import-reference-table", { body: { table_slug: slug, trigger: "manual" } });
+        if (error) { errors++; continue; }
+        totalRows += data?.rows_inserted || 0;
+      } catch { errors++; }
+    }
+
+    toast.success(`Importação completa: ${totalRows} registros (${errors} erros)`);
+    qc.invalidateQueries();
+    setImportingAll(false);
+  };
+
   return (
     <div className="space-y-4">
-      {/* Auto-import by TRT */}
+      {/* Bulk import */}
       <Card className="border-primary/30">
         <CardContent className="p-6">
           <div className="flex items-center gap-2 mb-2">
             <Download className="h-5 w-5 text-primary" />
-            <h3 className="font-bold text-sm">Importação Automática por TRT</h3>
+            <h3 className="font-bold text-sm">Importação Automática Completa</h3>
           </div>
           <p className="text-xs text-muted-foreground mb-4">
-            Selecione o TRT do processo para importar automaticamente todas as tabelas oficiais do PJe-Calc
-            (salário mínimo, INSS, IRRF, custas, feriados regionais, verbas padrão e mais).
+            Importa automaticamente todas as tabelas com fonte oficial: salário mínimo, INSS, IRRF, salário-família, seguro-desemprego, feriados, correção monetária e juros de mora.
+          </p>
+          <Button onClick={handleImportAll} disabled={importingAll}>
+            {importingAll ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+            Importar Todas as Tabelas
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* TRT-specific import */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center gap-2 mb-2">
+            <Download className="h-5 w-5 text-primary" />
+            <h3 className="font-bold text-sm">Importação por TRT (Seed PJe-Calc)</h3>
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">
+            Selecione o TRT para importar tabelas oficiais do PJe-Calc incluindo custas regionais e feriados estaduais.
           </p>
 
           {seeding && (
@@ -1049,9 +1233,7 @@ function AtualizacaoIndicesView() {
 
           {seedResult && !seedResult.error && (
             <div className="mb-4 p-3 rounded bg-primary/10 border border-primary/20">
-              <p className="text-sm font-medium text-primary">
-                ✅ Importação concluída — {seedResult.total_registros} registros processados
-              </p>
+              <p className="text-sm font-medium text-primary">✅ Importação concluída — {seedResult.total_registros} registros</p>
               <div className="mt-2 grid grid-cols-3 gap-1">
                 {seedResult.detalhes && Object.entries(seedResult.detalhes).map(([k, v]) => (
                   <div key={k} className="text-[10px] text-muted-foreground">
@@ -1064,15 +1246,9 @@ function AtualizacaoIndicesView() {
 
           <div className="grid grid-cols-3 gap-2">
             {Object.entries(TRTS).map(([trt, nome]) => (
-              <button
-                key={trt}
-                onClick={() => handleAutoImport(trt)}
-                disabled={seeding}
-                className="flex items-center gap-2 p-2.5 rounded border border-border/50 text-xs hover:bg-primary/5 hover:border-primary/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left"
-              >
-                <Badge variant={selectedTrt === trt && seedResult && !seedResult.error ? "default" : "secondary"} className="text-[10px] shrink-0">
-                  {trt.replace("TRT", "TRT ")}
-                </Badge>
+              <button key={trt} onClick={() => handleAutoImport(trt)} disabled={seeding}
+                className="flex items-center gap-2 p-2.5 rounded border border-border/50 text-xs hover:bg-primary/5 hover:border-primary/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left">
+                <Badge variant={selectedTrt === trt && seedResult && !seedResult.error ? "default" : "secondary"} className="text-[10px] shrink-0">{trt.replace("TRT", "TRT ")}</Badge>
                 <span className="text-muted-foreground truncate">{nome}</span>
                 {seeding && selectedTrt === trt && <Loader2 className="h-3 w-3 animate-spin ml-auto" />}
                 {selectedTrt === trt && seedResult && !seedResult.error && <span className="ml-auto text-primary">✓</span>}
@@ -1086,9 +1262,7 @@ function AtualizacaoIndicesView() {
       <Card>
         <CardContent className="p-6">
           <h3 className="font-semibold text-sm mb-2">Importação Manual (CSV)</h3>
-          <p className="text-xs text-muted-foreground mb-4">
-            Caso precise importar dados específicos não incluídos na importação automática, use os importadores CSV abaixo.
-          </p>
+          <p className="text-xs text-muted-foreground mb-4">Para dados específicos não incluídos na importação automática.</p>
           <div className="grid grid-cols-2 gap-3">
             {Object.entries(TABELA_CONFIG).filter(([k]) => k !== "atualizacao-indices").map(([key, config]) => (
               <Card key={key} className="border border-border/50">
@@ -1149,7 +1323,7 @@ function LoadingSpinner() {
 
 function EmptyState({ msg }: { msg?: string }) {
   return (
-    <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">{msg || "Nenhum dado cadastrado. Importe um arquivo CSV para popular esta tabela."}</CardContent></Card>
+    <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">{msg || "Nenhum dado cadastrado. Use os botões acima para importar dados."}</CardContent></Card>
   );
 }
 
@@ -1181,12 +1355,12 @@ export default function Tabelas() {
   if (!config || !ViewComponent) {
     return (
       <MainLayoutPremium title="Tabelas" breadcrumbs={[{ label: "Tabelas" }]}>
-        <div className="flex flex-col items-center justify-center py-20">
-          <Search className="h-12 w-12 text-muted-foreground/30 mb-4" />
-          <h3 className="text-lg font-semibold">Selecione uma tabela</h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            Escolha uma tabela no menu lateral para visualizar os dados de referência.
-          </p>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-xl font-bold">Visão Geral — Tabelas & Índices</h1>
+            <p className="text-sm text-muted-foreground">Status de saúde, última atualização e importações recentes.</p>
+          </div>
+          <HealthDashboard />
         </div>
       </MainLayoutPremium>
     );
