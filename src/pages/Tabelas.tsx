@@ -698,7 +698,7 @@ function JurosMoraView() {
 
 function PisosSalariaisView() {
   const [filterNome, setFilterNome] = useState("");
-  const [filterUf, setFilterUf] = useState("");
+  const [filterUf, setFilterUf] = useState("all");
   const [searched, setSearched] = useState(false);
   const [page, setPage] = useState(1);
   const qc = useQueryClient();
@@ -706,7 +706,7 @@ function PisosSalariaisView() {
     queryKey: ["pjecalc_pisos_salariais", filterNome, filterUf],
     queryFn: async () => {
       let q = supabase.from("pjecalc_pisos_salariais" as any).select("*").order("competencia", { ascending: false }).limit(500);
-      if (filterUf) q = q.eq("uf", filterUf);
+      if (filterUf !== "all") q = q.eq("uf", filterUf);
       if (filterNome) q = q.ilike("nome", `%${filterNome}%`);
       const { data, error } = await q;
       if (error) throw error;
@@ -734,7 +734,7 @@ function PisosSalariaisView() {
               <Select value={filterUf} onValueChange={setFilterUf}>
                 <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   {UFS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -764,7 +764,7 @@ function PisosSalariaisView() {
 
 function ValeTransporteView() {
   const [filterLinha, setFilterLinha] = useState("");
-  const [filterUf, setFilterUf] = useState("");
+  const [filterUf, setFilterUf] = useState("all");
   const [filterMun, setFilterMun] = useState("");
   const [searched, setSearched] = useState(false);
   const [page, setPage] = useState(1);
@@ -773,7 +773,7 @@ function ValeTransporteView() {
     queryKey: ["pjecalc_vale_transporte", filterLinha, filterUf, filterMun],
     queryFn: async () => {
       let q = supabase.from("pjecalc_vale_transporte" as any).select("*").order("vigencia_inicio", { ascending: false }).limit(500);
-      if (filterUf) q = q.eq("uf", filterUf);
+      if (filterUf !== "all") q = q.eq("uf", filterUf);
       if (filterMun) q = q.ilike("municipio", `%${filterMun}%`);
       if (filterLinha) q = q.ilike("linha", `%${filterLinha}%`);
       const { data, error } = await q;
@@ -802,7 +802,7 @@ function ValeTransporteView() {
               <Select value={filterUf} onValueChange={setFilterUf}>
                 <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   {UFS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -835,7 +835,7 @@ function ValeTransporteView() {
 }
 
 function FeriadosView() {
-  const [filterUf, setFilterUf] = useState("");
+  const [filterUf, setFilterUf] = useState("all");
   const [filterMun, setFilterMun] = useState("");
   const [filterNome, setFilterNome] = useState("");
   const [searched, setSearched] = useState(false);
@@ -843,7 +843,7 @@ function FeriadosView() {
     queryKey: ["calendars_feriados", filterUf, filterMun, filterNome],
     queryFn: async () => {
       let q = supabase.from("calendars").select("*").order("ano", { ascending: false });
-      if (filterUf) q = q.eq("uf", filterUf);
+      if (filterUf !== "all") q = q.eq("uf", filterUf);
       if (filterMun) q = q.ilike("municipio", `%${filterMun}%`);
       if (filterNome) q = q.ilike("nome", `%${filterNome}%`);
       const { data, error } = await q;
@@ -868,7 +868,7 @@ function FeriadosView() {
               <Select value={filterUf} onValueChange={setFilterUf}>
                 <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   {UFS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -914,8 +914,8 @@ function FeriadosView() {
 
 function VerbasView() {
   const [filterNome, setFilterNome] = useState("");
-  const [filterTipo, setFilterTipo] = useState("");
-  const [filterValor, setFilterValor] = useState("");
+  const [filterTipo, setFilterTipo] = useState("all");
+  const [filterValor, setFilterValor] = useState("all");
   const [searched, setSearched] = useState(false);
   const [page, setPage] = useState(1);
   const qc = useQueryClient();
@@ -924,8 +924,8 @@ function VerbasView() {
     queryFn: async () => {
       let q = supabase.from("pjecalc_verbas_padrao" as any).select("*").eq("ativo", true).order("nome");
       if (filterNome) q = q.ilike("nome", `%${filterNome}%`);
-      if (filterTipo) q = q.eq("tipo", filterTipo);
-      if (filterValor) q = q.eq("valor_tipo", filterValor);
+      if (filterTipo !== "all") q = q.eq("tipo", filterTipo);
+      if (filterValor !== "all") q = q.eq("valor_tipo", filterValor);
       const { data, error } = await q;
       if (error) throw error;
       return (data || []) as any[];
@@ -952,7 +952,7 @@ function VerbasView() {
               <Select value={filterValor} onValueChange={setFilterValor}>
                 <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="calculado">Calculado</SelectItem>
                   <SelectItem value="informado">Informado</SelectItem>
                 </SelectContent>
@@ -963,7 +963,7 @@ function VerbasView() {
               <Select value={filterTipo} onValueChange={setFilterTipo}>
                 <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="principal">Principal</SelectItem>
                   <SelectItem value="reflexa">Reflexa</SelectItem>
                 </SelectContent>
