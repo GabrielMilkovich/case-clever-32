@@ -24,16 +24,31 @@ import {
 // =====================================================
 // MÓDULOS DO PJe-Calc (sidebar)
 // =====================================================
+// Componentes de módulo existentes
+import { ModuloFGTS } from "@/components/cases/pjecalc/ModuloFGTS";
+import { ModuloCS } from "@/components/cases/pjecalc/ModuloCS";
+import { ModuloIR } from "@/components/cases/pjecalc/ModuloIR";
+import { ModuloCorrecao } from "@/components/cases/pjecalc/ModuloCorrecao";
+import { ModuloResumo } from "@/components/cases/pjecalc/ModuloResumo";
+import { ModuloCartaoPonto } from "@/components/cases/pjecalc/ModuloCartaoPonto";
+import { ModuloSeguroDesemprego } from "@/components/cases/pjecalc/ModuloSeguroDesemprego";
+import { ModuloHonorarios } from "@/components/cases/pjecalc/ModuloHonorarios";
+import { ModuloCustas } from "@/components/cases/pjecalc/ModuloCustas";
+
 const MODULOS = [
   { id: 'parametros', label: 'Parâmetros', icon: Calendar, desc: 'Dados do cálculo' },
   { id: 'faltas', label: 'Faltas', icon: Clock, desc: 'Registros de ausência' },
   { id: 'ferias', label: 'Férias', icon: Calendar, desc: 'Períodos aquisitivos' },
   { id: 'historico', label: 'Histórico Salarial', icon: DollarSign, desc: 'Bases de cálculo' },
+  { id: 'cartao_ponto', label: 'Cartão de Ponto', icon: Clock, desc: 'Jornada mensal' },
   { id: 'verbas', label: 'Verbas', icon: FileText, desc: 'Parcelas do cálculo' },
   { id: 'fgts', label: 'FGTS', icon: Building2, desc: 'Depósitos e multa' },
   { id: 'cs', label: 'Contrib. Social', icon: Receipt, desc: 'Segurado e empregador' },
   { id: 'ir', label: 'Imposto de Renda', icon: Percent, desc: 'IRRF / RRA' },
   { id: 'correcao', label: 'Correção/Juros', icon: TrendingUp, desc: 'Atualização monetária' },
+  { id: 'seguro', label: 'Seguro-Desemprego', icon: Shield, desc: 'Indenização substitutiva' },
+  { id: 'honorarios', label: 'Honorários', icon: Scale, desc: 'Sucumbenciais e contratuais' },
+  { id: 'custas', label: 'Custas', icon: Receipt, desc: 'Custas processuais' },
   { id: 'resumo', label: 'Resumo', icon: FileBarChart, desc: 'Resultado da liquidação' },
 ];
 
@@ -231,18 +246,26 @@ export default function PjeCalcPage() {
         return renderFerias();
       case 'historico':
         return renderHistorico();
+      case 'cartao_ponto':
+        return <ModuloCartaoPonto caseId={caseId!} dataAdmissao={formParams.data_admissao} dataDemissao={formParams.data_demissao} />;
       case 'verbas':
         return renderVerbas();
       case 'fgts':
-        return renderFGTS();
+        return <ModuloFGTS caseId={caseId!} />;
       case 'cs':
-        return renderCS();
+        return <ModuloCS caseId={caseId!} />;
       case 'ir':
-        return renderIR();
+        return <ModuloIR caseId={caseId!} />;
       case 'correcao':
-        return renderCorrecao();
+        return <ModuloCorrecao caseId={caseId!} />;
+      case 'seguro':
+        return <ModuloSeguroDesemprego caseId={caseId!} />;
+      case 'honorarios':
+        return <ModuloHonorarios caseId={caseId!} />;
+      case 'custas':
+        return <ModuloCustas caseId={caseId!} />;
       case 'resumo':
-        return renderResumo();
+        return <ModuloResumo caseId={caseId!} />;
       default:
         return null;
     }
@@ -697,26 +720,7 @@ export default function PjeCalcPage() {
     </div>
   );
 
-  // =====================================================
-  // MÓDULOS PLACEHOLDER
-  // =====================================================
-  const renderPlaceholder = (title: string, desc: string) => (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      <Card>
-        <CardContent className="p-8 text-center">
-          <p className="text-sm text-muted-foreground">{desc}</p>
-          <p className="text-xs text-muted-foreground mt-2">Configure os parâmetros e verbas primeiro.</p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-
-  const renderFGTS = () => renderPlaceholder("FGTS", "Configure depósitos de 8%, multa rescisória (20% ou 40%) e LC 110/2001.");
-  const renderCS = () => renderPlaceholder("Contribuição Social", "Configure segurado (progressivo), empregador (Empresa, SAT, Terceiros).");
-  const renderIR = () => renderPlaceholder("Imposto de Renda", "Configure Art. 12-A RRA, tributação exclusiva do 13º, deduções por dependentes.");
-  const renderCorrecao = () => renderPlaceholder("Correção, Juros e Multa", "Configure índice (IPCA-E/SELIC), juros de mora e multa Art. 523 CPC.");
-  const renderResumo = () => renderPlaceholder("Resumo da Liquidação", "Execute a liquidação para ver o resultado consolidado.");
+  // (Placeholders removed — all modules now use real components)
 
   // =====================================================
   // MAIN RENDER
