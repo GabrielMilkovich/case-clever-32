@@ -490,6 +490,8 @@ export class PjeCalcEngine {
   private faixasINSSDB: PjeINSSFaixaRow[];
   private faixasIRDB: PjeIRFaixaRow[];
   private excecoesCargas: PjeExcecaoCargaHoraria[];
+  private feriadosDB: PjeFeriadoDB[];
+  private prevPrivadaConfig: PjePrevidenciaPrivadaConfig;
   // Map of verba results by verba_id for reflexa resolution
   private verbaResultsMap: Map<string, PjeVerbaResult> = new Map();
 
@@ -511,6 +513,8 @@ export class PjeCalcEngine {
     faixasINSSDB: PjeINSSFaixaRow[] = [],
     faixasIRDB: PjeIRFaixaRow[] = [],
     excecoesCargas: PjeExcecaoCargaHoraria[] = [],
+    feriadosDB: PjeFeriadoDB[] = [],
+    prevPrivadaConfig: PjePrevidenciaPrivadaConfig = { apurar: false, percentual: 0, base_calculo: 'diferenca', deduzir_ir: false },
   ) {
     this.params = params;
     this.historicos = historicos;
@@ -529,6 +533,8 @@ export class PjeCalcEngine {
     this.faixasINSSDB = faixasINSSDB;
     this.faixasIRDB = faixasIRDB;
     this.excecoesCargas = excecoesCargas;
+    this.feriadosDB = feriadosDB;
+    this.prevPrivadaConfig = prevPrivadaConfig;
   }
 
   // =====================================================
@@ -637,6 +643,55 @@ export class PjeCalcEngine {
       if (compDate >= inicio && compDate <= fim) return Number(exc.carga_horaria);
     }
     return this.params.carga_horaria_padrao || 220;
+  }
+
+  // =====================================================
+  // QUANTIDADE CALENDÁRIO (Dias Úteis / Repousos / Feriados)
+  // =====================================================
+
+  calcularQuantidadeCalendario(competencia: string, tipo: 'dias_uteis' | 'repousos' | 'feriados'): number {
+    const [ano, mes] = competencia.split('-').map(Number);
+    const diasNoMes = new Date(ano, mes, 0).getDate();
+    
+    // Contar feriados no mês para o estado/município do cálculo
+    const feriadosNoMes = this.feriadosDB.filter(f => {
+      const fd = new Date(f.data);
+      if (fd.getFullYear() !== ano || fd.getMonth() + 1 !== mes) return false;
+      if (f.tipo === 'nacional') return true;
+      if (f.tipo === 'estadual' && this.params.considerar_feriado_estadual && f.uf === this.params.estado) return true;
+      if (f.tipo === 'municipal' && this.params.considerar_feriado_municipal && f.municipio === this.params.municipio) return true;
+      return false;
+    });
+
+    let diasUteis = 0;
+    let repousos = 0;
+    
+    for (let d = 1; d <= diasNoMes; d++) {
+      const date = new Date(ano, mes - 1, d);
+      const dow = date.getDay(); // 0=Sun, 6=Sat
+      const isSunday = dow === 0;
+      const isSaturday = dow === 6;
+      const isFeriado = feriadosNoMes.some(f => new Date(f.data).getDate() === d);
+      
+      if (isSunday || isFeriado) {
+        repousos++;
+      } else if (isSaturday && !this.params.sabado_dia_util) {
+        repousos++;
+      } else {
+        diasUteis++;
+      }
+    }
+
+    switch (tipo) {
+      case 'dias_uteis': return diasUteis;
+      case 'repousos': return repousos;
+      case 'feriados': return feriadosNoMes.length;
+    }
+  }
+
+  // Divisor com feriados integrados
+  getDivisorComFeriados(competencia: string): number {
+    return this.calcularQuantidadeCalendario(competencia, 'dias_uteis');
   }
 
   // =====================================================
