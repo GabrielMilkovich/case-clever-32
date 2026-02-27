@@ -1,0 +1,126 @@
+import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Save, Loader2 } from "lucide-react";
+
+interface Props { caseId: string; }
+
+export function ModuloDadosProcesso({ caseId }: Props) {
+  const qc = useQueryClient();
+  const [saving, setSaving] = useState(false);
+
+  const { data } = useQuery({
+    queryKey: ["pjecalc_dados_processo", caseId],
+    queryFn: async () => {
+      const { data } = await supabase.from("pjecalc_dados_processo" as any).select("*").eq("case_id", caseId).maybeSingle();
+      return data as any;
+    },
+  });
+
+  const [form, setForm] = useState({
+    numero_processo: '', vara: '', comarca: '', uf: 'SP', tipo_acao: 'trabalhista',
+    rito: 'ordinario', fase: 'conhecimento', data_distribuicao: '', data_citacao: '',
+    data_transito: '', juiz: '', reclamante_nome: '', reclamante_cpf: '',
+    reclamada_nome: '', reclamada_cnpj: '', objeto: '',
+  });
+
+  useEffect(() => {
+    if (data) setForm(prev => ({ ...prev, ...Object.fromEntries(Object.entries(data).filter(([k, v]) => k in prev && v != null)) }));
+  }, [data]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const payload = { case_id: caseId, ...form };
+      if (data?.id) {
+        await supabase.from("pjecalc_dados_processo" as any).update(payload).eq("id", data.id);
+      } else {
+        await supabase.from("pjecalc_dados_processo" as any).insert(payload);
+      }
+      qc.invalidateQueries({ queryKey: ["pjecalc_dados_processo", caseId] });
+      toast.success("Dados do processo salvos!");
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setSaving(false); }
+  };
+
+  const f = (key: string, label: string, type = "text") => (
+    <div>
+      <Label className="text-xs">{label}</Label>
+      <Input type={type} value={(form as any)[key] || ''} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} className="mt-1 h-8 text-xs" />
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Dados do Processo</h2>
+        <Button onClick={save} disabled={saving} size="sm">
+          {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />} Salvar
+        </Button>
+      </div>
+      <Card>
+        <CardHeader className="pb-3"><CardTitle className="text-sm">Identificação</CardTitle></CardHeader>
+        <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {f("numero_processo", "Nº Processo")}
+          {f("vara", "Vara")}
+          {f("comarca", "Comarca")}
+          <div>
+            <Label className="text-xs">UF</Label>
+            <Select value={form.uf} onValueChange={v => setForm(p => ({ ...p, uf: v }))}>
+              <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs">Rito</Label>
+            <Select value={form.rito} onValueChange={v => setForm(p => ({ ...p, rito: v }))}>
+              <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ordinario">Ordinário</SelectItem>
+                <SelectItem value="sumarissimo">Sumaríssimo</SelectItem>
+                <SelectItem value="sumario">Sumário</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs">Fase</Label>
+            <Select value={form.fase} onValueChange={v => setForm(p => ({ ...p, fase: v }))}>
+              <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="conhecimento">Conhecimento</SelectItem>
+                <SelectItem value="liquidacao">Liquidação</SelectItem>
+                <SelectItem value="execucao">Execução</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="pb-3"><CardTitle className="text-sm">Datas Processuais</CardTitle></CardHeader>
+        <CardContent className="grid grid-cols-3 gap-4">
+          {f("data_distribuicao", "Distribuição", "date")}
+          {f("data_citacao", "Citação", "date")}
+          {f("data_transito", "Trânsito em Julgado", "date")}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="pb-3"><CardTitle className="text-sm">Partes</CardTitle></CardHeader>
+        <CardContent className="grid grid-cols-2 gap-4">
+          {f("reclamante_nome", "Reclamante")}
+          {f("reclamante_cpf", "CPF Reclamante")}
+          {f("reclamada_nome", "Reclamada")}
+          {f("reclamada_cnpj", "CNPJ Reclamada")}
+          {f("juiz", "Juiz")}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
