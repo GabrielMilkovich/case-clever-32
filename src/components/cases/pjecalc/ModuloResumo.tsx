@@ -5,13 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Play, Loader2, FileBarChart, Download, Printer, FileCode } from "lucide-react";
+import { Play, Loader2, FileBarChart, Printer, FileCode, AlertTriangle, CheckCircle2, Info, XCircle } from "lucide-react";
 import {
   PjeCalcEngine,
   type PjeParametros, type PjeHistoricoSalarial, type PjeFalta, type PjeFerias,
   type PjeVerba, type PjeCartaoPonto, type PjeFGTSConfig, type PjeCSConfig,
   type PjeIRConfig, type PjeCorrecaoConfig, type PjeHonorariosConfig,
   type PjeCustasConfig, type PjeSeguroConfig, type PjeLiquidacaoResult,
+  type PjeIndiceRow, type PjeINSSFaixaRow, type PjeIRFaixaRow,
+  type PjeValidationResult,
 } from "@/lib/pjecalc/engine";
 import { gerarRelatorioPDF } from "@/lib/pjecalc/pdf-report";
 import { downloadXML } from "@/lib/pjecalc/xml-export";
@@ -21,6 +23,7 @@ interface Props { caseId: string; }
 export function ModuloResumo({ caseId }: Props) {
   const qc = useQueryClient();
   const [liquidando, setLiquidando] = useState(false);
+  const [validacao, setValidacao] = useState<PjeValidationResult | null>(null);
 
   const { data: caseData } = useQuery({
     queryKey: ["case", caseId],
@@ -40,6 +43,7 @@ export function ModuloResumo({ caseId }: Props) {
 
   const executarLiquidacao = async () => {
     setLiquidando(true);
+    setValidacao(null);
     try {
       // Load all module data in parallel
       const [paramsRes, histRes, faltasRes, feriasRes, verbasRes, cartaoRes] = await Promise.all([
@@ -62,11 +66,25 @@ export function ModuloResumo({ caseId }: Props) {
         supabase.from("pjecalc_seguro_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
       ]);
 
+      // ── Fase 1: Carregar dados do banco (séries históricas e tabelas versionadas) ──
+      const [indicesRes, inssFaixasRes, irFaixasRes, dadosProcessoRes] = await Promise.all([
+        supabase.from("pjecalc_correcao_monetaria").select("*").order("competencia"),
+        supabase.from("pjecalc_inss_faixas" as any).select("*").order("competencia_inicio,faixa"),
+        supabase.from("pjecalc_ir_faixas" as any).select("*").order("competencia_inicio,faixa"),
+        supabase.from("pjecalc_dados_processo" as any).select("*").eq("case_id", caseId).maybeSingle(),
+      ]);
+
       if (!paramsRes.data) throw new Error("Configure os Parâmetros primeiro.");
       if (!verbasRes.data?.length) throw new Error("Adicione pelo menos uma Verba.");
 
       const params = paramsRes.data as unknown as PjeParametros;
       params.case_id = caseId;
+
+      // Preencher data_citacao dos Dados do Processo se disponível
+      const dadosProcesso = (dadosProcessoRes as any)?.data;
+      if (dadosProcesso?.data_citacao && !params.data_citacao) {
+        params.data_citacao = dadosProcesso.data_citacao;
+      }
 
       const historicos: PjeHistoricoSalarial[] = (histRes.data || []).map((h: any) => ({ ...h, ocorrencias: [] }));
       const faltas: PjeFalta[] = (faltasRes.data || []).map((f: any) => ({ ...f }));
@@ -187,19 +205,60 @@ export function ModuloResumo({ caseId }: Props) {
         recebeu: seguroData?.recebeu ?? false,
       };
 
-      // Execute engine
+      // ── Preparar dados do banco para o engine ──
+      const indicesDB: PjeIndiceRow[] = (indicesRes.data || []).map((i: any) => ({
+        indice: i.indice,
+        competencia: i.competencia,
+        valor: Number(i.valor),
+        acumulado: Number(i.acumulado || 0),
+      }));
+
+      const faixasINSSDB: PjeINSSFaixaRow[] = ((inssFaixasRes as any).data || []).map((f: any) => ({
+        competencia_inicio: f.competencia_inicio,
+        competencia_fim: f.competencia_fim,
+        faixa: f.faixa,
+        valor_ate: Number(f.valor_ate),
+        aliquota: Number(f.aliquota),
+      }));
+
+      const faixasIRDB: PjeIRFaixaRow[] = ((irFaixasRes as any).data || []).map((f: any) => ({
+        competencia_inicio: f.competencia_inicio,
+        competencia_fim: f.competencia_fim,
+        faixa: f.faixa,
+        valor_ate: Number(f.valor_ate),
+        aliquota: Number(f.aliquota),
+        deducao: Number(f.deducao),
+        deducao_dependente: Number(f.deducao_dependente),
+      }));
+
+      // Execute engine com dados versionados do banco
       const engine = new PjeCalcEngine(
         params, historicos, faltas, ferias, verbas, cartaoPonto,
         fgtsConfig, csConfig, irConfig, correcaoConfig,
         honorariosConfig, custasConfig, seguroConfig,
+        indicesDB, faixasINSSDB, faixasIRDB,
       );
+
+      // ── Validação pré-liquidação ──
+      const preValidation = engine.validarPreLiquidacao();
+      setValidacao(preValidation);
+
+      if (!preValidation.valido) {
+        toast.error(`Liquidação bloqueada: ${preValidation.erros} erro(s) crítico(s) encontrado(s)`);
+        return;
+      }
+
+      if (preValidation.alertas > 0) {
+        toast.warning(`${preValidation.alertas} alerta(s) encontrado(s) — liquidação prosseguindo`);
+      }
+
       const result = engine.liquidar();
 
       // Persist
       await supabase.from("pjecalc_liquidacao_resultado" as any).insert({
         case_id: caseId,
         resultado: result as any,
-        engine_version: '2.0.0',
+        engine_version: '2.1.0',
         data_liquidacao: correcaoConfig.data_liquidacao,
         total_bruto: result.resumo.principal_bruto,
         total_liquido: result.resumo.liquido_reclamante,
@@ -254,6 +313,40 @@ export function ModuloResumo({ caseId }: Props) {
           </Button>
         </div>
       </div>
+
+      {/* ── Validação Pré-Liquidação ── */}
+      {validacao && validacao.itens.length > 0 && (
+        <Card className={validacao.valido ? 'border-yellow-500/50' : 'border-destructive/50'}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              {validacao.valido 
+                ? <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                : <XCircle className="h-4 w-4 text-destructive" />
+              }
+              Validação Pré-Liquidação
+              <Badge variant={validacao.valido ? 'secondary' : 'destructive'} className="text-[10px] ml-auto">
+                {validacao.erros} erros · {validacao.alertas} alertas · {validacao.observacoes} obs
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              {validacao.itens.map((item, idx) => (
+                <div key={idx} className="flex items-start gap-2 text-xs py-1 border-b border-border/20 last:border-0">
+                  {item.tipo === 'erro' && <XCircle className="h-3.5 w-3.5 text-destructive shrink-0 mt-0.5" />}
+                  {item.tipo === 'alerta' && <AlertTriangle className="h-3.5 w-3.5 text-yellow-500 shrink-0 mt-0.5" />}
+                  {item.tipo === 'observacao' && <Info className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />}
+                  <div>
+                    <span className="font-medium text-muted-foreground">[{item.modulo}]</span>{' '}
+                    <span>{item.mensagem}</span>
+                    {item.detalhe && <div className="text-muted-foreground text-[10px] mt-0.5">{item.detalhe}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {!res ? (
         <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">
@@ -378,6 +471,29 @@ export function ModuloResumo({ caseId }: Props) {
                   <div><span className="text-muted-foreground">Deduções</span><div className="font-mono">{fmt(res.imposto_renda.deducoes)}</div></div>
                   <div><span className="text-muted-foreground">Meses RRA</span><div className="font-mono">{res.imposto_renda.meses_rra}</div></div>
                   <div><span className="text-muted-foreground font-bold">IRRF</span><div className="font-mono font-bold text-destructive">{fmt(res.imposto_renda.imposto_devido)}</div></div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Validation from result */}
+          {res.validacao && res.validacao.itens.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                  Validação do Cálculo
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-1 text-xs">
+                  {res.validacao.itens.filter(i => i.tipo !== 'observacao').map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      {item.tipo === 'alerta' && <AlertTriangle className="h-3 w-3 text-yellow-500" />}
+                      {item.tipo === 'erro' && <XCircle className="h-3 w-3 text-destructive" />}
+                      <span className="text-muted-foreground">[{item.modulo}]</span> {item.mensagem}
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
