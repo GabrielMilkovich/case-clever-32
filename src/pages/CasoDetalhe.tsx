@@ -48,6 +48,7 @@ import { CaseBriefing } from "@/components/cases/CaseBriefing";
 import { RiskAnalysisPanel } from "@/components/cases/pericial/RiskAnalysisPanel";
 import { ControversyManager } from "@/components/cases/pericial/ControversyManager";
 import { ScenarioManager } from "@/components/cases/pericial/ScenarioManager";
+import { PjeCalcSummaryWidget } from "@/components/cases/PjeCalcSummaryWidget";
 import {
   CalculationEngine,
   type CalculatorRules,
@@ -862,6 +863,9 @@ export default function CasoDetalhe() {
             </Card>
 
             <CalculationDetailView caseId={id!} facts={facts} onExecuteCalc={executeCalculation} />
+
+            {/* PJe-Calc Integration Widget */}
+            <PjeCalcSummaryWidget caseId={id!} />
           </div>
         );
 
