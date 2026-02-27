@@ -253,14 +253,23 @@ Deno.serve(async (req) => {
     results["contribuicao_social"] = csCount;
 
     // 3. Imposto de Renda
-    for (const ir of [IR_2025, IR_2024]) {
-      await supabase.from("pjecalc_imposto_renda").upsert(ir, { onConflict: "competencia" });
-    }
-    // IR Faixas
     let irfCount = 0;
-    for (const faixa of [...IR_FAIXAS_2025, ...IR_FAIXAS_2024]) {
-      const { error } = await supabase.from("pjecalc_imposto_renda_faixas").upsert(faixa, { onConflict: "competencia,faixa" });
-      if (!error) irfCount++;
+    for (const ir of [IR_2025, IR_2024]) {
+      const { data: irRow } = await supabase.from("pjecalc_imposto_renda").upsert(ir, { onConflict: "competencia" }).select("id").single();
+      if (irRow) {
+        const faixas = ir.competencia === "2025-01-01" ? IR_FAIXAS_2025 : IR_FAIXAS_2024;
+        for (const f of faixas) {
+          const { error } = await supabase.from("pjecalc_imposto_renda_faixas").upsert({
+            ir_id: irRow.id,
+            faixa: f.faixa,
+            valor_inicial: f.valor_inicial,
+            valor_final: f.valor_final,
+            aliquota: f.aliquota,
+            parcela_deduzir: f.deducao,
+          }, { onConflict: "ir_id,faixa" });
+          if (!error) irfCount++;
+        }
+      }
     }
     results["imposto_renda"] = irfCount;
 
