@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Play, Loader2, FileBarChart, Download } from "lucide-react";
+import { Play, Loader2, FileBarChart, Download, Printer, FileCode } from "lucide-react";
 import {
   PjeCalcEngine,
   type PjeParametros, type PjeHistoricoSalarial, type PjeFalta, type PjeFerias,
@@ -13,12 +13,22 @@ import {
   type PjeIRConfig, type PjeCorrecaoConfig, type PjeHonorariosConfig,
   type PjeCustasConfig, type PjeSeguroConfig, type PjeLiquidacaoResult,
 } from "@/lib/pjecalc/engine";
+import { gerarRelatorioPDF } from "@/lib/pjecalc/pdf-report";
+import { downloadXML } from "@/lib/pjecalc/xml-export";
 
 interface Props { caseId: string; }
 
 export function ModuloResumo({ caseId }: Props) {
   const qc = useQueryClient();
   const [liquidando, setLiquidando] = useState(false);
+
+  const { data: caseData } = useQuery({
+    queryKey: ["case", caseId],
+    queryFn: async () => {
+      const { data } = await supabase.from("cases").select("*").eq("id", caseId).maybeSingle();
+      return data;
+    },
+  });
 
   const { data: resultado } = useQuery({
     queryKey: ["pjecalc_liquidacao", caseId],
