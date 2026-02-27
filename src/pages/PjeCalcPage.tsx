@@ -732,6 +732,9 @@ export default function PjeCalcPage() {
                     <Badge variant="outline" className="text-[10px] font-mono">
                       {v.periodo_inicio?.slice(0, 7)} → {v.periodo_fim?.slice(0, 7)}
                     </Badge>
+                    <Button variant="outline" size="sm" className="h-7 text-[10px] px-2" onClick={() => setSelectedVerbaForGrid(v)}>
+                      <BarChart3 className="h-3 w-3 mr-1" /> Grade
+                    </Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={async () => {
                       await supabase.from("pjecalc_verbas").delete().eq("id", v.id);
                       queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] });
