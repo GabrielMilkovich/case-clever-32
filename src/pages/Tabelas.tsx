@@ -1049,7 +1049,7 @@ function AtualizacaoIndicesView() {
 
           {seedResult && !seedResult.error && (
             <div className="mb-4 p-3 rounded bg-green-500/10 border border-green-500/20">
-              <p className="text-sm font-medium text-green-700 dark:text-green-400">
+              <p className="text-sm font-medium text-primary">
                 ✅ Importação concluída — {seedResult.total_registros} registros processados
               </p>
               <div className="mt-2 grid grid-cols-3 gap-1">
@@ -1075,7 +1075,7 @@ function AtualizacaoIndicesView() {
                 </Badge>
                 <span className="text-muted-foreground truncate">{nome}</span>
                 {seeding && selectedTrt === trt && <Loader2 className="h-3 w-3 animate-spin ml-auto" />}
-                {selectedTrt === trt && seedResult && !seedResult.error && <span className="ml-auto text-green-600">✓</span>}
+                {selectedTrt === trt && seedResult && !seedResult.error && <span className="ml-auto text-primary">✓</span>}
               </button>
             ))}
           </div>
