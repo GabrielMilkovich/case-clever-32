@@ -748,22 +748,27 @@ export class PjeCalcEngine {
     const base = new Decimal(valorBase);
     const mult = new Decimal(verba.multiplicador);
     
-    // Divisor resolution (uses carga horária por competência with exceções)
+    // Divisor resolution (uses carga horária por competência with exceções + feriados)
     let div: Decimal;
     if (verba.tipo_divisor === 'cartao_ponto') {
       div = new Decimal(this.getCartaoPontoDivisor(competencia, verba.divisor_cartao_colunas) || 30);
     } else if (verba.tipo_divisor === 'carga_horaria') {
       div = new Decimal(this.getCargaHorariaParaCompetencia(competencia));
+    } else if (verba.tipo_divisor === 'dias_uteis') {
+      div = new Decimal(this.getDivisorComFeriados(competencia));
     } else {
       div = new Decimal(verba.divisor_informado || 30);
     }
 
-    // Quantidade resolution
+    // Quantidade resolution (with calendario support)
     let qtd: Decimal;
     if (verba.tipo_quantidade === 'cartao_ponto') {
       qtd = new Decimal(this.getCartaoPontoQuantidade(competencia, verba.quantidade_cartao_colunas) || 0);
     } else if (verba.tipo_quantidade === 'avos') {
       qtd = new Decimal(this.calcularAvos(competencia, verba.caracteristica));
+    } else if (verba.tipo_quantidade === 'calendario') {
+      // Quantidade Calendário: usa dias úteis do período conforme feriados cadastrados
+      qtd = new Decimal(this.calcularQuantidadeCalendario(competencia, 'dias_uteis'));
     } else {
       qtd = new Decimal(verba.quantidade_informada || 1);
     }
@@ -1447,10 +1452,18 @@ export class PjeCalcEngine {
 
     let baseBruta = 0;
     let base13 = 0;
+    let baseFerias = 0;
     for (const vr of verbaResults) {
       const verba = this.verbas.find(v => v.id === vr.verba_id);
       if (!verba?.incidencias.irpf) continue;
-      if (verba.caracteristica === 'ferias') continue;
+      if (verba.caracteristica === 'ferias') {
+        // Tributação separada de férias (Fase 3)
+        if (this.irConfig.tributacao_separada_ferias) {
+          baseFerias += vr.total_diferenca;
+        }
+        // Se não separar, não entra na base (férias são isentas por natureza)
+        continue;
+      }
       if (verba.caracteristica === '13_salario' && this.irConfig.tributacao_exclusiva_13) {
         base13 += vr.total_diferenca;
       } else {
@@ -1495,10 +1508,22 @@ export class PjeCalcEngine {
       if (imposto13 > 0) imposto += imposto13;
     }
 
+    // Tributação separada de férias (Fase 3)
+    if (this.irConfig.tributacao_separada_ferias && baseFerias > 0) {
+      let impostoFerias = 0;
+      for (const faixa of tabelaIR.faixas) {
+        if (baseFerias <= faixa.ate * meses) {
+          impostoFerias = baseFerias * faixa.aliquota - faixa.deducao * meses;
+          break;
+        }
+      }
+      if (impostoFerias > 0) imposto += impostoFerias;
+    }
+
     return {
-      base_calculo: Number(new Decimal(baseBruta + base13).toDP(2)),
+      base_calculo: Number(new Decimal(baseBruta + base13 + baseFerias).toDP(2)),
       deducoes: Number(new Decimal(deducoes + deducaoDependentes).toDP(2)),
-      base_tributavel: Number(new Decimal(baseTributavel + base13).toDP(2)),
+      base_tributavel: Number(new Decimal(baseTributavel + base13 + baseFerias).toDP(2)),
       imposto_devido: Number(new Decimal(imposto).toDP(2)),
       meses_rra: meses,
       metodo: meses > 1 ? 'art_12a_rra' : 'tabela_mensal',
