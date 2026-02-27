@@ -49,6 +49,7 @@ import { RiskAnalysisPanel } from "@/components/cases/pericial/RiskAnalysisPanel
 import { ControversyManager } from "@/components/cases/pericial/ControversyManager";
 import { ScenarioManager } from "@/components/cases/pericial/ScenarioManager";
 import { PjeCalcSummaryWidget } from "@/components/cases/PjeCalcSummaryWidget";
+import { PjeCalcInline } from "@/components/cases/PjeCalcInline";
 import {
   CalculationEngine,
   type CalculatorRules,
@@ -806,66 +807,7 @@ export default function CasoDetalhe() {
       case "calculo":
         return (
           <div className="space-y-5">
-            {/* Premissas colapsável */}
-            <Collapsible>
-              <Card className="bg-card/80">
-                <CardContent className="p-4">
-                  <CollapsibleTrigger className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-primary/10">
-                        <Settings2 className="h-4 w-4 text-primary" />
-                      </div>
-                      <div className="text-left">
-                        <div className="text-sm font-semibold">Premissas & Cenários</div>
-                        <div className="text-xs text-muted-foreground">Defina divisor, método de HE, correção monetária e prescrição</div>
-                      </div>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform duration-200 [[data-state=open]>&]:rotate-90" />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-4 space-y-4">
-                    <ScenarioManager caseId={id!} />
-                    <PremissasEditor caseId={id!} />
-                  </CollapsibleContent>
-                </CardContent>
-              </Card>
-            </Collapsible>
-
-            {/* Calc Controls */}
-            <Card className="bg-card/80">
-              <CardContent className="p-4">
-                <div className="flex flex-col sm:flex-row gap-4 items-end">
-                  <div className="flex-1 w-full">
-                    <Label className="text-xs">Perfil de Cálculo</Label>
-                    <Select value={selectedProfile} onValueChange={setSelectedProfile}>
-                      <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione um perfil..." /></SelectTrigger>
-                      <SelectContent>
-                        {profiles.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button onClick={runPreCalcReview} disabled={!selectedProfile || !canCalculate || isCalculating || isReviewing} className="w-full sm:w-auto">
-                    {isReviewing ? <Search className="h-4 w-4 mr-2 animate-pulse" /> : isCalculating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
-                    {isReviewing 
-                      ? `Revisando documentos... ${reviewElapsed}s ~${Math.max(30 - reviewElapsed, 5)}s restantes`
-                      : isCalculating ? "Calculando..." : "Revisar e Calcular"}
-                  </Button>
-                </div>
-                {!canCalculate && (
-                  <div className="flex items-center gap-2 mt-3 p-2 rounded-md bg-accent/5 border border-accent/20 text-xs">
-                    <AlertTriangle className="h-3 w-3 text-accent" />
-                    <span className="text-accent">Confirme os fatos críticos para liberar o cálculo.</span>
-                    <Button size="sm" variant="link" className="text-xs h-auto p-0 ml-auto" onClick={goToValidation}>
-                      Ir para Validação →
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <CalculationDetailView caseId={id!} facts={facts} onExecuteCalc={executeCalculation} />
-
-            {/* PJe-Calc Integration Widget */}
-            <PjeCalcSummaryWidget caseId={id!} />
+            <PjeCalcInline caseId={id!} />
           </div>
         );
 

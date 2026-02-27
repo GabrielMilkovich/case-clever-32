@@ -2,23 +2,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Auth from "./pages/Auth";
 import Casos from "./pages/Casos";
 import CasoDetalhe from "./pages/CasoDetalhe";
-import Documentos from "./pages/Documentos";
-import Busca from "./pages/Busca";
-import Configuracoes from "./pages/Configuracoes";
-import AdminCalculadoras from "./pages/admin/Calculadoras";
-import AdminPerfis from "./pages/admin/Perfis";
-import AdminIndices from "./pages/admin/Indices";
-import AdminTestes from "./pages/admin/Testes";
-
-import RegrasTabelas from "./pages/RegrasTabelas";
+import Tabelas from "./pages/Tabelas";
 import PjeCalcPage from "./pages/PjeCalcPage";
 import NotFound from "./pages/NotFound";
-
 
 const queryClient = new QueryClient();
 
@@ -29,20 +19,13 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
+          <Route path="/" element={<Navigate to="/casos" replace />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/casos" element={<Casos />} />
           <Route path="/casos/:id" element={<CasoDetalhe />} />
-          <Route path="/documentos" element={<Documentos />} />
-          <Route path="/busca" element={<Busca />} />
-          <Route path="/configuracoes" element={<Configuracoes />} />
-          {/* Novo Cálculo removido — fluxo unificado dentro de Casos */}
+          <Route path="/tabelas" element={<Tabelas />} />
+          <Route path="/tabelas/:tipo" element={<Tabelas />} />
           <Route path="/pjecalc/:id" element={<PjeCalcPage />} />
-          <Route path="/regras-tabelas" element={<RegrasTabelas />} />
-          <Route path="/admin/calculadoras" element={<AdminCalculadoras />} />
-          <Route path="/admin/perfis" element={<AdminPerfis />} />
-          <Route path="/admin/indices" element={<AdminIndices />} />
-          <Route path="/admin/testes" element={<AdminTestes />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
