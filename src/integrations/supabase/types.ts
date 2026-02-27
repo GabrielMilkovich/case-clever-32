@@ -2238,6 +2238,7 @@ export type Database = {
           tipo: string
           valor_final: number
           valor_inicial: number
+          version_id: string | null
         }
         Insert: {
           aliquota: number
@@ -2250,6 +2251,7 @@ export type Database = {
           tipo?: string
           valor_final: number
           valor_inicial?: number
+          version_id?: string | null
         }
         Update: {
           aliquota?: number
@@ -2262,8 +2264,17 @@ export type Database = {
           tipo?: string
           valor_final?: number
           valor_inicial?: number
+          version_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pjecalc_contribuicao_social_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "reference_table_versions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pjecalc_correcao_config: {
         Row: {
@@ -2334,6 +2345,7 @@ export type Database = {
           id: string
           indice: string
           valor: number
+          version_id: string | null
         }
         Insert: {
           acumulado?: number | null
@@ -2343,6 +2355,7 @@ export type Database = {
           id?: string
           indice: string
           valor: number
+          version_id?: string | null
         }
         Update: {
           acumulado?: number | null
@@ -2352,8 +2365,17 @@ export type Database = {
           id?: string
           indice?: string
           valor?: number
+          version_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pjecalc_correcao_monetaria_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "reference_table_versions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pjecalc_cs_config: {
         Row: {
@@ -2530,6 +2552,7 @@ export type Database = {
           recurso_revista: number | null
           teto_custas_autos: number | null
           teto_custas_liquidacao: number | null
+          version_id: string | null
           vigencia_fim: string | null
           vigencia_inicio: string
         }
@@ -2548,6 +2571,7 @@ export type Database = {
           recurso_revista?: number | null
           teto_custas_autos?: number | null
           teto_custas_liquidacao?: number | null
+          version_id?: string | null
           vigencia_fim?: string | null
           vigencia_inicio: string
         }
@@ -2566,10 +2590,19 @@ export type Database = {
           recurso_revista?: number | null
           teto_custas_autos?: number | null
           teto_custas_liquidacao?: number | null
+          version_id?: string | null
           vigencia_fim?: string | null
           vigencia_inicio?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pjecalc_custas_judiciais_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "reference_table_versions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pjecalc_dados_processo: {
         Row: {
@@ -2693,6 +2726,53 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pjecalc_feriados: {
+        Row: {
+          created_at: string
+          data: string
+          fonte: string | null
+          id: string
+          municipio: string | null
+          municipio_ibge: string | null
+          nome: string
+          scope: string
+          uf: string | null
+          version_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          data: string
+          fonte?: string | null
+          id?: string
+          municipio?: string | null
+          municipio_ibge?: string | null
+          nome: string
+          scope?: string
+          uf?: string | null
+          version_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          data?: string
+          fonte?: string | null
+          id?: string
+          municipio?: string | null
+          municipio_ibge?: string | null
+          nome?: string
+          scope?: string
+          uf?: string | null
+          version_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pjecalc_feriados_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "reference_table_versions"
             referencedColumns: ["id"]
           },
         ]
@@ -3321,33 +3401,47 @@ export type Database = {
           categoria: string | null
           competencia: string
           created_at: string
+          fonte_doc: string | null
           id: string
           nome: string
           sindicato: string | null
           uf: string
           valor: number
+          version_id: string | null
         }
         Insert: {
           categoria?: string | null
           competencia: string
           created_at?: string
+          fonte_doc?: string | null
           id?: string
           nome: string
           sindicato?: string | null
           uf: string
           valor: number
+          version_id?: string | null
         }
         Update: {
           categoria?: string | null
           competencia?: string
           created_at?: string
+          fonte_doc?: string | null
           id?: string
           nome?: string
           sindicato?: string | null
           uf?: string
           valor?: number
+          version_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pjecalc_pisos_salariais_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "reference_table_versions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pjecalc_salario_familia: {
         Row: {
@@ -3358,6 +3452,7 @@ export type Database = {
           valor_cota: number
           valor_final: number
           valor_inicial: number
+          version_id: string | null
         }
         Insert: {
           competencia: string
@@ -3367,6 +3462,7 @@ export type Database = {
           valor_cota: number
           valor_final: number
           valor_inicial?: number
+          version_id?: string | null
         }
         Update: {
           competencia?: string
@@ -3376,8 +3472,17 @@ export type Database = {
           valor_cota?: number
           valor_final?: number
           valor_inicial?: number
+          version_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pjecalc_salario_familia_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "reference_table_versions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pjecalc_salario_minimo: {
         Row: {
@@ -3385,20 +3490,31 @@ export type Database = {
           created_at: string
           id: string
           valor: number
+          version_id: string | null
         }
         Insert: {
           competencia: string
           created_at?: string
           id?: string
           valor: number
+          version_id?: string | null
         }
         Update: {
           competencia?: string
           created_at?: string
           id?: string
           valor?: number
+          version_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pjecalc_salario_minimo_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "reference_table_versions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pjecalc_seguro_config: {
         Row: {
@@ -3445,6 +3561,7 @@ export type Database = {
           valor_piso: number
           valor_soma: number | null
           valor_teto: number | null
+          version_id: string | null
         }
         Insert: {
           competencia: string
@@ -3457,6 +3574,7 @@ export type Database = {
           valor_piso: number
           valor_soma?: number | null
           valor_teto?: number | null
+          version_id?: string | null
         }
         Update: {
           competencia?: string
@@ -3469,17 +3587,28 @@ export type Database = {
           valor_piso?: number
           valor_soma?: number | null
           valor_teto?: number | null
+          version_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pjecalc_seguro_desemprego_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "reference_table_versions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pjecalc_vale_transporte: {
         Row: {
           created_at: string
           id: string
           linha: string
+          max_desconto_pct: number
           municipio: string | null
           uf: string
           valor: number
+          version_id: string | null
           vigencia_fim: string | null
           vigencia_inicio: string
         }
@@ -3487,9 +3616,11 @@ export type Database = {
           created_at?: string
           id?: string
           linha: string
+          max_desconto_pct?: number
           municipio?: string | null
           uf: string
           valor: number
+          version_id?: string | null
           vigencia_fim?: string | null
           vigencia_inicio: string
         }
@@ -3497,13 +3628,23 @@ export type Database = {
           created_at?: string
           id?: string
           linha?: string
+          max_desconto_pct?: number
           municipio?: string | null
           uf?: string
           valor?: number
+          version_id?: string | null
           vigencia_fim?: string | null
           vigencia_inicio?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pjecalc_vale_transporte_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "reference_table_versions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pjecalc_verba_ocorrencias: {
         Row: {
@@ -4221,6 +4362,29 @@ export type Database = {
       }
     }
     Functions: {
+      apply_correction: {
+        Args: {
+          p_from_date: string
+          p_index?: string
+          p_to_date: string
+          p_value: number
+        }
+        Returns: Json
+      }
+      calc_inss: { Args: { p_base: number; p_date: string }; Returns: Json }
+      calc_irrf: {
+        Args: { p_base: number; p_date?: string; p_dependentes?: number }
+        Returns: Json
+      }
+      calc_juros: {
+        Args: {
+          p_from_date: string
+          p_rule?: string
+          p_to_date: string
+          p_value: number
+        }
+        Returns: Json
+      }
       get_next_queued_document: {
         Args: never
         Returns: {
@@ -4229,6 +4393,10 @@ export type Database = {
           priority: number
           queue_id: string
         }[]
+      }
+      get_reference_version: {
+        Args: { p_date: string; p_table_slug: string }
+        Returns: string
       }
       match_document_chunks: {
         Args: {
