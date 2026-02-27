@@ -1048,7 +1048,7 @@ function AtualizacaoIndicesView() {
           )}
 
           {seedResult && !seedResult.error && (
-            <div className="mb-4 p-3 rounded bg-green-500/10 border border-green-500/20">
+            <div className="mb-4 p-3 rounded bg-primary/10 border border-primary/20">
               <p className="text-sm font-medium text-primary">
                 ✅ Importação concluída — {seedResult.total_registros} registros processados
               </p>
