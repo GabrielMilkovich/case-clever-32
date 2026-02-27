@@ -37,7 +37,7 @@ const TIPOS_DEMISSAO = [
 interface PartyRow {
   id?: string;
   nome: string;
-  tipo: "reclamante" | "reclamada" | "advogado_reclamante" | "advogado_reclamada" | "perito";
+  tipo: "reclamante" | "reclamada";
   documento: string;
   documento_tipo: string;
   _isNew?: boolean;
@@ -189,9 +189,6 @@ export default function DadosProcesso({ caseId }: Props) {
                       <SelectContent>
                         <SelectItem value="reclamante" className="text-xs">Reclamante</SelectItem>
                         <SelectItem value="reclamada" className="text-xs">Reclamada</SelectItem>
-                        <SelectItem value="advogado_reclamante" className="text-xs">Adv. Reclamante</SelectItem>
-                        <SelectItem value="advogado_reclamada" className="text-xs">Adv. Reclamada</SelectItem>
-                        <SelectItem value="perito" className="text-xs">Perito</SelectItem>
                       </SelectContent>
                     </Select>
                   </TableCell>
