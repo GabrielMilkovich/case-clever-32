@@ -3802,6 +3802,184 @@ export type Database = {
           },
         ]
       }
+      reference_import_runs: {
+        Row: {
+          created_at: string
+          errors: Json | null
+          finished_at: string | null
+          id: string
+          performed_by: string | null
+          raw_file_hash: string | null
+          raw_file_path: string | null
+          result: string
+          started_at: string
+          stats: Json | null
+          table_slug: string
+          trigger: string
+        }
+        Insert: {
+          created_at?: string
+          errors?: Json | null
+          finished_at?: string | null
+          id?: string
+          performed_by?: string | null
+          raw_file_hash?: string | null
+          raw_file_path?: string | null
+          result?: string
+          started_at?: string
+          stats?: Json | null
+          table_slug: string
+          trigger?: string
+        }
+        Update: {
+          created_at?: string
+          errors?: Json | null
+          finished_at?: string | null
+          id?: string
+          performed_by?: string | null
+          raw_file_hash?: string | null
+          raw_file_path?: string | null
+          result?: string
+          started_at?: string
+          stats?: Json | null
+          table_slug?: string
+          trigger?: string
+        }
+        Relationships: []
+      }
+      reference_sources: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          type: string
+          url: string | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          type?: string
+          url?: string | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          type?: string
+          url?: string | null
+        }
+        Relationships: []
+      }
+      reference_table_registry: {
+        Row: {
+          created_at: string
+          id: string
+          is_auto_importable: boolean
+          last_import_at: string | null
+          last_import_result: Json | null
+          name: string
+          requires_manual_input: boolean
+          slug: string
+          source_id: string | null
+          status: string
+          update_frequency: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_auto_importable?: boolean
+          last_import_at?: string | null
+          last_import_result?: Json | null
+          name: string
+          requires_manual_input?: boolean
+          slug: string
+          source_id?: string | null
+          status?: string
+          update_frequency?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_auto_importable?: boolean
+          last_import_at?: string | null
+          last_import_result?: Json | null
+          name?: string
+          requires_manual_input?: boolean
+          slug?: string
+          source_id?: string | null
+          status?: string
+          update_frequency?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reference_table_registry_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "reference_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reference_table_versions: {
+        Row: {
+          competency_month: number | null
+          competency_year: number
+          created_at: string
+          created_by: string | null
+          id: string
+          import_run_id: string | null
+          notes: string | null
+          source_snapshot: Json | null
+          status: string
+          table_slug: string
+          valid_from: string | null
+          valid_to: string | null
+        }
+        Insert: {
+          competency_month?: number | null
+          competency_year: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          import_run_id?: string | null
+          notes?: string | null
+          source_snapshot?: Json | null
+          status?: string
+          table_slug: string
+          valid_from?: string | null
+          valid_to?: string | null
+        }
+        Update: {
+          competency_month?: number | null
+          competency_year?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          import_run_id?: string | null
+          notes?: string | null
+          source_snapshot?: Json | null
+          status?: string
+          table_slug?: string
+          valid_from?: string | null
+          valid_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reference_table_versions_import_run_id_fkey"
+            columns: ["import_run_id"]
+            isOneToOne: false
+            referencedRelation: "reference_import_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reference_tables: {
         Row: {
           ativo: boolean | null
