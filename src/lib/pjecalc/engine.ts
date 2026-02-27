@@ -184,6 +184,23 @@ export interface PjeCartaoPonto {
   intervalo_suprimido: number;
   dsr_horas: number;
   sobreaviso: number;
+  dados_extras?: Record<string, number>;
+  [key: string]: any;
+}
+
+export interface PjeFeriadoDB {
+  data: string;
+  nome: string;
+  tipo: 'nacional' | 'estadual' | 'municipal' | 'facultativo';
+  uf?: string;
+  municipio?: string;
+}
+
+export interface PjePrevidenciaPrivadaConfig {
+  apurar: boolean;
+  percentual: number;
+  base_calculo: 'diferenca' | 'devido' | 'corrigido';
+  deduzir_ir: boolean;
 }
 
 export interface PjeFGTSConfig {
@@ -273,6 +290,13 @@ export interface PjeSeguroConfig {
 // RESULTADO DA LIQUIDAÇÃO
 // =====================================================
 
+export interface PjePrevidenciaPrivadaResult {
+  apurado: boolean;
+  base: number;
+  percentual: number;
+  valor: number;
+}
+
 export interface PjeLiquidacaoResult {
   data_liquidacao: string;
   verbas: PjeVerbaResult[];
@@ -280,6 +304,7 @@ export interface PjeLiquidacaoResult {
   contribuicao_social: PjeCSResult;
   imposto_renda: PjeIRResult;
   seguro_desemprego: PjeSeguroResult;
+  previdencia_privada: PjePrevidenciaPrivadaResult;
   resumo: PjeResumo;
   validacao?: PjeValidationResult;
 }
@@ -357,6 +382,7 @@ export interface PjeResumo {
   cs_empregador: number;
   ir_retido: number;
   seguro_desemprego: number;
+  previdencia_privada: number;
   multa_523: number;
   honorarios_sucumbenciais: number;
   honorarios_contratuais: number;
