@@ -91,7 +91,7 @@ export default function Faltas({ caseId }: Props) {
         </div>
         <div className="border rounded p-2 text-center">
           <div className="text-[10px] text-muted-foreground">Justificadas</div>
-          <div className="text-sm font-bold text-green-600">{totalJustificadas}</div>
+          <div className="text-sm font-bold text-success">{totalJustificadas}</div>
         </div>
         <div className="border rounded p-2 text-center">
           <div className="text-[10px] text-muted-foreground">Não Justificadas</div>
