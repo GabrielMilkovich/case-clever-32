@@ -85,6 +85,13 @@ export interface PjeFerias {
   periodos_gozo?: { inicio: string; fim: string }[];
 }
 
+export interface PjeExcecaoCargaHoraria {
+  data_inicial: string;
+  data_final: string;
+  carga_horaria: number;
+  observacao?: string;
+}
+
 export interface PjeVerba {
   id: string;
   nome: string;
@@ -123,6 +130,13 @@ export interface PjeVerba {
   
   valor_informado_devido?: number;
   valor_informado_pago?: number;
+  
+  // Valor Pago Calculado (Fase 2)
+  valor_pago_tipo?: 'informado' | 'calculado';
+  pago_base?: number;
+  pago_divisor?: number;
+  pago_multiplicador?: number;
+  pago_quantidade?: number;
   
   incidencias: {
     fgts: boolean;
@@ -449,6 +463,7 @@ export class PjeCalcEngine {
   private indicesDB: PjeIndiceRow[];
   private faixasINSSDB: PjeINSSFaixaRow[];
   private faixasIRDB: PjeIRFaixaRow[];
+  private excecoesCargas: PjeExcecaoCargaHoraria[];
   // Map of verba results by verba_id for reflexa resolution
   private verbaResultsMap: Map<string, PjeVerbaResult> = new Map();
 
@@ -469,6 +484,7 @@ export class PjeCalcEngine {
     indicesDB: PjeIndiceRow[] = [],
     faixasINSSDB: PjeINSSFaixaRow[] = [],
     faixasIRDB: PjeIRFaixaRow[] = [],
+    excecoesCargas: PjeExcecaoCargaHoraria[] = [],
   ) {
     this.params = params;
     this.historicos = historicos;
@@ -486,6 +502,7 @@ export class PjeCalcEngine {
     this.indicesDB = indicesDB;
     this.faixasINSSDB = faixasINSSDB;
     this.faixasIRDB = faixasIRDB;
+    this.excecoesCargas = excecoesCargas;
   }
 
   // =====================================================
@@ -525,7 +542,7 @@ export class PjeCalcEngine {
   }
 
   // =====================================================
-  // CÁLCULO DE AVOS (13º e Férias)
+  // CÁLCULO DE AVOS (13º e Férias) — com Limitar Avos
   // =====================================================
   
   calcularAvos(competencia: string, caracteristica: string): number {
@@ -538,8 +555,18 @@ export class PjeCalcEngine {
     if (caracteristica === '13_salario') {
       const inicioAno = new Date(ano, 0, 1);
       const fimAno = new Date(ano, 11, 31);
-      const efetInicio = admDate > inicioAno ? admDate : inicioAno;
-      const efetFim = demDate < fimAno ? demDate : fimAno;
+      let efetInicio = admDate > inicioAno ? admDate : inicioAno;
+      let efetFim = demDate < fimAno ? demDate : fimAno;
+      
+      // Limitar avos ao período do cálculo quando ativado
+      if (this.params.limitar_avos_periodo) {
+        const periodo = this.getPeriodoCalculo();
+        const periodoInicio = new Date(periodo.inicio);
+        const periodoFim = new Date(periodo.fim);
+        if (periodoInicio > efetInicio) efetInicio = periodoInicio;
+        if (periodoFim < efetFim) efetFim = periodoFim;
+      }
+      
       if (efetInicio > efetFim) return 0;
       let avos = 0;
       for (let m = efetInicio.getMonth(); m <= efetFim.getMonth(); m++) {
@@ -550,9 +577,40 @@ export class PjeCalcEngine {
       return avos;
     }
     if (caracteristica === 'ferias') {
+      // Limitar avos de férias ao período do cálculo
+      if (this.params.limitar_avos_periodo) {
+        const periodo = this.getPeriodoCalculo();
+        const periodoInicio = new Date(periodo.inicio);
+        const periodoFim = new Date(periodo.fim);
+        let efetInicio = admDate > periodoInicio ? admDate : periodoInicio;
+        let efetFim = demDate < periodoFim ? demDate : periodoFim;
+        if (efetInicio > efetFim) return 0;
+        let avos = 0;
+        for (let m = efetInicio.getMonth(); m <= efetFim.getMonth(); m++) {
+          const diaInicio = (m === efetInicio.getMonth()) ? efetInicio.getDate() : 1;
+          const diaFim = (m === efetFim.getMonth()) ? efetFim.getDate() : new Date(efetFim.getFullYear(), m + 1, 0).getDate();
+          if (diaFim - diaInicio + 1 >= 15) avos++;
+        }
+        return Math.min(avos, 12);
+      }
       return 12;
     }
     return 1;
+  }
+
+  // =====================================================
+  // CARGA HORÁRIA POR COMPETÊNCIA (com exceções)
+  // =====================================================
+
+  getCargaHorariaParaCompetencia(competencia: string): number {
+    if (this.excecoesCargas.length === 0) return this.params.carga_horaria_padrao || 220;
+    const compDate = new Date(competencia + '-01');
+    for (const exc of this.excecoesCargas) {
+      const inicio = new Date(exc.data_inicial);
+      const fim = new Date(exc.data_final);
+      if (compDate >= inicio && compDate <= fim) return Number(exc.carga_horaria);
+    }
+    return this.params.carga_horaria_padrao || 220;
   }
 
   // =====================================================
@@ -609,12 +667,12 @@ export class PjeCalcEngine {
     const base = new Decimal(valorBase);
     const mult = new Decimal(verba.multiplicador);
     
-    // Divisor resolution
+    // Divisor resolution (uses carga horária por competência with exceções)
     let div: Decimal;
     if (verba.tipo_divisor === 'cartao_ponto') {
       div = new Decimal(this.getCartaoPontoDivisor(competencia, verba.divisor_cartao_colunas) || 30);
     } else if (verba.tipo_divisor === 'carga_horaria') {
-      div = new Decimal(this.params.carga_horaria_padrao || 220);
+      div = new Decimal(this.getCargaHorariaParaCompetencia(competencia));
     } else {
       div = new Decimal(verba.divisor_informado || 30);
     }
@@ -663,7 +721,17 @@ export class PjeCalcEngine {
       devido = new Decimal(0);
     }
 
-    const pago = new Decimal(verba.valor_informado_pago || 0);
+    // Valor Pago: informado ou calculado (Fase 2)
+    let pago: Decimal;
+    if (verba.valor_pago_tipo === 'calculado' && verba.pago_base !== undefined) {
+      const pagoBase = new Decimal(verba.pago_base || 0);
+      const pagoDiv = new Decimal(verba.pago_divisor || 30);
+      const pagoMult = new Decimal(verba.pago_multiplicador || 1);
+      const pagoQtd = new Decimal(verba.pago_quantidade || 1);
+      pago = pagoBase.times(pagoMult).div(pagoDiv).times(pagoQtd);
+    } else {
+      pago = new Decimal(verba.valor_informado_pago || 0);
+    }
     const diferenca = devido.minus(pago);
 
     const formula = verba.valor === 'calculado'
@@ -1102,6 +1170,15 @@ export class PjeCalcEngine {
 
     const depositos: PjeFGTSResult['depositos'] = [];
     
+    // Prescrição FGTS diferenciada
+    let dataPrescricaoFGTS: Date | null = null;
+    if (this.params.prescricao_fgts && this.params.data_ajuizamento) {
+      // ARE 709.212/DF STF: prazo quinquenal a partir do ajuizamento
+      // (alinhamento com prescrição comum, mas calculado separadamente)
+      const ajuiz = new Date(this.params.data_ajuizamento);
+      dataPrescricaoFGTS = new Date(ajuiz.getFullYear() - 5, ajuiz.getMonth(), ajuiz.getDate());
+    }
+    
     const basesPorComp: Record<string, number> = {};
     const bases13PorComp: Record<string, number> = {};
     
@@ -1111,6 +1188,12 @@ export class PjeCalcEngine {
 
       for (const oc of vr.ocorrencias) {
         if (oc.diferenca <= 0) continue;
+        // Aplicar prescrição FGTS diferenciada
+        if (dataPrescricaoFGTS) {
+          const [a, m] = oc.competencia.split('-').map(Number);
+          const compDate = new Date(a, m - 1, 1);
+          if (compDate < dataPrescricaoFGTS) continue;
+        }
         const target = verba.caracteristica === '13_salario' ? bases13PorComp : basesPorComp;
         target[oc.competencia] = (target[oc.competencia] || 0) + oc.diferenca;
       }
@@ -1119,6 +1202,12 @@ export class PjeCalcEngine {
     for (const hist of this.historicos) {
       if (!hist.incidencia_fgts || hist.fgts_recolhido) continue;
       for (const oc of hist.ocorrencias) {
+        // Aplicar prescrição FGTS no histórico também
+        if (dataPrescricaoFGTS) {
+          const [a, m] = oc.competencia.split('-').map(Number);
+          const compDate = new Date(a, m - 1, 1);
+          if (compDate < dataPrescricaoFGTS) continue;
+        }
         basesPorComp[oc.competencia] = (basesPorComp[oc.competencia] || 0) + oc.valor;
       }
     }
@@ -1186,6 +1275,16 @@ export class PjeCalcEngine {
       }
     }
 
+    // CS sobre salários pagos (Fase 2): adicionar salários pagos à base
+    if (this.csConfig.cs_sobre_salarios_pagos) {
+      for (const hist of this.historicos) {
+        if (!hist.incidencia_cs || hist.cs_recolhida) continue;
+        for (const oc of hist.ocorrencias) {
+          basesPorComp[oc.competencia] = (basesPorComp[oc.competencia] || 0) + oc.valor;
+        }
+      }
+    }
+
     // Segurado progressivo (tabela versionada por competência)
     if (this.csConfig.apurar_segurado) {
       for (const [comp, base] of Object.entries(basesPorComp)) {
@@ -1219,19 +1318,33 @@ export class PjeCalcEngine {
       }
     }
 
-    // Empregador (alíquotas fixas)
+    // Empregador (alíquotas fixas, com Simples Nacional)
     if (this.csConfig.apurar_empresa || this.csConfig.apurar_sat || this.csConfig.apurar_terceiros) {
       for (const [comp, base] of Object.entries(basesPorComp)) {
         if (base <= 0) continue;
-        const aliqEmp = (this.csConfig.aliquota_empresa_fixa ?? 20) / 100;
-        const aliqSat = (this.csConfig.aliquota_sat_fixa ?? 2) / 100;
-        const aliqTerc = (this.csConfig.aliquota_terceiros_fixa ?? 5.8) / 100;
-        empregador.push({
-          competencia: comp,
-          empresa: this.csConfig.apurar_empresa ? Number(new Decimal(base).times(aliqEmp).toDP(2)) : 0,
-          sat: this.csConfig.apurar_sat ? Number(new Decimal(base).times(aliqSat).toDP(2)) : 0,
-          terceiros: this.csConfig.apurar_terceiros ? Number(new Decimal(base).times(aliqTerc).toDP(2)) : 0,
-        });
+        
+        // Verificar se a competência está em período de Simples Nacional
+        const compDate = new Date(comp + '-01');
+        const isSimples = this.csConfig.periodos_simples?.some(p => {
+          const pInicio = new Date(p.inicio);
+          const pFim = new Date(p.fim);
+          return compDate >= pInicio && compDate <= pFim;
+        }) || false;
+        
+        if (isSimples) {
+          // Simples Nacional: sem CS patronal separada (já incluída no DAS)
+          empregador.push({ competencia: comp, empresa: 0, sat: 0, terceiros: 0 });
+        } else {
+          const aliqEmp = (this.csConfig.aliquota_empresa_fixa ?? 20) / 100;
+          const aliqSat = (this.csConfig.aliquota_sat_fixa ?? 2) / 100;
+          const aliqTerc = (this.csConfig.aliquota_terceiros_fixa ?? 5.8) / 100;
+          empregador.push({
+            competencia: comp,
+            empresa: this.csConfig.apurar_empresa ? Number(new Decimal(base).times(aliqEmp).toDP(2)) : 0,
+            sat: this.csConfig.apurar_sat ? Number(new Decimal(base).times(aliqSat).toDP(2)) : 0,
+            terceiros: this.csConfig.apurar_terceiros ? Number(new Decimal(base).times(aliqTerc).toDP(2)) : 0,
+          });
+        }
       }
     }
 
