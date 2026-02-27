@@ -996,14 +996,98 @@ function VerbasView() {
 }
 
 function AtualizacaoIndicesView() {
+  const [selectedTrt, setSelectedTrt] = useState<string | null>(null);
+  const [seeding, setSeeding] = useState(false);
+  const [seedResult, setSeedResult] = useState<any>(null);
+  const qc = useQueryClient();
+
+  const handleAutoImport = async (trt: string) => {
+    setSelectedTrt(trt);
+    setSeeding(true);
+    setSeedResult(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("seed-pjecalc-tables", {
+        body: { trt },
+      });
+      if (error) throw error;
+      setSeedResult(data);
+      toast.success(`Tabelas do ${trt} importadas com sucesso! ${data?.total_registros || 0} registros.`);
+      // Invalidate all table queries
+      qc.invalidateQueries();
+    } catch (err: any) {
+      toast.error("Erro na importação automática: " + (err.message || "Falha"));
+      setSeedResult({ error: err.message });
+    } finally {
+      setSeeding(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
+      {/* Auto-import by TRT */}
+      <Card className="border-primary/30">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-2 mb-2">
+            <Download className="h-5 w-5 text-primary" />
+            <h3 className="font-bold text-sm">Importação Automática por TRT</h3>
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">
+            Selecione o TRT do processo para importar automaticamente todas as tabelas oficiais do PJe-Calc
+            (salário mínimo, INSS, IRRF, custas, feriados regionais, verbas padrão e mais).
+          </p>
+
+          {seeding && (
+            <div className="flex items-center gap-3 mb-4 p-3 rounded bg-primary/5 border border-primary/20">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <div>
+                <p className="text-sm font-medium">Importando tabelas do {selectedTrt}...</p>
+                <p className="text-xs text-muted-foreground">Aguarde, isso pode levar alguns segundos.</p>
+              </div>
+            </div>
+          )}
+
+          {seedResult && !seedResult.error && (
+            <div className="mb-4 p-3 rounded bg-green-500/10 border border-green-500/20">
+              <p className="text-sm font-medium text-green-700 dark:text-green-400">
+                ✅ Importação concluída — {seedResult.total_registros} registros processados
+              </p>
+              <div className="mt-2 grid grid-cols-3 gap-1">
+                {seedResult.detalhes && Object.entries(seedResult.detalhes).map(([k, v]) => (
+                  <div key={k} className="text-[10px] text-muted-foreground">
+                    <span className="font-medium">{k.replace(/_/g, " ")}:</span> {String(v)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-3 gap-2">
+            {Object.entries(TRTS).map(([trt, nome]) => (
+              <button
+                key={trt}
+                onClick={() => handleAutoImport(trt)}
+                disabled={seeding}
+                className="flex items-center gap-2 p-2.5 rounded border border-border/50 text-xs hover:bg-primary/5 hover:border-primary/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left"
+              >
+                <Badge variant={selectedTrt === trt && seedResult && !seedResult.error ? "default" : "secondary"} className="text-[10px] shrink-0">
+                  {trt.replace("TRT", "TRT ")}
+                </Badge>
+                <span className="text-muted-foreground truncate">{nome}</span>
+                {seeding && selectedTrt === trt && <Loader2 className="h-3 w-3 animate-spin ml-auto" />}
+                {selectedTrt === trt && seedResult && !seedResult.error && <span className="ml-auto text-green-600">✓</span>}
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Manual CSV fallback */}
       <Card>
         <CardContent className="p-6">
-          <h3 className="font-semibold text-sm mb-4">Importar Tabelas Auxiliares</h3>
+          <h3 className="font-semibold text-sm mb-2">Importação Manual (CSV)</h3>
           <p className="text-xs text-muted-foreground mb-4">
-            O Gestor Nacional do PJe-Calc (TRT8) é responsável por atualizar mensalmente as tabelas nacionais.
-            Cada TRT possui um Gestor Regional que inclui feriados estaduais/municipais, pisos salariais e vale-transporte.
+            Caso precise importar dados específicos não incluídos na importação automática, use os importadores CSV abaixo.
           </p>
           <div className="grid grid-cols-2 gap-3">
             {Object.entries(TABELA_CONFIG).filter(([k]) => k !== "atualizacao-indices").map(([key, config]) => (
@@ -1013,26 +1097,9 @@ function AtualizacaoIndicesView() {
                     <p className="text-xs font-medium">{config.title}</p>
                     <p className="text-[10px] text-muted-foreground">{config.description}</p>
                   </div>
-                  <CsvImporter tipo={key} onImported={() => {}} />
+                  <CsvImporter tipo={key} onImported={() => qc.invalidateQueries()} />
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-6">
-          <h3 className="font-semibold text-sm mb-3">Tabelas Regionais por TRT</h3>
-          <p className="text-xs text-muted-foreground mb-4">
-            Selecione o TRT para importar as tabelas regionais (pisos salariais, feriados estaduais/municipais e vale-transporte).
-          </p>
-          <div className="grid grid-cols-3 gap-2">
-            {Object.entries(TRTS).map(([trt, nome]) => (
-              <div key={trt} className="flex items-center gap-2 p-2 rounded border border-border/50 text-xs">
-                <Badge variant="secondary" className="text-[10px]">{trt}</Badge>
-                <span className="text-muted-foreground truncate">{nome}</span>
-              </div>
             ))}
           </div>
         </CardContent>
