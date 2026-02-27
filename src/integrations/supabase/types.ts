@@ -2163,6 +2163,7 @@ export type Database = {
           case_id: string
           competencia: string
           created_at: string
+          dados_extras: Json | null
           dias_trabalhados: number | null
           dias_uteis: number | null
           dsr_horas: number | null
@@ -2180,6 +2181,7 @@ export type Database = {
           case_id: string
           competencia: string
           created_at?: string
+          dados_extras?: Json | null
           dias_trabalhados?: number | null
           dias_uteis?: number | null
           dsr_horas?: number | null
@@ -2197,6 +2199,7 @@ export type Database = {
           case_id?: string
           competencia?: string
           created_at?: string
+          dados_extras?: Json | null
           dias_trabalhados?: number | null
           dias_uteis?: number | null
           dsr_horas?: number | null
@@ -2221,6 +2224,42 @@ export type Database = {
             foreignKeyName: "pjecalc_cartao_ponto_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pjecalc_cartao_ponto_colunas: {
+        Row: {
+          case_id: string
+          colunas: Json
+          created_at: string | null
+          id: string
+        }
+        Insert: {
+          case_id: string
+          colunas?: Json
+          created_at?: string | null
+          id?: string
+        }
+        Update: {
+          case_id?: string
+          colunas?: Json
+          created_at?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pjecalc_cartao_ponto_colunas_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: true
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "pjecalc_cartao_ponto_colunas_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -3300,8 +3339,11 @@ export type Database = {
           created_at: string
           data_liquidacao: string | null
           engine_version: string | null
+          fechado_em: string | null
+          fechado_por: string | null
           id: string
           resultado: Json
+          status: string
           total_bruto: number | null
           total_liquido: number | null
           total_reclamada: number | null
@@ -3312,8 +3354,11 @@ export type Database = {
           created_at?: string
           data_liquidacao?: string | null
           engine_version?: string | null
+          fechado_em?: string | null
+          fechado_por?: string | null
           id?: string
           resultado: Json
+          status?: string
           total_bruto?: number | null
           total_liquido?: number | null
           total_reclamada?: number | null
@@ -3324,8 +3369,11 @@ export type Database = {
           created_at?: string
           data_liquidacao?: string | null
           engine_version?: string | null
+          fechado_em?: string | null
+          fechado_por?: string | null
           id?: string
           resultado?: Json
+          status?: string
           total_bruto?: number | null
           total_liquido?: number | null
           total_reclamada?: number | null
@@ -3607,6 +3655,54 @@ export type Database = {
             columns: ["version_id"]
             isOneToOne: false
             referencedRelation: "reference_table_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pjecalc_previdencia_privada_config: {
+        Row: {
+          apurar: boolean
+          base_calculo: string
+          case_id: string
+          created_at: string | null
+          deduzir_ir: boolean
+          id: string
+          observacao: string | null
+          percentual: number
+        }
+        Insert: {
+          apurar?: boolean
+          base_calculo?: string
+          case_id: string
+          created_at?: string | null
+          deduzir_ir?: boolean
+          id?: string
+          observacao?: string | null
+          percentual?: number
+        }
+        Update: {
+          apurar?: boolean
+          base_calculo?: string
+          case_id?: string
+          created_at?: string | null
+          deduzir_ir?: boolean
+          id?: string
+          observacao?: string | null
+          percentual?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pjecalc_previdencia_privada_config_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: true
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "pjecalc_previdencia_privada_config_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: true
+            referencedRelation: "cases"
             referencedColumns: ["id"]
           },
         ]

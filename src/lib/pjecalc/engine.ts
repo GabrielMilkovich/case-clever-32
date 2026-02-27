@@ -184,6 +184,23 @@ export interface PjeCartaoPonto {
   intervalo_suprimido: number;
   dsr_horas: number;
   sobreaviso: number;
+  dados_extras?: Record<string, number>;
+  [key: string]: any;
+}
+
+export interface PjeFeriadoDB {
+  data: string;
+  nome: string;
+  tipo: 'nacional' | 'estadual' | 'municipal' | 'facultativo';
+  uf?: string;
+  municipio?: string;
+}
+
+export interface PjePrevidenciaPrivadaConfig {
+  apurar: boolean;
+  percentual: number;
+  base_calculo: 'diferenca' | 'devido' | 'corrigido';
+  deduzir_ir: boolean;
 }
 
 export interface PjeFGTSConfig {
@@ -273,6 +290,13 @@ export interface PjeSeguroConfig {
 // RESULTADO DA LIQUIDAÇÃO
 // =====================================================
 
+export interface PjePrevidenciaPrivadaResult {
+  apurado: boolean;
+  base: number;
+  percentual: number;
+  valor: number;
+}
+
 export interface PjeLiquidacaoResult {
   data_liquidacao: string;
   verbas: PjeVerbaResult[];
@@ -280,6 +304,7 @@ export interface PjeLiquidacaoResult {
   contribuicao_social: PjeCSResult;
   imposto_renda: PjeIRResult;
   seguro_desemprego: PjeSeguroResult;
+  previdencia_privada: PjePrevidenciaPrivadaResult;
   resumo: PjeResumo;
   validacao?: PjeValidationResult;
 }
@@ -357,6 +382,7 @@ export interface PjeResumo {
   cs_empregador: number;
   ir_retido: number;
   seguro_desemprego: number;
+  previdencia_privada: number;
   multa_523: number;
   honorarios_sucumbenciais: number;
   honorarios_contratuais: number;
@@ -464,6 +490,8 @@ export class PjeCalcEngine {
   private faixasINSSDB: PjeINSSFaixaRow[];
   private faixasIRDB: PjeIRFaixaRow[];
   private excecoesCargas: PjeExcecaoCargaHoraria[];
+  private feriadosDB: PjeFeriadoDB[];
+  private prevPrivadaConfig: PjePrevidenciaPrivadaConfig;
   // Map of verba results by verba_id for reflexa resolution
   private verbaResultsMap: Map<string, PjeVerbaResult> = new Map();
 
@@ -485,6 +513,8 @@ export class PjeCalcEngine {
     faixasINSSDB: PjeINSSFaixaRow[] = [],
     faixasIRDB: PjeIRFaixaRow[] = [],
     excecoesCargas: PjeExcecaoCargaHoraria[] = [],
+    feriadosDB: PjeFeriadoDB[] = [],
+    prevPrivadaConfig: PjePrevidenciaPrivadaConfig = { apurar: false, percentual: 0, base_calculo: 'diferenca', deduzir_ir: false },
   ) {
     this.params = params;
     this.historicos = historicos;
@@ -503,6 +533,8 @@ export class PjeCalcEngine {
     this.faixasINSSDB = faixasINSSDB;
     this.faixasIRDB = faixasIRDB;
     this.excecoesCargas = excecoesCargas;
+    this.feriadosDB = feriadosDB;
+    this.prevPrivadaConfig = prevPrivadaConfig;
   }
 
   // =====================================================
@@ -614,6 +646,55 @@ export class PjeCalcEngine {
   }
 
   // =====================================================
+  // QUANTIDADE CALENDÁRIO (Dias Úteis / Repousos / Feriados)
+  // =====================================================
+
+  calcularQuantidadeCalendario(competencia: string, tipo: 'dias_uteis' | 'repousos' | 'feriados'): number {
+    const [ano, mes] = competencia.split('-').map(Number);
+    const diasNoMes = new Date(ano, mes, 0).getDate();
+    
+    // Contar feriados no mês para o estado/município do cálculo
+    const feriadosNoMes = this.feriadosDB.filter(f => {
+      const fd = new Date(f.data);
+      if (fd.getFullYear() !== ano || fd.getMonth() + 1 !== mes) return false;
+      if (f.tipo === 'nacional') return true;
+      if (f.tipo === 'estadual' && this.params.considerar_feriado_estadual && f.uf === this.params.estado) return true;
+      if (f.tipo === 'municipal' && this.params.considerar_feriado_municipal && f.municipio === this.params.municipio) return true;
+      return false;
+    });
+
+    let diasUteis = 0;
+    let repousos = 0;
+    
+    for (let d = 1; d <= diasNoMes; d++) {
+      const date = new Date(ano, mes - 1, d);
+      const dow = date.getDay(); // 0=Sun, 6=Sat
+      const isSunday = dow === 0;
+      const isSaturday = dow === 6;
+      const isFeriado = feriadosNoMes.some(f => new Date(f.data).getDate() === d);
+      
+      if (isSunday || isFeriado) {
+        repousos++;
+      } else if (isSaturday && !this.params.sabado_dia_util) {
+        repousos++;
+      } else {
+        diasUteis++;
+      }
+    }
+
+    switch (tipo) {
+      case 'dias_uteis': return diasUteis;
+      case 'repousos': return repousos;
+      case 'feriados': return feriadosNoMes.length;
+    }
+  }
+
+  // Divisor com feriados integrados
+  getDivisorComFeriados(competencia: string): number {
+    return this.calcularQuantidadeCalendario(competencia, 'dias_uteis');
+  }
+
+  // =====================================================
   // PRAZO DO AVISO PRÉVIO (Lei 12.506/2011)
   // =====================================================
 
@@ -667,22 +748,27 @@ export class PjeCalcEngine {
     const base = new Decimal(valorBase);
     const mult = new Decimal(verba.multiplicador);
     
-    // Divisor resolution (uses carga horária por competência with exceções)
+    // Divisor resolution (uses carga horária por competência with exceções + feriados)
     let div: Decimal;
     if (verba.tipo_divisor === 'cartao_ponto') {
       div = new Decimal(this.getCartaoPontoDivisor(competencia, verba.divisor_cartao_colunas) || 30);
     } else if (verba.tipo_divisor === 'carga_horaria') {
       div = new Decimal(this.getCargaHorariaParaCompetencia(competencia));
+    } else if (verba.tipo_divisor === 'dias_uteis') {
+      div = new Decimal(this.getDivisorComFeriados(competencia));
     } else {
       div = new Decimal(verba.divisor_informado || 30);
     }
 
-    // Quantidade resolution
+    // Quantidade resolution (with calendario support)
     let qtd: Decimal;
     if (verba.tipo_quantidade === 'cartao_ponto') {
       qtd = new Decimal(this.getCartaoPontoQuantidade(competencia, verba.quantidade_cartao_colunas) || 0);
     } else if (verba.tipo_quantidade === 'avos') {
       qtd = new Decimal(this.calcularAvos(competencia, verba.caracteristica));
+    } else if (verba.tipo_quantidade === 'calendario') {
+      // Quantidade Calendário: usa dias úteis do período conforme feriados cadastrados
+      qtd = new Decimal(this.calcularQuantidadeCalendario(competencia, 'dias_uteis'));
     } else {
       qtd = new Decimal(verba.quantidade_informada || 1);
     }
@@ -1366,10 +1452,18 @@ export class PjeCalcEngine {
 
     let baseBruta = 0;
     let base13 = 0;
+    let baseFerias = 0;
     for (const vr of verbaResults) {
       const verba = this.verbas.find(v => v.id === vr.verba_id);
       if (!verba?.incidencias.irpf) continue;
-      if (verba.caracteristica === 'ferias') continue;
+      if (verba.caracteristica === 'ferias') {
+        // Tributação separada de férias (Fase 3)
+        if (this.irConfig.tributacao_separada_ferias) {
+          baseFerias += vr.total_diferenca;
+        }
+        // Se não separar, não entra na base (férias são isentas por natureza)
+        continue;
+      }
       if (verba.caracteristica === '13_salario' && this.irConfig.tributacao_exclusiva_13) {
         base13 += vr.total_diferenca;
       } else {
@@ -1414,10 +1508,22 @@ export class PjeCalcEngine {
       if (imposto13 > 0) imposto += imposto13;
     }
 
+    // Tributação separada de férias (Fase 3)
+    if (this.irConfig.tributacao_separada_ferias && baseFerias > 0) {
+      let impostoFerias = 0;
+      for (const faixa of tabelaIR.faixas) {
+        if (baseFerias <= faixa.ate * meses) {
+          impostoFerias = baseFerias * faixa.aliquota - faixa.deducao * meses;
+          break;
+        }
+      }
+      if (impostoFerias > 0) imposto += impostoFerias;
+    }
+
     return {
-      base_calculo: Number(new Decimal(baseBruta + base13).toDP(2)),
+      base_calculo: Number(new Decimal(baseBruta + base13 + baseFerias).toDP(2)),
       deducoes: Number(new Decimal(deducoes + deducaoDependentes).toDP(2)),
-      base_tributavel: Number(new Decimal(baseTributavel + base13).toDP(2)),
+      base_tributavel: Number(new Decimal(baseTributavel + base13 + baseFerias).toDP(2)),
       imposto_devido: Number(new Decimal(imposto).toDP(2)),
       meses_rra: meses,
       metodo: meses > 1 ? 'art_12a_rra' : 'tabela_mensal',
@@ -1670,43 +1776,41 @@ export class PjeCalcEngine {
     // ── 8. Seguro-Desemprego ──
     const seguro = this.calcularSeguroDesemprego();
 
+    // ── 8b. Previdência Privada ──
+    let prevPrivada: PjePrevidenciaPrivadaResult = { apurado: false, base: 0, percentual: 0, valor: 0 };
+    if (this.prevPrivadaConfig.apurar && this.prevPrivadaConfig.percentual > 0) {
+      let basePP = 0;
+      for (const vr of verbaResults) {
+        const verba = this.verbas.find(vb => vb.id === vr.verba_id);
+        if (!verba?.incidencias.previdencia_privada) continue;
+        if (this.prevPrivadaConfig.base_calculo === 'devido') basePP += vr.total_devido;
+        else if (this.prevPrivadaConfig.base_calculo === 'corrigido') basePP += vr.total_corrigido;
+        else basePP += vr.total_diferenca;
+      }
+      const valorPP = Number(new Decimal(basePP).times(this.prevPrivadaConfig.percentual / 100).toDP(2));
+      prevPrivada = { apurado: true, base: basePP, percentual: this.prevPrivadaConfig.percentual, valor: valorPP };
+    }
+
     // ── 9. Composição do Resumo ──
     const principalBruto = verbaResults
-      .filter(v => {
-        const verba = this.verbas.find(vb => vb.id === v.verba_id);
-        return verba?.compor_principal !== false;
-      })
+      .filter(v => { const verba = this.verbas.find(vb => vb.id === v.verba_id); return verba?.compor_principal !== false; })
       .reduce((s, v) => s + v.total_diferenca, 0);
-
     const principalCorrigido = verbaResults
-      .filter(v => {
-        const verba = this.verbas.find(vb => vb.id === v.verba_id);
-        return verba?.compor_principal !== false;
-      })
+      .filter(v => { const verba = this.verbas.find(vb => vb.id === v.verba_id); return verba?.compor_principal !== false; })
       .reduce((s, v) => s + v.total_corrigido, 0);
-
     const jurosMora = verbaResults
-      .filter(v => {
-        const verba = this.verbas.find(vb => vb.id === v.verba_id);
-        return verba?.compor_principal !== false;
-      })
+      .filter(v => { const verba = this.verbas.find(vb => vb.id === v.verba_id); return verba?.compor_principal !== false; })
       .reduce((s, v) => s + v.total_juros, 0);
 
-    // ── 10. Honorários ──
     const honorarios = this.calcularHonorarios(principalCorrigido, jurosMora, fgts.total_fgts);
-
-    // ── 11. Multa 523 ──
     const valorCondenacao = principalCorrigido + jurosMora + fgts.total_fgts;
     const multa523 = this.calcularMulta523(valorCondenacao);
-
-    // ── 12. Custas ──
     const custas = this.calcularCustas(valorCondenacao);
-
     const csDescontado = this.csConfig.cobrar_reclamante ? cs.total_segurado : 0;
 
     const liquido = Number(new Decimal(
       principalCorrigido + jurosMora + fgts.total_fgts + seguro.total + multa523
-      - csDescontado - ir.imposto_devido
+      - csDescontado - ir.imposto_devido - prevPrivada.valor
     ).toDP(2));
 
     const totalReclamada = Number(new Decimal(
@@ -1718,28 +1822,16 @@ export class PjeCalcEngine {
       principal_bruto: Number(new Decimal(principalBruto).toDP(2)),
       principal_corrigido: Number(new Decimal(principalCorrigido).toDP(2)),
       juros_mora: Number(new Decimal(jurosMora).toDP(2)),
-      fgts_total: fgts.total_fgts,
-      cs_segurado: csDescontado,
-      cs_empregador: cs.total_empregador,
-      ir_retido: ir.imposto_devido,
-      seguro_desemprego: seguro.total,
-      multa_523: multa523,
-      honorarios_sucumbenciais: honorarios.sucumbenciais,
-      honorarios_contratuais: honorarios.contratuais,
-      custas,
-      liquido_reclamante: liquido,
-      total_reclamada: totalReclamada,
+      fgts_total: fgts.total_fgts, cs_segurado: csDescontado, cs_empregador: cs.total_empregador,
+      ir_retido: ir.imposto_devido, seguro_desemprego: seguro.total, previdencia_privada: prevPrivada.valor,
+      multa_523: multa523, honorarios_sucumbenciais: honorarios.sucumbenciais,
+      honorarios_contratuais: honorarios.contratuais, custas, liquido_reclamante: liquido, total_reclamada: totalReclamada,
     };
 
     return {
       data_liquidacao: this.correcaoConfig.data_liquidacao,
-      verbas: verbaResults,
-      fgts,
-      contribuicao_social: cs,
-      imposto_renda: ir,
-      seguro_desemprego: seguro,
-      resumo,
-      validacao,
+      verbas: verbaResults, fgts, contribuicao_social: cs, imposto_renda: ir,
+      seguro_desemprego: seguro, previdencia_privada: prevPrivada, resumo, validacao,
     };
   }
 

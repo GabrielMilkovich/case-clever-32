@@ -39,6 +39,7 @@ import { ModuloSalarioFamilia } from "@/components/cases/pjecalc/ModuloSalarioFa
 import { ModuloPensaoAlimenticia } from "@/components/cases/pjecalc/ModuloPensaoAlimenticia";
 import { ModuloOcorrencias } from "@/components/cases/pjecalc/ModuloOcorrencias";
 import { ModuloDadosProcesso } from "@/components/cases/pjecalc/ModuloDadosProcesso";
+import { ModuloPrevidenciaPrivada } from "@/components/cases/pjecalc/ModuloPrevidenciaPrivada";
 
 const MODULOS = [
   { id: 'dados_processo', label: 'Dados do Processo', icon: Briefcase, desc: 'Identificação processual' },
@@ -56,6 +57,7 @@ const MODULOS = [
   { id: 'salario_familia', label: 'Salário-Família', icon: Users, desc: 'Cotas por dependente' },
   { id: 'multas', label: 'Multas CLT', icon: AlertTriangle, desc: 'Art. 467 e 477' },
   { id: 'pensao', label: 'Pensão Alimentícia', icon: Scale, desc: 'Desconto judicial' },
+  { id: 'prev_privada', label: 'Prev. Privada', icon: Shield, desc: 'Complementar' },
   { id: 'honorarios', label: 'Honorários', icon: Scale, desc: 'Sucumbenciais e contratuais' },
   { id: 'custas', label: 'Custas', icon: Receipt, desc: 'Custas processuais' },
   { id: 'resumo', label: 'Resumo', icon: FileBarChart, desc: 'Resultado da liquidação' },
@@ -292,6 +294,8 @@ export default function PjeCalcPage() {
         return <ModuloPensaoAlimenticia caseId={caseId!} />;
       case 'honorarios':
         return <ModuloHonorarios caseId={caseId!} />;
+      case 'prev_privada':
+        return <ModuloPrevidenciaPrivada caseId={caseId!} />;
       case 'custas':
         return <ModuloCustas caseId={caseId!} />;
       case 'resumo':
