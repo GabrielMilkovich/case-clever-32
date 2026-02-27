@@ -859,8 +859,8 @@ export class PjeCalcEngine {
 
     const idxOrigem = indices.find(i => i.competencia.slice(0, 7) >= compOrigem) 
       || indices[0];
-    const idxDestino = indices.findLast(i => i.competencia.slice(0, 7) <= compDestino) 
-      || indices[indices.length - 1];
+    const idxDestinoArr = indices.filter(i => i.competencia.slice(0, 7) <= compDestino);
+    const idxDestino = idxDestinoArr.length > 0 ? idxDestinoArr[idxDestinoArr.length - 1] : indices[indices.length - 1];
 
     if (!idxOrigem || !idxDestino || !idxOrigem.acumulado || !idxDestino.acumulado) return null;
     if (Number(idxOrigem.acumulado) === 0) return null;
