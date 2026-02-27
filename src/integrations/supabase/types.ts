@@ -2157,6 +2157,132 @@ export type Database = {
           },
         ]
       }
+      pjecalc_contribuicao_social: {
+        Row: {
+          aliquota: number
+          competencia: string
+          created_at: string
+          faixa: number
+          id: string
+          teto_beneficio: number | null
+          teto_maximo: number | null
+          tipo: string
+          valor_final: number
+          valor_inicial: number
+        }
+        Insert: {
+          aliquota: number
+          competencia: string
+          created_at?: string
+          faixa?: number
+          id?: string
+          teto_beneficio?: number | null
+          teto_maximo?: number | null
+          tipo?: string
+          valor_final: number
+          valor_inicial?: number
+        }
+        Update: {
+          aliquota?: number
+          competencia?: string
+          created_at?: string
+          faixa?: number
+          id?: string
+          teto_beneficio?: number | null
+          teto_maximo?: number | null
+          tipo?: string
+          valor_final?: number
+          valor_inicial?: number
+        }
+        Relationships: []
+      }
+      pjecalc_correcao_monetaria: {
+        Row: {
+          acumulado: number | null
+          competencia: string
+          created_at: string
+          fonte: string | null
+          id: string
+          indice: string
+          valor: number
+        }
+        Insert: {
+          acumulado?: number | null
+          competencia: string
+          created_at?: string
+          fonte?: string | null
+          id?: string
+          indice: string
+          valor: number
+        }
+        Update: {
+          acumulado?: number | null
+          competencia?: string
+          created_at?: string
+          fonte?: string | null
+          id?: string
+          indice?: string
+          valor?: number
+        }
+        Relationships: []
+      }
+      pjecalc_custas_judiciais: {
+        Row: {
+          agravo_instrumento: number | null
+          agravo_peticao: number | null
+          atos_oficiais_rural: number | null
+          atos_oficiais_urbana: number | null
+          created_at: string
+          embargos_arrematacao: number | null
+          embargos_execucao: number | null
+          embargos_terceiros: number | null
+          id: string
+          impugnacao_sentenca: number | null
+          piso_custas_conhecimento: number | null
+          recurso_revista: number | null
+          teto_custas_autos: number | null
+          teto_custas_liquidacao: number | null
+          vigencia_fim: string | null
+          vigencia_inicio: string
+        }
+        Insert: {
+          agravo_instrumento?: number | null
+          agravo_peticao?: number | null
+          atos_oficiais_rural?: number | null
+          atos_oficiais_urbana?: number | null
+          created_at?: string
+          embargos_arrematacao?: number | null
+          embargos_execucao?: number | null
+          embargos_terceiros?: number | null
+          id?: string
+          impugnacao_sentenca?: number | null
+          piso_custas_conhecimento?: number | null
+          recurso_revista?: number | null
+          teto_custas_autos?: number | null
+          teto_custas_liquidacao?: number | null
+          vigencia_fim?: string | null
+          vigencia_inicio: string
+        }
+        Update: {
+          agravo_instrumento?: number | null
+          agravo_peticao?: number | null
+          atos_oficiais_rural?: number | null
+          atos_oficiais_urbana?: number | null
+          created_at?: string
+          embargos_arrematacao?: number | null
+          embargos_execucao?: number | null
+          embargos_terceiros?: number | null
+          id?: string
+          impugnacao_sentenca?: number | null
+          piso_custas_conhecimento?: number | null
+          recurso_revista?: number | null
+          teto_custas_autos?: number | null
+          teto_custas_liquidacao?: number | null
+          vigencia_fim?: string | null
+          vigencia_inicio?: string
+        }
+        Relationships: []
+      }
       pjecalc_faltas: {
         Row: {
           case_id: string
@@ -2375,6 +2501,98 @@ export type Database = {
           },
         ]
       }
+      pjecalc_imposto_renda: {
+        Row: {
+          competencia: string
+          created_at: string
+          deducao_aposentado_65: number
+          deducao_dependente: number
+          id: string
+        }
+        Insert: {
+          competencia: string
+          created_at?: string
+          deducao_aposentado_65?: number
+          deducao_dependente?: number
+          id?: string
+        }
+        Update: {
+          competencia?: string
+          created_at?: string
+          deducao_aposentado_65?: number
+          deducao_dependente?: number
+          id?: string
+        }
+        Relationships: []
+      }
+      pjecalc_imposto_renda_faixas: {
+        Row: {
+          aliquota: number
+          created_at: string
+          faixa: number
+          id: string
+          ir_id: string
+          parcela_deduzir: number
+          valor_final: number | null
+          valor_inicial: number
+        }
+        Insert: {
+          aliquota?: number
+          created_at?: string
+          faixa?: number
+          id?: string
+          ir_id: string
+          parcela_deduzir?: number
+          valor_final?: number | null
+          valor_inicial?: number
+        }
+        Update: {
+          aliquota?: number
+          created_at?: string
+          faixa?: number
+          id?: string
+          ir_id?: string
+          parcela_deduzir?: number
+          valor_final?: number | null
+          valor_inicial?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pjecalc_imposto_renda_faixas_ir_id_fkey"
+            columns: ["ir_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_imposto_renda"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pjecalc_juros_mora: {
+        Row: {
+          acumulado: number | null
+          competencia: string
+          created_at: string
+          id: string
+          taxa_mensal: number
+          tipo: string
+        }
+        Insert: {
+          acumulado?: number | null
+          competencia: string
+          created_at?: string
+          id?: string
+          taxa_mensal: number
+          tipo?: string
+        }
+        Update: {
+          acumulado?: number | null
+          competencia?: string
+          created_at?: string
+          id?: string
+          taxa_mensal?: number
+          tipo?: string
+        }
+        Relationships: []
+      }
       pjecalc_parametros: {
         Row: {
           carga_horaria_padrao: number
@@ -2488,6 +2706,162 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pjecalc_pisos_salariais: {
+        Row: {
+          categoria: string | null
+          competencia: string
+          created_at: string
+          id: string
+          nome: string
+          sindicato: string | null
+          uf: string
+          valor: number
+        }
+        Insert: {
+          categoria?: string | null
+          competencia: string
+          created_at?: string
+          id?: string
+          nome: string
+          sindicato?: string | null
+          uf: string
+          valor: number
+        }
+        Update: {
+          categoria?: string | null
+          competencia?: string
+          created_at?: string
+          id?: string
+          nome?: string
+          sindicato?: string | null
+          uf?: string
+          valor?: number
+        }
+        Relationships: []
+      }
+      pjecalc_salario_familia: {
+        Row: {
+          competencia: string
+          created_at: string
+          faixa: number
+          id: string
+          valor_cota: number
+          valor_final: number
+          valor_inicial: number
+        }
+        Insert: {
+          competencia: string
+          created_at?: string
+          faixa?: number
+          id?: string
+          valor_cota: number
+          valor_final: number
+          valor_inicial?: number
+        }
+        Update: {
+          competencia?: string
+          created_at?: string
+          faixa?: number
+          id?: string
+          valor_cota?: number
+          valor_final?: number
+          valor_inicial?: number
+        }
+        Relationships: []
+      }
+      pjecalc_salario_minimo: {
+        Row: {
+          competencia: string
+          created_at: string
+          id: string
+          valor: number
+        }
+        Insert: {
+          competencia: string
+          created_at?: string
+          id?: string
+          valor: number
+        }
+        Update: {
+          competencia?: string
+          created_at?: string
+          id?: string
+          valor?: number
+        }
+        Relationships: []
+      }
+      pjecalc_seguro_desemprego: {
+        Row: {
+          competencia: string
+          created_at: string
+          faixa: number
+          id: string
+          percentual: number
+          valor_final: number
+          valor_inicial: number
+          valor_piso: number
+          valor_soma: number | null
+          valor_teto: number | null
+        }
+        Insert: {
+          competencia: string
+          created_at?: string
+          faixa?: number
+          id?: string
+          percentual: number
+          valor_final: number
+          valor_inicial?: number
+          valor_piso: number
+          valor_soma?: number | null
+          valor_teto?: number | null
+        }
+        Update: {
+          competencia?: string
+          created_at?: string
+          faixa?: number
+          id?: string
+          percentual?: number
+          valor_final?: number
+          valor_inicial?: number
+          valor_piso?: number
+          valor_soma?: number | null
+          valor_teto?: number | null
+        }
+        Relationships: []
+      }
+      pjecalc_vale_transporte: {
+        Row: {
+          created_at: string
+          id: string
+          linha: string
+          municipio: string | null
+          uf: string
+          valor: number
+          vigencia_fim: string | null
+          vigencia_inicio: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          linha: string
+          municipio?: string | null
+          uf: string
+          valor: number
+          vigencia_fim?: string | null
+          vigencia_inicio: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          linha?: string
+          municipio?: string | null
+          uf?: string
+          valor?: number
+          vigencia_fim?: string | null
+          vigencia_inicio?: string
+        }
+        Relationships: []
       }
       pjecalc_verba_ocorrencias: {
         Row: {
@@ -2704,6 +3078,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pjecalc_verbas_padrao: {
+        Row: {
+          ativo: boolean | null
+          caracteristica: string
+          created_at: string
+          divisor_padrao: number | null
+          id: string
+          incidencia_cs: boolean | null
+          incidencia_fgts: boolean | null
+          incidencia_irpf: boolean | null
+          multiplicador_padrao: number | null
+          nome: string
+          ocorrencia_pagamento: string
+          tipo: string
+          valor_tipo: string
+        }
+        Insert: {
+          ativo?: boolean | null
+          caracteristica?: string
+          created_at?: string
+          divisor_padrao?: number | null
+          id?: string
+          incidencia_cs?: boolean | null
+          incidencia_fgts?: boolean | null
+          incidencia_irpf?: boolean | null
+          multiplicador_padrao?: number | null
+          nome: string
+          ocorrencia_pagamento?: string
+          tipo?: string
+          valor_tipo?: string
+        }
+        Update: {
+          ativo?: boolean | null
+          caracteristica?: string
+          created_at?: string
+          divisor_padrao?: number | null
+          id?: string
+          incidencia_cs?: boolean | null
+          incidencia_fgts?: boolean | null
+          incidencia_irpf?: boolean | null
+          multiplicador_padrao?: number | null
+          nome?: string
+          ocorrencia_pagamento?: string
+          tipo?: string
+          valor_tipo?: string
+        }
+        Relationships: []
       }
       profile_calculators: {
         Row: {
