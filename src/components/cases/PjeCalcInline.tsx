@@ -15,18 +15,36 @@ import {
   Save, Play, FileText, Calendar, Clock,
   DollarSign, Building2, Receipt, Percent, TrendingUp, FileBarChart,
   Check, Plus, Trash2, Loader2, Briefcase, Calculator,
+  Scale, Shield, Gavel, Users, Landmark, Zap,
 } from "lucide-react";
 
+// Module components
+import { ModuloDadosProcesso } from "./pjecalc/ModuloDadosProcesso";
+import { ModuloCartaoPonto } from "./pjecalc/ModuloCartaoPonto";
+import { ModuloFGTS } from "./pjecalc/ModuloFGTS";
+import { ModuloCS } from "./pjecalc/ModuloCS";
+import { ModuloIR } from "./pjecalc/ModuloIR";
+import { ModuloCorrecao } from "./pjecalc/ModuloCorrecao";
+import { ModuloSeguroDesemprego } from "./pjecalc/ModuloSeguroDesemprego";
+import { ModuloHonorarios } from "./pjecalc/ModuloHonorarios";
+import { ModuloCustas } from "./pjecalc/ModuloCustas";
+import { ModuloResumo } from "./pjecalc/ModuloResumo";
+
 const MODULOS = [
-  { id: 'parametros', label: 'Parâmetros', icon: Calendar, desc: 'Dados do cálculo' },
+  { id: 'dados_processo', label: 'Dados do Processo', icon: Gavel, desc: 'Identificação e partes' },
+  { id: 'parametros', label: 'Parâmetros', icon: Calendar, desc: 'Datas e configuração' },
+  { id: 'historico', label: 'Histórico Salarial', icon: DollarSign, desc: 'Bases de cálculo' },
   { id: 'faltas', label: 'Faltas', icon: Clock, desc: 'Registros de ausência' },
   { id: 'ferias', label: 'Férias', icon: Calendar, desc: 'Períodos aquisitivos' },
-  { id: 'historico', label: 'Histórico Salarial', icon: DollarSign, desc: 'Bases de cálculo' },
+  { id: 'cartao_ponto', label: 'Cartão de Ponto', icon: Clock, desc: 'Horas extras e noturnas' },
   { id: 'verbas', label: 'Verbas', icon: FileText, desc: 'Parcelas do cálculo' },
   { id: 'fgts', label: 'FGTS', icon: Building2, desc: 'Depósitos e multa' },
   { id: 'cs', label: 'Contrib. Social', icon: Receipt, desc: 'Segurado e empregador' },
   { id: 'ir', label: 'Imposto de Renda', icon: Percent, desc: 'IRRF / RRA' },
   { id: 'correcao', label: 'Correção/Juros', icon: TrendingUp, desc: 'Atualização monetária' },
+  { id: 'seguro_desemprego', label: 'Seguro-Desemprego', icon: Shield, desc: 'Indenização substitutiva' },
+  { id: 'honorarios', label: 'Honorários', icon: Scale, desc: 'Sucumbenciais e contratuais' },
+  { id: 'custas', label: 'Custas', icon: Landmark, desc: 'Custas e assistência' },
   { id: 'resumo', label: 'Resumo', icon: FileBarChart, desc: 'Resultado da liquidação' },
 ];
 
@@ -38,8 +56,9 @@ interface PjeCalcInlineProps {
 
 export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
   const queryClient = useQueryClient();
-  const [activeModule, setActiveModule] = useState('parametros');
+  const [activeModule, setActiveModule] = useState('dados_processo');
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   // DATA
   const { data: params } = useQuery({
@@ -91,6 +110,14 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
     },
   });
 
+  const { data: dadosProcesso } = useQuery({
+    queryKey: ["pjecalc_dados_processo", caseId],
+    queryFn: async () => {
+      const { data } = await supabase.from("pjecalc_dados_processo" as any).select("*").eq("case_id", caseId).maybeSingle();
+      return data as any;
+    },
+  });
+
   // FORM STATE
   const [formParams, setFormParams] = useState({
     estado: 'SP', municipio: '', data_admissao: '', data_demissao: '',
@@ -138,6 +165,104 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
     }
   }, [params, contract]);
 
+  // ── OCR AUTO-SYNC ──
+  const syncFromOCR = async () => {
+    setSyncing(true);
+    try {
+      const { data: facts } = await supabase.from("facts").select("*").eq("case_id", caseId);
+      if (!facts?.length) { toast.info("Nenhum fato extraído para sincronizar."); return; }
+
+      const factMap: Record<string, string> = {};
+      for (const f of facts) factMap[f.chave] = f.valor;
+
+      // Auto-populate Parâmetros
+      const autoParams: any = { case_id: caseId };
+      if (factMap.data_admissao) autoParams.data_admissao = factMap.data_admissao;
+      if (factMap.data_demissao) autoParams.data_demissao = factMap.data_demissao;
+      if (factMap.data_ajuizamento) autoParams.data_ajuizamento = factMap.data_ajuizamento;
+      if (factMap.salario_base || factMap.salario_mensal) {
+        autoParams.ultima_remuneracao = parseFloat(factMap.salario_base || factMap.salario_mensal);
+        autoParams.maior_remuneracao = autoParams.ultima_remuneracao;
+      }
+      if (factMap.jornada_contratual) {
+        const jornada = parseInt(factMap.jornada_contratual);
+        if (jornada) autoParams.carga_horaria_padrao = jornada;
+      }
+      if (factMap.estado || factMap.uf) autoParams.estado = factMap.estado || factMap.uf;
+      if (factMap.municipio || factMap.cidade) autoParams.municipio = factMap.municipio || factMap.cidade;
+
+      // Upsert params
+      if (params?.id) {
+        await supabase.from("pjecalc_parametros").update(autoParams).eq("id", params.id);
+      } else {
+        autoParams.regime_trabalho = 'tempo_integral';
+        autoParams.sabado_dia_util = true;
+        await supabase.from("pjecalc_parametros").insert(autoParams);
+      }
+
+      // Auto-populate Dados do Processo
+      const processData: any = { case_id: caseId };
+      if (factMap.numero_processo) processData.numero_processo = factMap.numero_processo;
+      if (factMap.reclamante || factMap.nome_reclamante) processData.reclamante_nome = factMap.reclamante || factMap.nome_reclamante;
+      if (factMap.cpf_reclamante || factMap.cpf) processData.reclamante_cpf = factMap.cpf_reclamante || factMap.cpf;
+      if (factMap.reclamada || factMap.nome_reclamada || factMap.empregador) processData.reclamada_nome = factMap.reclamada || factMap.nome_reclamada || factMap.empregador;
+      if (factMap.cnpj_reclamada || factMap.cnpj) processData.reclamada_cnpj = factMap.cnpj_reclamada || factMap.cnpj;
+      if (factMap.vara) processData.vara = factMap.vara;
+      if (factMap.comarca) processData.comarca = factMap.comarca;
+
+      if (dadosProcesso?.id) {
+        await supabase.from("pjecalc_dados_processo" as any).update(processData).eq("id", dadosProcesso.id);
+      } else {
+        await supabase.from("pjecalc_dados_processo" as any).insert(processData);
+      }
+
+      // Auto-populate Histórico Salarial
+      if (autoParams.data_admissao && autoParams.ultima_remuneracao) {
+        const existing = await supabase.from("pjecalc_historico_salarial").select("id").eq("case_id", caseId);
+        if (!existing.data?.length) {
+          await supabase.from("pjecalc_historico_salarial").insert({
+            case_id: caseId,
+            nome: 'Salário Base',
+            periodo_inicio: autoParams.data_admissao,
+            periodo_fim: autoParams.data_demissao || new Date().toISOString().slice(0, 10),
+            tipo_valor: 'informado',
+            valor_informado: autoParams.ultima_remuneracao,
+            incidencia_fgts: true,
+            incidencia_cs: true,
+          });
+        }
+      }
+
+      // Auto-generate verbas if empty
+      const existingVerbas = await supabase.from("pjecalc_verbas").select("id").eq("case_id", caseId);
+      if (!existingVerbas.data?.length && autoParams.data_admissao) {
+        const periodo = { inicio: autoParams.data_admissao, fim: autoParams.data_demissao || new Date().toISOString().slice(0, 10) };
+        const verbasExpresso = [
+          { nome: 'Horas Extras 50%', caracteristica: 'comum', ocorrencia_pagamento: 'mensal', tipo: 'principal', multiplicador: 1.5, divisor_informado: autoParams.carga_horaria_padrao || 220 },
+          { nome: 'RSR s/ Horas Extras', caracteristica: 'comum', ocorrencia_pagamento: 'mensal', tipo: 'reflexa', multiplicador: 1, divisor_informado: 30 },
+          { nome: '13º Salário', caracteristica: '13_salario', ocorrencia_pagamento: 'dezembro', tipo: 'reflexa', multiplicador: 1, divisor_informado: 12 },
+          { nome: 'Férias + 1/3', caracteristica: 'ferias', ocorrencia_pagamento: 'periodo_aquisitivo', tipo: 'reflexa', multiplicador: 1.3333, divisor_informado: 12 },
+        ];
+        for (let i = 0; i < verbasExpresso.length; i++) {
+          await supabase.from("pjecalc_verbas").insert({ case_id: caseId, ...verbasExpresso[i], periodo_inicio: periodo.inicio, periodo_fim: periodo.fim, ordem: i });
+        }
+      }
+
+      // Invalidate all queries
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["pjecalc_parametros", caseId] }),
+        queryClient.invalidateQueries({ queryKey: ["pjecalc_dados_processo", caseId] }),
+        queryClient.invalidateQueries({ queryKey: ["pjecalc_historico", caseId] }),
+        queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] }),
+      ]);
+      toast.success("Dados sincronizados do OCR! Verifique cada módulo.");
+    } catch (e) {
+      toast.error("Erro ao sincronizar: " + (e as Error).message);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const saveParams = async () => {
     setSaving(true);
     try {
@@ -179,6 +304,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
   const moduleStatus = (modId: string): 'done' | 'active' | 'pending' => {
     if (modId === activeModule) return 'active';
     switch (modId) {
+      case 'dados_processo': return dadosProcesso ? 'done' : 'pending';
       case 'parametros': return params ? 'done' : 'pending';
       case 'faltas': return faltas.length > 0 ? 'done' : 'pending';
       case 'ferias': return ferias.length > 0 ? 'done' : 'pending';
@@ -188,30 +314,23 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
     }
   };
 
-  const renderPlaceholder = (title: string, desc: string) => (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      <Card>
-        <CardContent className="p-8 text-center">
-          <p className="text-sm text-muted-foreground">{desc}</p>
-          <p className="text-xs text-muted-foreground mt-2">Configure os parâmetros e verbas primeiro.</p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-
   const renderModule = () => {
     switch (activeModule) {
+      case 'dados_processo': return <ModuloDadosProcesso caseId={caseId} />;
       case 'parametros': return renderParametros();
       case 'faltas': return renderFaltas();
       case 'ferias': return renderFerias();
       case 'historico': return renderHistorico();
+      case 'cartao_ponto': return <ModuloCartaoPonto caseId={caseId} dataAdmissao={formParams.data_admissao} dataDemissao={formParams.data_demissao} />;
       case 'verbas': return renderVerbas();
-      case 'fgts': return renderPlaceholder("FGTS", "Configure depósitos de 8%, multa rescisória (20% ou 40%) e LC 110/2001.");
-      case 'cs': return renderPlaceholder("Contribuição Social", "Configure segurado (progressivo), empregador (Empresa, SAT, Terceiros).");
-      case 'ir': return renderPlaceholder("Imposto de Renda", "Configure Art. 12-A RRA, tributação exclusiva do 13º, deduções por dependentes.");
-      case 'correcao': return renderPlaceholder("Correção, Juros e Multa", "Configure índice (IPCA-E/SELIC), juros de mora e multa Art. 523 CPC.");
-      case 'resumo': return renderPlaceholder("Resumo da Liquidação", "Execute a liquidação para ver o resultado consolidado.");
+      case 'fgts': return <ModuloFGTS caseId={caseId} />;
+      case 'cs': return <ModuloCS caseId={caseId} />;
+      case 'ir': return <ModuloIR caseId={caseId} />;
+      case 'correcao': return <ModuloCorrecao caseId={caseId} />;
+      case 'seguro_desemprego': return <ModuloSeguroDesemprego caseId={caseId} />;
+      case 'honorarios': return <ModuloHonorarios caseId={caseId} />;
+      case 'custas': return <ModuloCustas caseId={caseId} />;
+      case 'resumo': return <ModuloResumo caseId={caseId} />;
       default: return null;
     }
   };
@@ -493,42 +612,58 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
   );
 
   return (
-    <div className="flex gap-4" style={{ minHeight: '500px' }}>
-      {/* Module sidebar */}
-      <div className="w-52 flex-shrink-0">
-        <ScrollArea className="h-[600px]">
-          <div className="space-y-1 pr-3">
-            {MODULOS.map((mod) => {
-              const status = moduleStatus(mod.id);
-              return (
-                <button
-                  key={mod.id}
-                  onClick={() => setActiveModule(mod.id)}
-                  className={cn(
-                    "w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-left transition-all text-xs",
-                    status === 'active' && "bg-primary text-primary-foreground shadow-sm",
-                    status === 'done' && "bg-[hsl(var(--success))]/10 text-foreground hover:bg-[hsl(var(--success))]/20",
-                    status === 'pending' && "text-muted-foreground hover:bg-muted/50",
-                  )}
-                >
-                  {status === 'done' ? <Check className="h-3.5 w-3.5 text-[hsl(var(--success))]" /> : <mod.icon className="h-3.5 w-3.5" />}
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium truncate">{mod.label}</div>
-                    <div className={cn("text-[10px] truncate", status === 'active' ? 'text-primary-foreground/70' : 'text-muted-foreground')}>{mod.desc}</div>
-                  </div>
-                </button>
-              );
-            })}
+    <div className="space-y-3">
+      {/* OCR Sync Bar */}
+      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
+        <CardContent className="p-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Zap className="h-4 w-4 text-primary" />
+            <span className="text-xs font-medium">Sincronização Automática OCR → Cálculo</span>
           </div>
-        </ScrollArea>
-      </div>
-      {/* Module content */}
-      <div className="flex-1 min-w-0">
-        <ScrollArea className="h-[600px]">
-          <div className="pr-4 pb-8">
-            {renderModule()}
-          </div>
-        </ScrollArea>
+          <Button size="sm" variant="outline" onClick={syncFromOCR} disabled={syncing}>
+            {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Zap className="h-4 w-4 mr-1" />}
+            Sincronizar do OCR
+          </Button>
+        </CardContent>
+      </Card>
+
+      <div className="flex gap-4" style={{ minHeight: '500px' }}>
+        {/* Module sidebar */}
+        <div className="w-52 flex-shrink-0">
+          <ScrollArea className="h-[650px]">
+            <div className="space-y-1 pr-3">
+              {MODULOS.map((mod) => {
+                const status = moduleStatus(mod.id);
+                return (
+                  <button
+                    key={mod.id}
+                    onClick={() => setActiveModule(mod.id)}
+                    className={cn(
+                      "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-all text-xs",
+                      status === 'active' && "bg-primary text-primary-foreground shadow-sm",
+                      status === 'done' && "bg-[hsl(var(--success))]/10 text-foreground hover:bg-[hsl(var(--success))]/20",
+                      status === 'pending' && "text-muted-foreground hover:bg-muted/50",
+                    )}
+                  >
+                    {status === 'done' ? <Check className="h-3.5 w-3.5 text-[hsl(var(--success))]" /> : <mod.icon className="h-3.5 w-3.5" />}
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium truncate">{mod.label}</div>
+                      <div className={cn("text-[10px] truncate", status === 'active' ? 'text-primary-foreground/70' : 'text-muted-foreground')}>{mod.desc}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </ScrollArea>
+        </div>
+        {/* Module content */}
+        <div className="flex-1 min-w-0">
+          <ScrollArea className="h-[650px]">
+            <div className="pr-4 pb-8">
+              {renderModule()}
+            </div>
+          </ScrollArea>
+        </div>
       </div>
     </div>
   );
