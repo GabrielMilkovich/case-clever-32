@@ -34,6 +34,10 @@ import { ModuloCartaoPonto } from "@/components/cases/pjecalc/ModuloCartaoPonto"
 import { ModuloSeguroDesemprego } from "@/components/cases/pjecalc/ModuloSeguroDesemprego";
 import { ModuloHonorarios } from "@/components/cases/pjecalc/ModuloHonorarios";
 import { ModuloCustas } from "@/components/cases/pjecalc/ModuloCustas";
+import { ModuloMultasCLT } from "@/components/cases/pjecalc/ModuloMultasCLT";
+import { ModuloSalarioFamilia } from "@/components/cases/pjecalc/ModuloSalarioFamilia";
+import { ModuloPensaoAlimenticia } from "@/components/cases/pjecalc/ModuloPensaoAlimenticia";
+import { ModuloOcorrencias } from "@/components/cases/pjecalc/ModuloOcorrencias";
 
 const MODULOS = [
   { id: 'parametros', label: 'Parâmetros', icon: Calendar, desc: 'Dados do cálculo' },
@@ -47,6 +51,9 @@ const MODULOS = [
   { id: 'ir', label: 'Imposto de Renda', icon: Percent, desc: 'IRRF / RRA' },
   { id: 'correcao', label: 'Correção/Juros', icon: TrendingUp, desc: 'Atualização monetária' },
   { id: 'seguro', label: 'Seguro-Desemprego', icon: Shield, desc: 'Indenização substitutiva' },
+  { id: 'salario_familia', label: 'Salário-Família', icon: Users, desc: 'Cotas por dependente' },
+  { id: 'multas', label: 'Multas CLT', icon: AlertTriangle, desc: 'Art. 467 e 477' },
+  { id: 'pensao', label: 'Pensão Alimentícia', icon: Scale, desc: 'Desconto judicial' },
   { id: 'honorarios', label: 'Honorários', icon: Scale, desc: 'Sucumbenciais e contratuais' },
   { id: 'custas', label: 'Custas', icon: Receipt, desc: 'Custas processuais' },
   { id: 'resumo', label: 'Resumo', icon: FileBarChart, desc: 'Resultado da liquidação' },
@@ -60,6 +67,7 @@ export default function PjeCalcPage() {
   const queryClient = useQueryClient();
   const [activeModule, setActiveModule] = useState('parametros');
   const [saving, setSaving] = useState(false);
+  const [selectedVerbaForGrid, setSelectedVerbaForGrid] = useState<any>(null);
 
   // =====================================================
   // DATA
@@ -237,6 +245,18 @@ export default function PjeCalcPage() {
   // RENDER MODULES
   // =====================================================
   const renderModule = () => {
+    // Grade de ocorrências (subview dentro de Verbas)
+    if (selectedVerbaForGrid) {
+      return <ModuloOcorrencias
+        caseId={caseId!}
+        verbaId={selectedVerbaForGrid.id}
+        verbaNome={selectedVerbaForGrid.nome}
+        periodoInicio={selectedVerbaForGrid.periodo_inicio}
+        periodoFim={selectedVerbaForGrid.periodo_fim}
+        onClose={() => setSelectedVerbaForGrid(null)}
+      />;
+    }
+
     switch (activeModule) {
       case 'parametros':
         return renderParametros();
@@ -260,6 +280,12 @@ export default function PjeCalcPage() {
         return <ModuloCorrecao caseId={caseId!} />;
       case 'seguro':
         return <ModuloSeguroDesemprego caseId={caseId!} />;
+      case 'salario_familia':
+        return <ModuloSalarioFamilia caseId={caseId!} />;
+      case 'multas':
+        return <ModuloMultasCLT caseId={caseId!} />;
+      case 'pensao':
+        return <ModuloPensaoAlimenticia caseId={caseId!} />;
       case 'honorarios':
         return <ModuloHonorarios caseId={caseId!} />;
       case 'custas':
@@ -706,6 +732,9 @@ export default function PjeCalcPage() {
                     <Badge variant="outline" className="text-[10px] font-mono">
                       {v.periodo_inicio?.slice(0, 7)} → {v.periodo_fim?.slice(0, 7)}
                     </Badge>
+                    <Button variant="outline" size="sm" className="h-7 text-[10px] px-2" onClick={() => setSelectedVerbaForGrid(v)}>
+                      <BarChart3 className="h-3 w-3 mr-1" /> Grade
+                    </Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={async () => {
                       await supabase.from("pjecalc_verbas").delete().eq("id", v.id);
                       queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] });
