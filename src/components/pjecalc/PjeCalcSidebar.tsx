@@ -94,9 +94,10 @@ export function PjeCalcSidebar({ activeModule, onModuleChange, collapsed, onTogg
                   </span>
                 </div>
               )}
-              {items.map((mod, idx) => {
+          {items.map((mod) => {
                 const isActive = activeModule === mod.id;
                 const Icon = mod.icon;
+                const globalIdx = MODULES.findIndex((m) => m.id === mod.id) + 1;
                 return (
                   <button
                     key={mod.id}
