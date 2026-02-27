@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -16,9 +16,9 @@ export function ModuloSeguroDesemprego({ caseId }: Props) {
   const [saving, setSaving] = useState(false);
 
   const { data } = useQuery({
-    queryKey: ["pjecalc_seguro_desemprego", caseId],
+    queryKey: ["pjecalc_seguro_config", caseId],
     queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_seguro_desemprego" as any).select("*").eq("case_id", caseId).maybeSingle();
+      const { data } = await supabase.from("pjecalc_seguro_config" as any).select("*").eq("case_id", caseId).maybeSingle();
       return data as any;
     },
   });
@@ -37,9 +37,14 @@ export function ModuloSeguroDesemprego({ caseId }: Props) {
     setSaving(true);
     try {
       const payload = { case_id: caseId, ...form, valor_parcela: form.valor_parcela ? parseFloat(form.valor_parcela) : null };
-      if (data?.id) await supabase.from("pjecalc_seguro_desemprego" as any).update(payload).eq("id", data.id);
-      else await supabase.from("pjecalc_seguro_desemprego" as any).insert(payload);
-      qc.invalidateQueries({ queryKey: ["pjecalc_seguro_desemprego", caseId] });
+      if (data?.id) {
+        const { error } = await supabase.from("pjecalc_seguro_config" as any).update(payload).eq("id", data.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("pjecalc_seguro_config" as any).insert(payload);
+        if (error) throw error;
+      }
+      qc.invalidateQueries({ queryKey: ["pjecalc_seguro_config", caseId] });
       toast.success("Seguro-desemprego salvo!");
     } catch (e) { toast.error((e as Error).message); }
     finally { setSaving(false); }
@@ -61,7 +66,7 @@ export function ModuloSeguroDesemprego({ caseId }: Props) {
             <div><Label className="text-xs">Nº de Parcelas</Label><Input type="number" min={3} max={5} value={form.parcelas} onChange={e => setForm(p => ({ ...p, parcelas: parseInt(e.target.value) || 5 }))} className="mt-1 h-8 text-xs" /></div>
             <div><Label className="text-xs">Valor por Parcela (R$)</Label><Input type="number" step="0.01" value={form.valor_parcela} onChange={e => setForm(p => ({ ...p, valor_parcela: e.target.value }))} className="mt-1 h-8 text-xs" placeholder="Calculado automaticamente" /></div>
           </div>
-          <p className="text-[10px] text-muted-foreground">Se marcado "Apurar", o valor será calculado com base na tabela vigente do FAT e incluído na condenação como indenização substitutiva.</p>
+          <p className="text-[10px] text-muted-foreground">Se marcado "Apurar", o valor será calculado com base na tabela vigente do FAT/CODEFAT 2025 e incluído na condenação como indenização substitutiva. Se o valor por parcela não for informado, será calculado automaticamente com base na última remuneração.</p>
         </CardContent>
       </Card>
     </div>

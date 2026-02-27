@@ -6,7 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Play, Loader2, FileBarChart, Download } from "lucide-react";
-import { PjeCalcEngine, type PjeParametros, type PjeHistoricoSalarial, type PjeFalta, type PjeFerias, type PjeVerba, type PjeFGTSConfig, type PjeCSConfig, type PjeIRConfig, type PjeCorrecaoConfig, type PjeLiquidacaoResult } from "@/lib/pjecalc/engine";
+import {
+  PjeCalcEngine,
+  type PjeParametros, type PjeHistoricoSalarial, type PjeFalta, type PjeFerias,
+  type PjeVerba, type PjeCartaoPonto, type PjeFGTSConfig, type PjeCSConfig,
+  type PjeIRConfig, type PjeCorrecaoConfig, type PjeHonorariosConfig,
+  type PjeCustasConfig, type PjeSeguroConfig, type PjeLiquidacaoResult,
+} from "@/lib/pjecalc/engine";
 
 interface Props { caseId: string; }
 
@@ -25,20 +31,26 @@ export function ModuloResumo({ caseId }: Props) {
   const executarLiquidacao = async () => {
     setLiquidando(true);
     try {
-      // Load all module data
-      const [paramsRes, histRes, faltasRes, feriasRes, verbasRes] = await Promise.all([
+      // Load all module data in parallel
+      const [paramsRes, histRes, faltasRes, feriasRes, verbasRes, cartaoRes] = await Promise.all([
         supabase.from("pjecalc_parametros").select("*").eq("case_id", caseId).maybeSingle(),
         supabase.from("pjecalc_historico_salarial").select("*").eq("case_id", caseId).order("periodo_inicio"),
         supabase.from("pjecalc_faltas").select("*").eq("case_id", caseId),
         supabase.from("pjecalc_ferias").select("*").eq("case_id", caseId),
         supabase.from("pjecalc_verbas").select("*").eq("case_id", caseId).order("ordem"),
+        supabase.from("pjecalc_cartao_ponto").select("*").eq("case_id", caseId).order("competencia"),
       ]);
 
-      // These tables are new and not yet in generated types, so we use raw queries
-      const fgtsData = await supabase.from("pjecalc_fgts_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any);
-      const csData = await supabase.from("pjecalc_cs_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any);
-      const irData = await supabase.from("pjecalc_ir_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any);
-      const correcaoData = await supabase.from("pjecalc_correcao_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any);
+      // Load config tables in parallel
+      const [fgtsData, csData, irData, correcaoData, honorariosData, custasData, seguroData] = await Promise.all([
+        supabase.from("pjecalc_fgts_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
+        supabase.from("pjecalc_cs_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
+        supabase.from("pjecalc_ir_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
+        supabase.from("pjecalc_correcao_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
+        supabase.from("pjecalc_honorarios" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
+        supabase.from("pjecalc_custas_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
+        supabase.from("pjecalc_seguro_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
+      ]);
 
       if (!paramsRes.data) throw new Error("Configure os Parâmetros primeiro.");
       if (!verbasRes.data?.length) throw new Error("Adicione pelo menos uma Verba.");
@@ -46,12 +58,21 @@ export function ModuloResumo({ caseId }: Props) {
       const params = paramsRes.data as unknown as PjeParametros;
       params.case_id = caseId;
 
-      const historicos: PjeHistoricoSalarial[] = (histRes.data || []).map((h: any) => ({
-        ...h, ocorrencias: [],
-      }));
-
+      const historicos: PjeHistoricoSalarial[] = (histRes.data || []).map((h: any) => ({ ...h, ocorrencias: [] }));
       const faltas: PjeFalta[] = (faltasRes.data || []).map((f: any) => ({ ...f }));
       const ferias: PjeFerias[] = (feriasRes.data || []).map((f: any) => ({ ...f }));
+
+      const cartaoPonto: PjeCartaoPonto[] = (cartaoRes.data || []).map((r: any) => ({
+        competencia: r.competencia,
+        dias_uteis: r.dias_uteis || 22,
+        dias_trabalhados: r.dias_trabalhados || 22,
+        horas_extras_50: r.horas_extras_50 || 0,
+        horas_extras_100: r.horas_extras_100 || 0,
+        horas_noturnas: r.horas_noturnas || 0,
+        intervalo_suprimido: r.intervalo_suprimido || 0,
+        dsr_horas: r.dsr_horas || 0,
+        sobreaviso: r.sobreaviso || 0,
+      }));
 
       const verbas: PjeVerba[] = (verbasRes.data || []).map((v: any) => ({
         ...v,
@@ -123,7 +144,7 @@ export function ModuloResumo({ caseId }: Props) {
         indice: correcaoData?.indice || 'IPCA-E',
         epoca: correcaoData?.epoca || 'mensal',
         data_fixa: correcaoData?.data_fixa,
-        juros_tipo: correcaoData?.juros_tipo || 'selic',
+        juros_tipo: correcaoData?.juros_tipo || 'simples_mensal',
         juros_percentual: correcaoData?.juros_percentual ?? 1,
         juros_inicio: correcaoData?.juros_inicio || 'ajuizamento',
         multa_523: correcaoData?.multa_523 ?? false,
@@ -131,15 +152,44 @@ export function ModuloResumo({ caseId }: Props) {
         data_liquidacao: correcaoData?.data_liquidacao || new Date().toISOString().slice(0, 10),
       };
 
+      const honorariosConfig: PjeHonorariosConfig = {
+        apurar_sucumbenciais: honorariosData?.apurar_sucumbenciais ?? true,
+        percentual_sucumbenciais: honorariosData?.percentual_sucumbenciais ?? 15,
+        base_sucumbenciais: honorariosData?.base_sucumbenciais || 'condenacao',
+        apurar_contratuais: honorariosData?.apurar_contratuais ?? false,
+        percentual_contratuais: honorariosData?.percentual_contratuais ?? 20,
+        valor_fixo: honorariosData?.valor_fixo,
+      };
+
+      const custasConfig: PjeCustasConfig = {
+        apurar: custasData?.apurar ?? true,
+        percentual: custasData?.percentual ?? 2,
+        valor_minimo: custasData?.valor_minimo ?? 10.64,
+        valor_maximo: custasData?.valor_maximo,
+        isento: custasData?.isento ?? false,
+        assistencia_judiciaria: custasData?.assistencia_judiciaria ?? false,
+      };
+
+      const seguroConfig: PjeSeguroConfig = {
+        apurar: seguroData?.apurar ?? false,
+        parcelas: seguroData?.parcelas ?? 5,
+        valor_parcela: seguroData?.valor_parcela,
+        recebeu: seguroData?.recebeu ?? false,
+      };
+
       // Execute engine
-      const engine = new PjeCalcEngine(params, historicos, faltas, ferias, verbas, fgtsConfig, csConfig, irConfig, correcaoConfig);
+      const engine = new PjeCalcEngine(
+        params, historicos, faltas, ferias, verbas, cartaoPonto,
+        fgtsConfig, csConfig, irConfig, correcaoConfig,
+        honorariosConfig, custasConfig, seguroConfig,
+      );
       const result = engine.liquidar();
 
       // Persist
       await supabase.from("pjecalc_liquidacao_resultado" as any).insert({
         case_id: caseId,
         resultado: result as any,
-        engine_version: '1.0.0',
+        engine_version: '2.0.0',
         data_liquidacao: correcaoConfig.data_liquidacao,
         total_bruto: result.resumo.principal_bruto,
         total_liquido: result.resumo.liquido_reclamante,
@@ -157,7 +207,7 @@ export function ModuloResumo({ caseId }: Props) {
   };
 
   const res: PjeLiquidacaoResult | null = resultado?.resultado || null;
-  const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+  const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
 
   return (
     <div className="space-y-4">
@@ -179,8 +229,8 @@ export function ModuloResumo({ caseId }: Props) {
           {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { label: 'Principal Bruto', value: res.resumo.principal_bruto, color: 'text-primary' },
-              { label: 'FGTS Total', value: res.resumo.fgts_total, color: 'text-primary' },
+              { label: 'Principal Bruto', value: res.resumo.principal_bruto, color: 'text-foreground' },
+              { label: 'Corrigido + Juros', value: res.resumo.principal_corrigido + res.resumo.juros_mora, color: 'text-primary' },
               { label: 'Líquido Reclamante', value: res.resumo.liquido_reclamante, color: 'text-[hsl(var(--success))]' },
               { label: 'Total Reclamada', value: res.resumo.total_reclamada, color: 'text-destructive' },
             ].map(item => (
@@ -195,7 +245,7 @@ export function ModuloResumo({ caseId }: Props) {
 
           {/* Detailed Breakdown */}
           <Card>
-            <CardHeader className="pb-3"><CardTitle className="text-sm">Composição</CardTitle></CardHeader>
+            <CardHeader className="pb-3"><CardTitle className="text-sm">Composição da Liquidação</CardTitle></CardHeader>
             <CardContent>
               <table className="w-full text-xs">
                 <tbody>
@@ -205,10 +255,12 @@ export function ModuloResumo({ caseId }: Props) {
                     ['(+) Juros de Mora', res.resumo.juros_mora],
                     ['(+) FGTS (depósitos + multa)', res.resumo.fgts_total],
                     ['(-) CS Segurado', -res.resumo.cs_segurado],
-                    ['(-) IRRF', -res.resumo.ir_retido],
-                    ['(+) Multa Art. 523 CPC', res.resumo.multa_523],
-                    ['(+) Honorários', res.resumo.honorarios],
-                    ['(+) Custas', res.resumo.custas],
+                    ['(-) IRRF (Art. 12-A RRA)', -res.resumo.ir_retido],
+                    ...(res.resumo.seguro_desemprego > 0 ? [['(+) Seguro-Desemprego (indenização)', res.resumo.seguro_desemprego]] : []),
+                    ...(res.resumo.multa_523 > 0 ? [['(+) Multa Art. 523, §1º CPC', res.resumo.multa_523]] : []),
+                    ...(res.resumo.honorarios_sucumbenciais > 0 ? [['(+) Honorários Sucumbenciais', res.resumo.honorarios_sucumbenciais]] : []),
+                    ...(res.resumo.honorarios_contratuais > 0 ? [['(+) Honorários Contratuais', res.resumo.honorarios_contratuais]] : []),
+                    ...(res.resumo.custas > 0 ? [['(+) Custas Processuais', res.resumo.custas]] : []),
                   ].map(([label, value]) => (
                     <tr key={label as string} className="border-b border-border/30">
                       <td className="py-2 text-muted-foreground">{label}</td>
@@ -237,7 +289,16 @@ export function ModuloResumo({ caseId }: Props) {
             <CardHeader className="pb-3"><CardTitle className="text-sm">Verbas ({res.verbas.length})</CardTitle></CardHeader>
             <CardContent>
               <table className="w-full text-xs">
-                <thead><tr className="bg-muted/50"><th className="p-2 text-left">Verba</th><th className="p-2 text-center">Tipo</th><th className="p-2 text-right">Devido</th><th className="p-2 text-right">Pago</th><th className="p-2 text-right">Diferença</th></tr></thead>
+                <thead><tr className="bg-muted/50">
+                  <th className="p-2 text-left">Verba</th>
+                  <th className="p-2 text-center">Tipo</th>
+                  <th className="p-2 text-right">Devido</th>
+                  <th className="p-2 text-right">Pago</th>
+                  <th className="p-2 text-right">Diferença</th>
+                  <th className="p-2 text-right">Corrigido</th>
+                  <th className="p-2 text-right">Juros</th>
+                  <th className="p-2 text-right font-bold">Final</th>
+                </tr></thead>
                 <tbody>
                   {res.verbas.map(v => (
                     <tr key={v.verba_id} className="border-b border-border/30">
@@ -245,13 +306,46 @@ export function ModuloResumo({ caseId }: Props) {
                       <td className="p-2 text-center"><Badge variant={v.tipo === 'principal' ? 'default' : 'secondary'} className="text-[10px]">{v.tipo === 'principal' ? 'P' : 'R'}</Badge></td>
                       <td className="p-2 text-right font-mono">{fmt(v.total_devido)}</td>
                       <td className="p-2 text-right font-mono">{fmt(v.total_pago)}</td>
-                      <td className="p-2 text-right font-mono font-medium">{fmt(v.total_diferenca)}</td>
+                      <td className="p-2 text-right font-mono">{fmt(v.total_diferenca)}</td>
+                      <td className="p-2 text-right font-mono">{fmt(v.total_corrigido)}</td>
+                      <td className="p-2 text-right font-mono">{fmt(v.total_juros)}</td>
+                      <td className="p-2 text-right font-mono font-bold">{fmt(v.total_final)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </CardContent>
           </Card>
+
+          {/* FGTS Detail */}
+          {res.fgts.total_fgts > 0 && (
+            <Card>
+              <CardHeader className="pb-3"><CardTitle className="text-sm">FGTS</CardTitle></CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-4 gap-4 text-xs">
+                  <div><span className="text-muted-foreground">Depósitos (8%)</span><div className="font-mono font-medium">{fmt(res.fgts.total_depositos)}</div></div>
+                  <div><span className="text-muted-foreground">Multa</span><div className="font-mono font-medium">{fmt(res.fgts.multa_valor)}</div></div>
+                  {res.fgts.lc110_10 > 0 && <div><span className="text-muted-foreground">LC 110 (10%)</span><div className="font-mono font-medium">{fmt(res.fgts.lc110_10)}</div></div>}
+                  <div><span className="text-muted-foreground font-bold">Total FGTS</span><div className="font-mono font-bold">{fmt(res.fgts.total_fgts)}</div></div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* IR Detail */}
+          {res.imposto_renda.imposto_devido > 0 && (
+            <Card>
+              <CardHeader className="pb-3"><CardTitle className="text-sm">Imposto de Renda (Art. 12-A RRA)</CardTitle></CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-4 gap-4 text-xs">
+                  <div><span className="text-muted-foreground">Base</span><div className="font-mono">{fmt(res.imposto_renda.base_calculo)}</div></div>
+                  <div><span className="text-muted-foreground">Deduções</span><div className="font-mono">{fmt(res.imposto_renda.deducoes)}</div></div>
+                  <div><span className="text-muted-foreground">Meses RRA</span><div className="font-mono">{res.imposto_renda.meses_rra}</div></div>
+                  <div><span className="text-muted-foreground font-bold">IRRF</span><div className="font-mono font-bold text-destructive">{fmt(res.imposto_renda.imposto_devido)}</div></div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="text-[10px] text-muted-foreground text-right">
             Liquidação em {resultado?.data_liquidacao || '—'} • Engine v{resultado?.engine_version}
