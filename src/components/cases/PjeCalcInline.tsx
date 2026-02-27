@@ -679,11 +679,11 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
         <CardContent className="p-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Zap className="h-4 w-4 text-primary" />
-            <span className="text-xs font-medium">Sincronização Automática OCR → Cálculo</span>
+            <span className="text-xs font-medium">Sincronização Automática de Dados</span>
           </div>
           <Button size="sm" variant="outline" onClick={syncFromOCR} disabled={syncing}>
             {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Zap className="h-4 w-4 mr-1" />}
-            Sincronizar do OCR
+            Sincronizar Dados
           </Button>
         </CardContent>
       </Card>
