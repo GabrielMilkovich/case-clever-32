@@ -26,17 +26,19 @@ export function ModuloResumo({ caseId }: Props) {
     setLiquidando(true);
     try {
       // Load all module data
-      const [paramsRes, histRes, faltasRes, feriasRes, verbasRes, fgtsRes, csRes, irRes, correcaoRes] = await Promise.all([
+      const [paramsRes, histRes, faltasRes, feriasRes, verbasRes] = await Promise.all([
         supabase.from("pjecalc_parametros").select("*").eq("case_id", caseId).maybeSingle(),
         supabase.from("pjecalc_historico_salarial").select("*").eq("case_id", caseId).order("periodo_inicio"),
         supabase.from("pjecalc_faltas").select("*").eq("case_id", caseId),
         supabase.from("pjecalc_ferias").select("*").eq("case_id", caseId),
         supabase.from("pjecalc_verbas").select("*").eq("case_id", caseId).order("ordem"),
-        supabase.from("pjecalc_fgts_config" as any).select("*").eq("case_id", caseId).maybeSingle(),
-        supabase.from("pjecalc_cs_config" as any).select("*").eq("case_id", caseId).maybeSingle(),
-        supabase.from("pjecalc_ir_config" as any).select("*").eq("case_id", caseId).maybeSingle(),
-        supabase.from("pjecalc_correcao_config" as any).select("*").eq("case_id", caseId).maybeSingle(),
       ]);
+
+      // These tables are new and not yet in generated types, so we use raw queries
+      const fgtsData = await supabase.from("pjecalc_fgts_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any);
+      const csData = await supabase.from("pjecalc_cs_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any);
+      const irData = await supabase.from("pjecalc_ir_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any);
+      const correcaoData = await supabase.from("pjecalc_correcao_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any);
 
       if (!paramsRes.data) throw new Error("Configure os Parâmetros primeiro.");
       if (!verbasRes.data?.length) throw new Error("Adicione pelo menos uma Verba.");
