@@ -223,10 +223,36 @@ export function ModuloResumo({ caseId }: Props) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Resumo da Liquidação</h2>
-        <Button onClick={executarLiquidacao} disabled={liquidando} size="sm">
-          {liquidando ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Play className="h-4 w-4 mr-1" />}
-          Liquidar
-        </Button>
+        <div className="flex gap-2">
+          {res && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => {
+                gerarRelatorioPDF(res, {
+                  cliente: caseData?.cliente,
+                  processo: caseData?.numero_processo,
+                  dataLiquidacao: resultado?.data_liquidacao,
+                  engineVersion: resultado?.engine_version,
+                });
+              }}>
+                <Printer className="h-4 w-4 mr-1" /> PDF
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => {
+                downloadXML(res, {
+                  cliente: caseData?.cliente,
+                  processo: caseData?.numero_processo,
+                  dataLiquidacao: resultado?.data_liquidacao,
+                  engineVersion: resultado?.engine_version,
+                });
+              }}>
+                <FileCode className="h-4 w-4 mr-1" /> XML
+              </Button>
+            </>
+          )}
+          <Button onClick={executarLiquidacao} disabled={liquidando} size="sm">
+            {liquidando ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Play className="h-4 w-4 mr-1" />}
+            Liquidar
+          </Button>
+        </div>
       </div>
 
       {!res ? (
