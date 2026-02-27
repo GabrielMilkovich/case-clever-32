@@ -1776,43 +1776,41 @@ export class PjeCalcEngine {
     // ── 8. Seguro-Desemprego ──
     const seguro = this.calcularSeguroDesemprego();
 
+    // ── 8b. Previdência Privada ──
+    let prevPrivada: PjePrevidenciaPrivadaResult = { apurado: false, base: 0, percentual: 0, valor: 0 };
+    if (this.prevPrivadaConfig.apurar && this.prevPrivadaConfig.percentual > 0) {
+      let basePP = 0;
+      for (const vr of verbaResults) {
+        const verba = this.verbas.find(vb => vb.id === vr.verba_id);
+        if (!verba?.incidencias.previdencia_privada) continue;
+        if (this.prevPrivadaConfig.base_calculo === 'devido') basePP += vr.total_devido;
+        else if (this.prevPrivadaConfig.base_calculo === 'corrigido') basePP += vr.total_corrigido;
+        else basePP += vr.total_diferenca;
+      }
+      const valorPP = Number(new Decimal(basePP).times(this.prevPrivadaConfig.percentual / 100).toDP(2));
+      prevPrivada = { apurado: true, base: basePP, percentual: this.prevPrivadaConfig.percentual, valor: valorPP };
+    }
+
     // ── 9. Composição do Resumo ──
     const principalBruto = verbaResults
-      .filter(v => {
-        const verba = this.verbas.find(vb => vb.id === v.verba_id);
-        return verba?.compor_principal !== false;
-      })
+      .filter(v => { const verba = this.verbas.find(vb => vb.id === v.verba_id); return verba?.compor_principal !== false; })
       .reduce((s, v) => s + v.total_diferenca, 0);
-
     const principalCorrigido = verbaResults
-      .filter(v => {
-        const verba = this.verbas.find(vb => vb.id === v.verba_id);
-        return verba?.compor_principal !== false;
-      })
+      .filter(v => { const verba = this.verbas.find(vb => vb.id === v.verba_id); return verba?.compor_principal !== false; })
       .reduce((s, v) => s + v.total_corrigido, 0);
-
     const jurosMora = verbaResults
-      .filter(v => {
-        const verba = this.verbas.find(vb => vb.id === v.verba_id);
-        return verba?.compor_principal !== false;
-      })
+      .filter(v => { const verba = this.verbas.find(vb => vb.id === v.verba_id); return verba?.compor_principal !== false; })
       .reduce((s, v) => s + v.total_juros, 0);
 
-    // ── 10. Honorários ──
     const honorarios = this.calcularHonorarios(principalCorrigido, jurosMora, fgts.total_fgts);
-
-    // ── 11. Multa 523 ──
     const valorCondenacao = principalCorrigido + jurosMora + fgts.total_fgts;
     const multa523 = this.calcularMulta523(valorCondenacao);
-
-    // ── 12. Custas ──
     const custas = this.calcularCustas(valorCondenacao);
-
     const csDescontado = this.csConfig.cobrar_reclamante ? cs.total_segurado : 0;
 
     const liquido = Number(new Decimal(
       principalCorrigido + jurosMora + fgts.total_fgts + seguro.total + multa523
-      - csDescontado - ir.imposto_devido
+      - csDescontado - ir.imposto_devido - prevPrivada.valor
     ).toDP(2));
 
     const totalReclamada = Number(new Decimal(
@@ -1824,28 +1822,16 @@ export class PjeCalcEngine {
       principal_bruto: Number(new Decimal(principalBruto).toDP(2)),
       principal_corrigido: Number(new Decimal(principalCorrigido).toDP(2)),
       juros_mora: Number(new Decimal(jurosMora).toDP(2)),
-      fgts_total: fgts.total_fgts,
-      cs_segurado: csDescontado,
-      cs_empregador: cs.total_empregador,
-      ir_retido: ir.imposto_devido,
-      seguro_desemprego: seguro.total,
-      multa_523: multa523,
-      honorarios_sucumbenciais: honorarios.sucumbenciais,
-      honorarios_contratuais: honorarios.contratuais,
-      custas,
-      liquido_reclamante: liquido,
-      total_reclamada: totalReclamada,
+      fgts_total: fgts.total_fgts, cs_segurado: csDescontado, cs_empregador: cs.total_empregador,
+      ir_retido: ir.imposto_devido, seguro_desemprego: seguro.total, previdencia_privada: prevPrivada.valor,
+      multa_523: multa523, honorarios_sucumbenciais: honorarios.sucumbenciais,
+      honorarios_contratuais: honorarios.contratuais, custas, liquido_reclamante: liquido, total_reclamada: totalReclamada,
     };
 
     return {
       data_liquidacao: this.correcaoConfig.data_liquidacao,
-      verbas: verbaResults,
-      fgts,
-      contribuicao_social: cs,
-      imposto_renda: ir,
-      seguro_desemprego: seguro,
-      resumo,
-      validacao,
+      verbas: verbaResults, fgts, contribuicao_social: cs, imposto_renda: ir,
+      seguro_desemprego: seguro, previdencia_privada: prevPrivada, resumo, validacao,
     };
   }
 
