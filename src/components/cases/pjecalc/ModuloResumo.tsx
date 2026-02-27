@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Play, Loader2, FileBarChart, Download } from "lucide-react";
+import { Play, Loader2, FileBarChart, Download, Printer, FileCode } from "lucide-react";
 import {
   PjeCalcEngine,
   type PjeParametros, type PjeHistoricoSalarial, type PjeFalta, type PjeFerias,
@@ -13,12 +13,22 @@ import {
   type PjeIRConfig, type PjeCorrecaoConfig, type PjeHonorariosConfig,
   type PjeCustasConfig, type PjeSeguroConfig, type PjeLiquidacaoResult,
 } from "@/lib/pjecalc/engine";
+import { gerarRelatorioPDF } from "@/lib/pjecalc/pdf-report";
+import { downloadXML } from "@/lib/pjecalc/xml-export";
 
 interface Props { caseId: string; }
 
 export function ModuloResumo({ caseId }: Props) {
   const qc = useQueryClient();
   const [liquidando, setLiquidando] = useState(false);
+
+  const { data: caseData } = useQuery({
+    queryKey: ["case", caseId],
+    queryFn: async () => {
+      const { data } = await supabase.from("cases").select("*").eq("id", caseId).maybeSingle();
+      return data;
+    },
+  });
 
   const { data: resultado } = useQuery({
     queryKey: ["pjecalc_liquidacao", caseId],
@@ -213,10 +223,36 @@ export function ModuloResumo({ caseId }: Props) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Resumo da Liquidação</h2>
-        <Button onClick={executarLiquidacao} disabled={liquidando} size="sm">
-          {liquidando ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Play className="h-4 w-4 mr-1" />}
-          Liquidar
-        </Button>
+        <div className="flex gap-2">
+          {res && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => {
+                gerarRelatorioPDF(res, {
+                  cliente: caseData?.cliente,
+                  processo: caseData?.numero_processo,
+                  dataLiquidacao: resultado?.data_liquidacao,
+                  engineVersion: resultado?.engine_version,
+                });
+              }}>
+                <Printer className="h-4 w-4 mr-1" /> PDF
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => {
+                downloadXML(res, {
+                  cliente: caseData?.cliente,
+                  processo: caseData?.numero_processo,
+                  dataLiquidacao: resultado?.data_liquidacao,
+                  engineVersion: resultado?.engine_version,
+                });
+              }}>
+                <FileCode className="h-4 w-4 mr-1" /> XML
+              </Button>
+            </>
+          )}
+          <Button onClick={executarLiquidacao} disabled={liquidando} size="sm">
+            {liquidando ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Play className="h-4 w-4 mr-1" />}
+            Liquidar
+          </Button>
+        </div>
       </div>
 
       {!res ? (

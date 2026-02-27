@@ -1,17 +1,20 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Trash2, Loader2, Calculator } from "lucide-react";
+import { Plus, Trash2, Loader2, Calculator, Upload, Download } from "lucide-react";
+import { parseCartaoPontoCSV, gerarCSVModelo } from "@/lib/pjecalc/csv-import";
 
 interface Props { caseId: string; dataAdmissao?: string; dataDemissao?: string; }
 
 export function ModuloCartaoPonto({ caseId, dataAdmissao, dataDemissao }: Props) {
   const qc = useQueryClient();
   const [generating, setGenerating] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: registros = [] } = useQuery({
     queryKey: ["pjecalc_cartao_ponto", caseId],
@@ -49,14 +52,55 @@ export function ModuloCartaoPonto({ caseId, dataAdmissao, dataDemissao }: Props)
     await supabase.from("pjecalc_cartao_ponto" as any).update({ [field]: value }).eq("id", id);
   };
 
+  const handleCSVImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const { rows, errors } = parseCartaoPontoCSV(text);
+      if (errors.length > 0) {
+        toast.error(`Erros no CSV: ${errors.slice(0, 3).join("; ")}`);
+      }
+      if (rows.length === 0) { toast.error("Nenhuma linha válida encontrada."); return; }
+      // Delete existing and insert
+      await supabase.from("pjecalc_cartao_ponto" as any).delete().eq("case_id", caseId);
+      const dbRows = rows.map(r => ({ case_id: caseId, ...r }));
+      await supabase.from("pjecalc_cartao_ponto" as any).insert(dbRows);
+      qc.invalidateQueries({ queryKey: ["pjecalc_cartao_ponto", caseId] });
+      toast.success(`${rows.length} competências importadas do CSV`);
+    } catch (err) { toast.error((err as Error).message); }
+    finally { setImporting(false); if (fileInputRef.current) fileInputRef.current.value = ""; }
+  };
+
+  const downloadModelo = () => {
+    const csv = gerarCSVModelo();
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "cartao_ponto_modelo.csv";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Cartão de Ponto</h2>
-        <Button size="sm" variant="outline" onClick={gerarCompetencias} disabled={generating}>
-          {generating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Calculator className="h-4 w-4 mr-1" />}
-          Gerar Competências
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="ghost" onClick={downloadModelo} title="Baixar modelo CSV">
+            <Download className="h-4 w-4 mr-1" /> Modelo
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+            {importing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
+            Importar CSV
+          </Button>
+          <input ref={fileInputRef} type="file" accept=".csv,.txt,.tsv" className="hidden" onChange={handleCSVImport} />
+          <Button size="sm" variant="outline" onClick={gerarCompetencias} disabled={generating}>
+            {generating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Calculator className="h-4 w-4 mr-1" />}
+            Gerar
+          </Button>
+        </div>
       </div>
       {registros.length === 0 ? (
         <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Clique em "Gerar Competências" para criar o cartão de ponto.</CardContent></Card>
