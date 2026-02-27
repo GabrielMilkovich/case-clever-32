@@ -115,7 +115,7 @@ export function PjeCalcSidebar({ activeModule, onModuleChange, collapsed, onTogg
                       <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r bg-sidebar-primary" />
                     )}
                     <span className="flex items-center justify-center w-5 h-5 text-xs font-mono text-sidebar-foreground/40">
-                      {String(idx + 1 + (group === "verbas" ? 6 : group === "encargos" ? 7 : group === "resultado" ? 10 : 0)).padStart(2, "0")}
+                      {String(globalIdx).padStart(2, "0")}
                     </span>
                     <Icon className="h-4 w-4 shrink-0" />
                     {!collapsed && <span className="truncate">{mod.label}</span>}
