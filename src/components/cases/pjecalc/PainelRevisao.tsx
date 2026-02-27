@@ -27,7 +27,7 @@ interface Props {
   caseId: string;
   validacao: PjeValidationResult | null;
   resultado: PjeLiquidacaoResult | null;
-  modulosStatus: Record<string, 'nao_iniciado' | 'incompleto' | 'preenchido' | 'validado'>;
+  modulosStatus: Record<string, string>;
 }
 
 export function PainelRevisao({ caseId, validacao, resultado, modulosStatus }: Props) {
