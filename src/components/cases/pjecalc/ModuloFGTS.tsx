@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Save, Loader2 } from "lucide-react";
+import { FGTSSaldosSaques } from "./FGTSSaldosSaques";
 
 interface Props { caseId: string; }
 
@@ -133,6 +134,7 @@ export function ModuloFGTS({ caseId }: Props) {
           <div className="flex items-center gap-2"><Checkbox checked={form.lc110_05} onCheckedChange={v => setForm(p => ({ ...p, lc110_05: !!v }))} /><Label className="text-xs">LC 110/2001 — 0,5% (empregador)</Label></div>
         </CardContent>
       </Card>
+      <FGTSSaldosSaques caseId={caseId} />
     </div>
   );
 }

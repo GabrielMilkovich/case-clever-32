@@ -29,25 +29,34 @@ export function ModuloCS({ caseId }: Props) {
     aliquota_segurado_tipo: 'empregado', aliquota_segurado_fixa: '',
     limitar_teto: true, apurar_empresa: true, apurar_sat: true, apurar_terceiros: true,
     aliquota_empresa_fixa: '20', aliquota_sat_fixa: '2', aliquota_terceiros_fixa: '5.8',
+    simples_nacional: false, simples_inicio: '', simples_fim: '',
   });
 
   useEffect(() => {
-    if (data) setForm({
-      apurar_segurado: data.apurar_segurado ?? true, cobrar_reclamante: data.cobrar_reclamante ?? true,
-      cs_sobre_salarios_pagos: data.cs_sobre_salarios_pagos ?? false,
-      aliquota_segurado_tipo: data.aliquota_segurado_tipo || 'empregado',
-      aliquota_segurado_fixa: data.aliquota_segurado_fixa?.toString() || '',
-      limitar_teto: data.limitar_teto ?? true, apurar_empresa: data.apurar_empresa ?? true,
-      apurar_sat: data.apurar_sat ?? true, apurar_terceiros: data.apurar_terceiros ?? true,
-      aliquota_empresa_fixa: data.aliquota_empresa_fixa?.toString() || '20',
-      aliquota_sat_fixa: data.aliquota_sat_fixa?.toString() || '2',
-      aliquota_terceiros_fixa: data.aliquota_terceiros_fixa?.toString() || '5.8',
-    });
+    if (data) {
+      const periodos = data.periodos_simples || [];
+      setForm({
+        apurar_segurado: data.apurar_segurado ?? true, cobrar_reclamante: data.cobrar_reclamante ?? true,
+        cs_sobre_salarios_pagos: data.cs_sobre_salarios_pagos ?? false,
+        aliquota_segurado_tipo: data.aliquota_segurado_tipo || 'empregado',
+        aliquota_segurado_fixa: data.aliquota_segurado_fixa?.toString() || '',
+        limitar_teto: data.limitar_teto ?? true, apurar_empresa: data.apurar_empresa ?? true,
+        apurar_sat: data.apurar_sat ?? true, apurar_terceiros: data.apurar_terceiros ?? true,
+        aliquota_empresa_fixa: data.aliquota_empresa_fixa?.toString() || '20',
+        aliquota_sat_fixa: data.aliquota_sat_fixa?.toString() || '2',
+        aliquota_terceiros_fixa: data.aliquota_terceiros_fixa?.toString() || '5.8',
+        simples_nacional: periodos.length > 0,
+        simples_inicio: periodos[0]?.inicio || '',
+        simples_fim: periodos[0]?.fim || '',
+      });
+    }
   }, [data]);
 
   const save = async () => {
     setSaving(true);
     try {
+      const periodos_simples = form.simples_nacional && form.simples_inicio && form.simples_fim
+        ? [{ inicio: form.simples_inicio, fim: form.simples_fim }] : [];
       const payload = {
         case_id: caseId, apurar_segurado: form.apurar_segurado, cobrar_reclamante: form.cobrar_reclamante,
         cs_sobre_salarios_pagos: form.cs_sobre_salarios_pagos, aliquota_segurado_tipo: form.aliquota_segurado_tipo,
@@ -57,6 +66,7 @@ export function ModuloCS({ caseId }: Props) {
         aliquota_empresa_fixa: parseFloat(form.aliquota_empresa_fixa) || 20,
         aliquota_sat_fixa: parseFloat(form.aliquota_sat_fixa) || 2,
         aliquota_terceiros_fixa: parseFloat(form.aliquota_terceiros_fixa) || 5.8,
+        periodos_simples,
       };
       if (data?.id) await supabase.from("pjecalc_cs_config" as any).update(payload).eq("id", data.id);
       else await supabase.from("pjecalc_cs_config" as any).insert(payload);
@@ -114,6 +124,18 @@ export function ModuloCS({ caseId }: Props) {
               <Input type="number" step="0.01" value={form.aliquota_terceiros_fixa} onChange={e => setForm(p => ({ ...p, aliquota_terceiros_fixa: e.target.value }))} className="h-8 text-xs" placeholder="5.8%" />
             </div>
           </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="pb-3"><CardTitle className="text-sm">Simples Nacional</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center gap-2"><Checkbox checked={form.simples_nacional} onCheckedChange={v => setForm(p => ({ ...p, simples_nacional: !!v }))} /><Label className="text-xs">Empresa optante do Simples Nacional (isenta CS patronal)</Label></div>
+          {form.simples_nacional && (
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label className="text-xs">Início do Simples</Label><Input type="date" value={form.simples_inicio} onChange={e => setForm(p => ({ ...p, simples_inicio: e.target.value }))} className="mt-1 h-8 text-xs" /></div>
+              <div><Label className="text-xs">Fim do Simples</Label><Input type="date" value={form.simples_fim} onChange={e => setForm(p => ({ ...p, simples_fim: e.target.value }))} className="mt-1 h-8 text-xs" /></div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
