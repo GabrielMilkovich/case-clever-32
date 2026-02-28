@@ -304,6 +304,7 @@ export default function PjeCalcPage() {
         case 'prev_privada': return <ModuloPrevidenciaPrivada caseId={caseId!} />;
         case 'custas': return <ModuloCustas caseId={caseId!} />;
         case 'resumo': return <ModuloResumo caseId={caseId!} />;
+        case 'tabelas_regionais': return <ModuloTabelasRegionais caseId={caseId!} estado={formParams.estado} municipio={formParams.municipio} />;
         // Phase 4 modules
         case 'memoria': return resultado?.resultado ? <MemoriaCalculoExpandida resultado={resultado.resultado} /> : <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Execute a liquidação primeiro.</CardContent></Card>;
         case 'comparacao': return <ComparacaoCenarios caseId={caseId!} />;
@@ -459,6 +460,8 @@ export default function PjeCalcPage() {
           <div className="flex items-center gap-2"><Checkbox checked={formParams.considerar_feriado_municipal} onCheckedChange={v => setFormParams(p => ({ ...p, considerar_feriado_municipal: !!v }))} /><Label className="text-xs">Considerar Feriado Municipal</Label></div>
         </CardContent>
       </Card>
+      {/* Phase 10: Saturday exceptions per period */}
+      <ExcecoesSabado caseId={caseId!} globalSabadoDiaUtil={formParams.sabado_dia_util} />
     </div>
   );
 
