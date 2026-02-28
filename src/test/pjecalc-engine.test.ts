@@ -150,7 +150,7 @@ const defaultHonorarios: PjeHonorariosConfig = {
 
 const defaultCustas: PjeCustasConfig = {
   apurar: true, percentual: 2, valor_minimo: 10.64, isento: false,
-  assistencia_judiciaria: false,
+  assistencia_judiciaria: false, itens: [],
 };
 
 const defaultSeguro: PjeSeguroConfig = {

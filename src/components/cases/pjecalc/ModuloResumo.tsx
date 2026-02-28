@@ -204,6 +204,7 @@ export function ModuloResumo({ caseId }: Props) {
         valor_maximo: custasData?.valor_maximo,
         isento: custasData?.isento ?? false,
         assistencia_judiciaria: custasData?.assistencia_judiciaria ?? false,
+        itens: custasData?.itens ?? [],
       };
 
       const seguroConfig: PjeSeguroConfig = {
