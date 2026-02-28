@@ -1721,6 +1721,18 @@ export class PjeCalcEngine {
       if (v.valor === 'calculado' && v.base_calculo.historicos.length === 0 && v.base_calculo.verbas.length === 0 && !this.params.ultima_remuneracao && !this.params.maior_remuneracao) {
         itens.push({ tipo: 'alerta', modulo: 'Verbas', mensagem: `Verba "${v.nome}" sem base de cálculo identificável` });
       }
+      // Verificar divisor zero
+      if (v.valor === 'calculado' && v.tipo_divisor === 'informado' && (v.divisor_informado === 0 || !v.divisor_informado)) {
+        itens.push({ tipo: 'erro', modulo: 'Verbas', mensagem: `Verba "${v.nome}" com divisor zero — causaria divisão por zero` });
+      }
+      // Verificar multiplicador zero em verbas calculadas
+      if (v.valor === 'calculado' && v.multiplicador === 0) {
+        itens.push({ tipo: 'alerta', modulo: 'Verbas', mensagem: `Verba "${v.nome}" com multiplicador = 0 — resultado será zero` });
+      }
+      // Verificar incidências conflitantes
+      if (v.caracteristica === 'ferias' && v.incidencias.contribuicao_social) {
+        itens.push({ tipo: 'observacao', modulo: 'Verbas', mensagem: `Férias "${v.nome}" com incidência CS ativa — férias indenizadas são isentas de CS` });
+      }
     }
 
     // ── Histórico salarial ──
