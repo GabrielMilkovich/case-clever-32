@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Save, Loader2 } from "lucide-react";
 import { FGTSSaldosSaques } from "./FGTSSaldosSaques";
+import { GradeFGTSOcorrencias } from "./GradeFGTSOcorrencias";
 
 interface Props { caseId: string; }
 
@@ -88,38 +89,9 @@ export function ModuloFGTS({ caseId }: Props) {
         <CardContent className="space-y-3">
           <div className="flex items-center gap-2"><Checkbox checked={form.multa_apurar} onCheckedChange={v => setForm(p => ({ ...p, multa_apurar: !!v }))} /><Label className="text-xs">Apurar Multa</Label></div>
           <div className="grid grid-cols-3 gap-3">
-            <div>
-              <Label className="text-xs">Tipo</Label>
-              <Select value={form.multa_tipo} onValueChange={v => setForm(p => ({ ...p, multa_tipo: v }))}>
-                <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="calculada">Calculada</SelectItem>
-                  <SelectItem value="informada">Informada</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Percentual (%)</Label>
-              <Select value={form.multa_percentual.toString()} onValueChange={v => setForm(p => ({ ...p, multa_percentual: Number(v) }))}>
-                <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="40">40%</SelectItem>
-                  <SelectItem value="20">20%</SelectItem>
-                  <SelectItem value="0">0%</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Base</Label>
-              <Select value={form.multa_base} onValueChange={v => setForm(p => ({ ...p, multa_base: v }))}>
-                <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="devido">Devido</SelectItem>
-                  <SelectItem value="diferenca">Diferença</SelectItem>
-                  <SelectItem value="saldo_saque">Saldo p/ Saque</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <div><Label className="text-xs">Tipo</Label><Select value={form.multa_tipo} onValueChange={v => setForm(p => ({ ...p, multa_tipo: v }))}><SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="calculada">Calculada</SelectItem><SelectItem value="informada">Informada</SelectItem></SelectContent></Select></div>
+            <div><Label className="text-xs">Percentual (%)</Label><Select value={form.multa_percentual.toString()} onValueChange={v => setForm(p => ({ ...p, multa_percentual: Number(v) }))}><SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="40">40%</SelectItem><SelectItem value="20">20%</SelectItem><SelectItem value="0">0%</SelectItem></SelectContent></Select></div>
+            <div><Label className="text-xs">Base</Label><Select value={form.multa_base} onValueChange={v => setForm(p => ({ ...p, multa_base: v }))}><SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="devido">Devido</SelectItem><SelectItem value="diferenca">Diferença</SelectItem><SelectItem value="saldo_saque">Saldo p/ Saque</SelectItem></SelectContent></Select></div>
           </div>
           {form.multa_tipo === 'informada' && (
             <div><Label className="text-xs">Valor Informado (R$)</Label><Input type="number" step="0.01" value={form.multa_valor_informado} onChange={e => setForm(p => ({ ...p, multa_valor_informado: e.target.value }))} className="mt-1 h-8 text-xs" /></div>
@@ -135,6 +107,8 @@ export function ModuloFGTS({ caseId }: Props) {
         </CardContent>
       </Card>
       <FGTSSaldosSaques caseId={caseId} />
+      {/* Grade editável de ocorrências FGTS */}
+      <GradeFGTSOcorrencias caseId={caseId} />
     </div>
   );
 }

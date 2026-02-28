@@ -2530,6 +2530,57 @@ export type Database = {
           },
         ]
       }
+      pjecalc_cs_ocorrencias: {
+        Row: {
+          aba: string
+          ativa: boolean
+          base: number
+          calculo_id: string
+          competencia: string
+          empresa: number
+          id: string
+          origem: string
+          sat: number
+          segurado: number
+          terceiros: number
+          total: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          aba?: string
+          ativa?: boolean
+          base?: number
+          calculo_id: string
+          competencia: string
+          empresa?: number
+          id?: string
+          origem?: string
+          sat?: number
+          segurado?: number
+          terceiros?: number
+          total?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          aba?: string
+          ativa?: boolean
+          base?: number
+          calculo_id?: string
+          competencia?: string
+          empresa?: number
+          id?: string
+          origem?: string
+          sat?: number
+          segurado?: number
+          terceiros?: number
+          total?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       pjecalc_custas: {
         Row: {
           apurar: boolean | null
@@ -2992,6 +3043,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pjecalc_fgts_ocorrencias: {
+        Row: {
+          aliquota: number
+          ativa: boolean
+          base_historico: number
+          base_total: number
+          base_verbas: number
+          calculo_id: string
+          competencia: string
+          id: string
+          multa: number
+          origem: string
+          recolhido: number
+          updated_at: string
+          updated_by: string | null
+          valor: number
+        }
+        Insert: {
+          aliquota?: number
+          ativa?: boolean
+          base_historico?: number
+          base_total?: number
+          base_verbas?: number
+          calculo_id: string
+          competencia: string
+          id?: string
+          multa?: number
+          origem?: string
+          recolhido?: number
+          updated_at?: string
+          updated_by?: string | null
+          valor?: number
+        }
+        Update: {
+          aliquota?: number
+          ativa?: boolean
+          base_historico?: number
+          base_total?: number
+          base_verbas?: number
+          calculo_id?: string
+          competencia?: string
+          id?: string
+          multa?: number
+          origem?: string
+          recolhido?: number
+          updated_at?: string
+          updated_by?: string | null
+          valor?: number
+        }
+        Relationships: []
       }
       pjecalc_historico_ocorrencias: {
         Row: {
@@ -3552,6 +3654,75 @@ export type Database = {
           texto?: string
           tipo?: string | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      pjecalc_ocorrencias: {
+        Row: {
+          ativa: boolean
+          base_valor: number
+          calculo_id: string
+          competencia: string
+          correcao: number
+          devido: number
+          diferenca: number
+          divisor_valor: number
+          dobra: number
+          id: string
+          juros: number
+          meta_json: Json | null
+          multiplicador_valor: number
+          origem: string
+          pago: number
+          quantidade_valor: number
+          total: number
+          updated_at: string
+          updated_by: string | null
+          verba_id: string
+        }
+        Insert: {
+          ativa?: boolean
+          base_valor?: number
+          calculo_id: string
+          competencia: string
+          correcao?: number
+          devido?: number
+          diferenca?: number
+          divisor_valor?: number
+          dobra?: number
+          id?: string
+          juros?: number
+          meta_json?: Json | null
+          multiplicador_valor?: number
+          origem?: string
+          pago?: number
+          quantidade_valor?: number
+          total?: number
+          updated_at?: string
+          updated_by?: string | null
+          verba_id: string
+        }
+        Update: {
+          ativa?: boolean
+          base_valor?: number
+          calculo_id?: string
+          competencia?: string
+          correcao?: number
+          devido?: number
+          diferenca?: number
+          divisor_valor?: number
+          dobra?: number
+          id?: string
+          juros?: number
+          meta_json?: Json | null
+          multiplicador_valor?: number
+          origem?: string
+          pago?: number
+          quantidade_valor?: number
+          total?: number
+          updated_at?: string
+          updated_by?: string | null
+          verba_id?: string
         }
         Relationships: []
       }
@@ -4847,6 +5018,10 @@ export type Database = {
           page_number: number
           similarity: number
         }[]
+      }
+      pjecalc_batch_update_ocorrencias: {
+        Args: { p_calculo_id: string; p_changes: Json; p_filtro: Json }
+        Returns: number
       }
       queue_case_documents: {
         Args: { p_case_id: string; p_priority?: number }
