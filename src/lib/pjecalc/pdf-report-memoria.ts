@@ -75,7 +75,7 @@ export function gerarRelatorioMemoriaCalculo(
   `).join("");
 
   // CS detail
-  const csRows = result.contribuicao_social.segurado.map(s => `
+  const csRows = [...result.contribuicao_social.segurado_devidos, ...result.contribuicao_social.segurado_pagos].map(s => `
     <tr>
       <td class="comp">${s.competencia}</td>
       <td class="num">${fmt(s.base)}</td>

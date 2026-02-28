@@ -121,6 +121,8 @@ export interface PjeVerba {
   quantidade_informada: number;
   quantidade_cartao_colunas?: string[];
   quantidade_proporcionalizar: boolean;
+  proporcionalizar_devido?: boolean;
+  proporcionalizar_pago?: boolean;
   
   exclusoes: {
     faltas_justificadas: boolean;
@@ -351,8 +353,11 @@ export interface PjeFGTSResult {
 }
 
 export interface PjeCSResult {
-  segurado: { competencia: string; base: number; aliquota: number; valor: number; recolhido: number; diferenca: number }[];
+  segurado_devidos: { competencia: string; base: number; aliquota: number; valor: number; recolhido: number; diferenca: number }[];
+  segurado_pagos: { competencia: string; base: number; aliquota: number; valor: number; recolhido: number; diferenca: number }[];
   empregador: { competencia: string; empresa: number; sat: number; terceiros: number }[];
+  total_segurado_devidos: number;
+  total_segurado_pagos: number;
   total_segurado: number;
   total_empregador: number;
 }
@@ -780,7 +785,7 @@ export class PjeCalcEngine {
       qtd = new Decimal(this.calcularPrazoAviso());
     }
 
-    // Proporcionalizar meses incompletos
+    // Proporcionalizar QUANTIDADE em meses incompletos
     if (verba.quantidade_proporcionalizar) {
       const [ano, mes] = competencia.split('-').map(Number);
       const diasNoMes = new Date(ano, mes, 0).getDate();
@@ -803,6 +808,21 @@ export class PjeCalcEngine {
       devido = base.times(mult).div(div).times(qtd).times(dobra);
     }
 
+    // Proporcionalizar DEVIDO separadamente (Fase 6 - PJe-Calc)
+    if (verba.proporcionalizar_devido) {
+      const [ano, mes] = competencia.split('-').map(Number);
+      const diasNoMes = new Date(ano, mes, 0).getDate();
+      const admDate = new Date(this.params.data_admissao);
+      const demDate = this.params.data_demissao ? new Date(this.params.data_demissao) : null;
+      let diaInicio = 1, diaFim = diasNoMes;
+      if (admDate.getFullYear() === ano && admDate.getMonth() + 1 === mes) diaInicio = admDate.getDate();
+      if (demDate && demDate.getFullYear() === ano && demDate.getMonth() + 1 === mes) diaFim = demDate.getDate();
+      const diasTrabalhados = diaFim - diaInicio + 1;
+      if (diasTrabalhados < diasNoMes) {
+        devido = devido.times(diasTrabalhados).div(diasNoMes);
+      }
+    }
+
     if (verba.zerar_valor_negativo && devido.isNegative()) {
       devido = new Decimal(0);
     }
@@ -818,6 +838,22 @@ export class PjeCalcEngine {
     } else {
       pago = new Decimal(verba.valor_informado_pago || 0);
     }
+
+    // Proporcionalizar PAGO separadamente (Fase 6 - PJe-Calc)
+    if (verba.proporcionalizar_pago && pago.greaterThan(0)) {
+      const [ano, mes] = competencia.split('-').map(Number);
+      const diasNoMes = new Date(ano, mes, 0).getDate();
+      const admDate = new Date(this.params.data_admissao);
+      const demDate = this.params.data_demissao ? new Date(this.params.data_demissao) : null;
+      let diaInicio = 1, diaFim = diasNoMes;
+      if (admDate.getFullYear() === ano && admDate.getMonth() + 1 === mes) diaInicio = admDate.getDate();
+      if (demDate && demDate.getFullYear() === ano && demDate.getMonth() + 1 === mes) diaFim = demDate.getDate();
+      const diasTrabalhados = diaFim - diaInicio + 1;
+      if (diasTrabalhados < diasNoMes) {
+        pago = pago.times(diasTrabalhados).div(diasNoMes);
+      }
+    }
+
     const diferenca = devido.minus(pago);
 
     const formula = verba.valor === 'calculado'
@@ -1343,59 +1379,54 @@ export class PjeCalcEngine {
   // =====================================================
 
   calcularCS(verbaResults: PjeVerbaResult[]): PjeCSResult {
-    const segurado: PjeCSResult['segurado'] = [];
+    const segurado_devidos: PjeCSResult['segurado_devidos'] = [];
+    const segurado_pagos: PjeCSResult['segurado_pagos'] = [];
     const empregador: PjeCSResult['empregador'] = [];
 
     if (!this.csConfig.apurar_segurado && !this.csConfig.apurar_empresa) {
-      return { segurado, empregador, total_segurado: 0, total_empregador: 0 };
+      return { segurado_devidos: [], segurado_pagos: [], empregador, total_segurado_devidos: 0, total_segurado_pagos: 0, total_segurado: 0, total_empregador: 0 };
     }
 
-    // Agrupar por competência
-    const basesPorComp: Record<string, number> = {};
+    // ═══ Track 1: CS sobre salários DEVIDOS (diferenças) ═══
+    const basesDevidos: Record<string, number> = {};
     for (const vr of verbaResults) {
       const verba = this.verbas.find(v => v.id === vr.verba_id);
       if (!verba?.incidencias.contribuicao_social) continue;
       if (verba.caracteristica === 'ferias') continue;
       for (const oc of vr.ocorrencias) {
         if (oc.diferenca <= 0) continue;
-        basesPorComp[oc.competencia] = (basesPorComp[oc.competencia] || 0) + oc.diferenca;
+        basesDevidos[oc.competencia] = (basesDevidos[oc.competencia] || 0) + oc.diferenca;
       }
     }
 
-    // CS sobre salários pagos (Fase 2): adicionar salários pagos à base
+    // ═══ Track 2: CS sobre salários PAGOS (histórico não recolhido) ═══
+    const basesPagos: Record<string, number> = {};
     if (this.csConfig.cs_sobre_salarios_pagos) {
       for (const hist of this.historicos) {
         if (!hist.incidencia_cs || hist.cs_recolhida) continue;
         for (const oc of hist.ocorrencias) {
-          basesPorComp[oc.competencia] = (basesPorComp[oc.competencia] || 0) + oc.valor;
+          basesPagos[oc.competencia] = (basesPagos[oc.competencia] || 0) + oc.valor;
         }
       }
     }
 
-    // Segurado progressivo (tabela versionada por competência)
+    // Apurar segurado sobre DEVIDOS
     if (this.csConfig.apurar_segurado) {
-      for (const [comp, base] of Object.entries(basesPorComp)) {
-        let imposto = 0;
-        if (this.csConfig.aliquota_segurado_tipo === 'fixa' && this.csConfig.aliquota_segurado_fixa) {
-          imposto = base * (this.csConfig.aliquota_segurado_fixa / 100);
-        } else {
-          // Buscar tabela vigente para a competência
-          const faixas = this.getFaixasINSSParaCompetencia(comp);
-          const teto = faixas[faixas.length - 1].ate;
-          let baseRestante = this.csConfig.limitar_teto ? Math.min(base, teto) : base;
-          let faixaAnterior = 0;
-          for (const faixa of faixas) {
-            const limiteNaFaixa = faixa.ate - faixaAnterior;
-            const baseNaFaixa = Math.min(baseRestante, limiteNaFaixa);
-            if (baseNaFaixa > 0) {
-              imposto += baseNaFaixa * faixa.aliquota;
-              baseRestante -= baseNaFaixa;
-            }
-            if (baseRestante <= 0) break;
-            faixaAnterior = faixa.ate;
-          }
-        }
-        segurado.push({
+      for (const [comp, base] of Object.entries(basesDevidos)) {
+        const imposto = this.calcularINSSProgressivo(comp, base);
+        segurado_devidos.push({
+          competencia: comp, base,
+          aliquota: base > 0 ? imposto / base : 0,
+          valor: Number(new Decimal(imposto).toDP(2)),
+          recolhido: 0,
+          diferenca: Number(new Decimal(imposto).toDP(2)),
+        });
+      }
+
+      // Apurar segurado sobre PAGOS (track separado)
+      for (const [comp, base] of Object.entries(basesPagos)) {
+        const imposto = this.calcularINSSProgressivo(comp, base);
+        segurado_pagos.push({
           competencia: comp, base,
           aliquota: base > 0 ? imposto / base : 0,
           valor: Number(new Decimal(imposto).toDP(2)),
@@ -1405,12 +1436,15 @@ export class PjeCalcEngine {
       }
     }
 
-    // Empregador (alíquotas fixas, com Simples Nacional)
+    // Empregador (sobre devidos + pagos combinados)
+    const basesEmpregador: Record<string, number> = { ...basesDevidos };
+    for (const [comp, val] of Object.entries(basesPagos)) {
+      basesEmpregador[comp] = (basesEmpregador[comp] || 0) + val;
+    }
+
     if (this.csConfig.apurar_empresa || this.csConfig.apurar_sat || this.csConfig.apurar_terceiros) {
-      for (const [comp, base] of Object.entries(basesPorComp)) {
+      for (const [comp, base] of Object.entries(basesEmpregador)) {
         if (base <= 0) continue;
-        
-        // Verificar se a competência está em período de Simples Nacional
         const compDate = new Date(comp + '-01');
         const isSimples = this.csConfig.periodos_simples?.some(p => {
           const pInicio = new Date(p.inicio);
@@ -1419,7 +1453,6 @@ export class PjeCalcEngine {
         }) || false;
         
         if (isSimples) {
-          // Simples Nacional: sem CS patronal separada (já incluída no DAS)
           empregador.push({ competencia: comp, empresa: 0, sat: 0, terceiros: 0 });
         } else {
           const aliqEmp = (this.csConfig.aliquota_empresa_fixa ?? 20) / 100;
@@ -1435,11 +1468,39 @@ export class PjeCalcEngine {
       }
     }
 
+    const totalDevidos = segurado_devidos.reduce((s, x) => s + x.diferenca, 0);
+    const totalPagos = segurado_pagos.reduce((s, x) => s + x.diferenca, 0);
+
     return {
-      segurado, empregador,
-      total_segurado: segurado.reduce((s, x) => s + x.diferenca, 0),
+      segurado_devidos, segurado_pagos, empregador,
+      total_segurado_devidos: totalDevidos,
+      total_segurado_pagos: totalPagos,
+      total_segurado: totalDevidos + totalPagos,
       total_empregador: empregador.reduce((s, x) => s + x.empresa + x.sat + x.terceiros, 0),
     };
+  }
+
+  // Helper: calcular INSS progressivo para uma competência
+  private calcularINSSProgressivo(comp: string, base: number): number {
+    if (this.csConfig.aliquota_segurado_tipo === 'fixa' && this.csConfig.aliquota_segurado_fixa) {
+      return base * (this.csConfig.aliquota_segurado_fixa / 100);
+    }
+    const faixas = this.getFaixasINSSParaCompetencia(comp);
+    const teto = faixas[faixas.length - 1].ate;
+    let baseRestante = this.csConfig.limitar_teto ? Math.min(base, teto) : base;
+    let imposto = 0;
+    let faixaAnterior = 0;
+    for (const faixa of faixas) {
+      const limiteNaFaixa = faixa.ate - faixaAnterior;
+      const baseNaFaixa = Math.min(baseRestante, limiteNaFaixa);
+      if (baseNaFaixa > 0) {
+        imposto += baseNaFaixa * faixa.aliquota;
+        baseRestante -= baseNaFaixa;
+      }
+      if (baseRestante <= 0) break;
+      faixaAnterior = faixa.ate;
+    }
+    return imposto;
   }
 
   // =====================================================
@@ -1660,6 +1721,18 @@ export class PjeCalcEngine {
       if (v.valor === 'calculado' && v.base_calculo.historicos.length === 0 && v.base_calculo.verbas.length === 0 && !this.params.ultima_remuneracao && !this.params.maior_remuneracao) {
         itens.push({ tipo: 'alerta', modulo: 'Verbas', mensagem: `Verba "${v.nome}" sem base de cálculo identificável` });
       }
+      // Verificar divisor zero
+      if (v.valor === 'calculado' && v.tipo_divisor === 'informado' && (v.divisor_informado === 0 || !v.divisor_informado)) {
+        itens.push({ tipo: 'erro', modulo: 'Verbas', mensagem: `Verba "${v.nome}" com divisor zero — causaria divisão por zero` });
+      }
+      // Verificar multiplicador zero em verbas calculadas
+      if (v.valor === 'calculado' && v.multiplicador === 0) {
+        itens.push({ tipo: 'alerta', modulo: 'Verbas', mensagem: `Verba "${v.nome}" com multiplicador = 0 — resultado será zero` });
+      }
+      // Verificar incidências conflitantes
+      if (v.caracteristica === 'ferias' && v.incidencias.contribuicao_social) {
+        itens.push({ tipo: 'observacao', modulo: 'Verbas', mensagem: `Férias "${v.nome}" com incidência CS ativa — férias indenizadas são isentas de CS` });
+      }
     }
 
     // ── Histórico salarial ──
@@ -1705,6 +1778,35 @@ export class PjeCalcEngine {
     // ── Configurações de FGTS ──
     if (this.fgtsConfig.apurar && this.fgtsConfig.multa_apurar && this.fgtsConfig.multa_tipo === 'informada' && !this.fgtsConfig.multa_valor_informado) {
       itens.push({ tipo: 'alerta', modulo: 'FGTS', mensagem: 'Multa FGTS definida como informada mas sem valor' });
+    }
+
+    // ── Cartão de Ponto vs Verbas ──
+    const verbasCartao = this.verbas.filter(v => v.tipo_quantidade === 'cartao_ponto' || v.tipo_divisor === 'cartao_ponto');
+    if (verbasCartao.length > 0 && this.cartaoPonto.length === 0) {
+      itens.push({ tipo: 'erro', modulo: 'Cartão de Ponto', mensagem: `${verbasCartao.length} verba(s) usam cartão de ponto como fonte, mas nenhum registro foi informado`, detalhe: verbasCartao.map(v => v.nome).join(', ') });
+    }
+
+    // ── Histórico gaps ──
+    if (this.historicos.length > 1) {
+      const sorted = [...this.historicos].sort((a, b) => a.periodo_inicio.localeCompare(b.periodo_inicio));
+      for (let i = 1; i < sorted.length; i++) {
+        const prevFim = new Date(sorted[i - 1].periodo_fim);
+        const curInicio = new Date(sorted[i].periodo_inicio);
+        const diffDays = (curInicio.getTime() - prevFim.getTime()) / 86400000;
+        if (diffDays > 32) {
+          itens.push({ tipo: 'alerta', modulo: 'Histórico', mensagem: `Gap de ${Math.round(diffDays)} dias entre "${sorted[i - 1].nome}" e "${sorted[i].nome}"`, detalhe: `${sorted[i - 1].periodo_fim} → ${sorted[i].periodo_inicio}` });
+        }
+      }
+    }
+
+    // ── IRRF sem CS dedutível ──
+    if (this.irConfig.apurar && this.irConfig.deduzir_cs && !this.csConfig.apurar_segurado) {
+      itens.push({ tipo: 'alerta', modulo: 'Imposto de Renda', mensagem: 'IR configurado para deduzir CS, mas CS do segurado não está ativada' });
+    }
+
+    // ── Correção sem data de citação para ADC 58/59 ──
+    if ((this.correcaoConfig.indice === 'IPCA-E' || this.correcaoConfig.indice === 'SELIC') && !this.params.data_citacao) {
+      itens.push({ tipo: 'alerta', modulo: 'Correção', mensagem: 'Usando índice ADC 58/59 sem data de citação — será estimada a partir do ajuizamento + 60 dias' });
     }
 
     const erros = itens.filter(i => i.tipo === 'erro').length;
@@ -1845,10 +1947,19 @@ export class PjeCalcEngine {
     const ocorrencias: PjeOcorrenciaResult[] = [];
     let totalDevido = 0, totalPago = 0, totalDiferenca = 0;
 
+    // Base Integralization (Fase 6): converter meses fracionários em meses completos
+    // para reflexos em férias e 13º (PJe-Calc integraliza a base antes de aplicar a fórmula)
+    const shouldIntegralizar = reflexa.base_calculo.integralizar && 
+      (reflexa.caracteristica === 'ferias' || reflexa.caracteristica === '13_salario');
+
     switch (comportamento) {
       case 'valor_mensal': {
         for (const oc of principalResult.ocorrencias) {
-          const baseValor = reflexa.gerar_verba_reflexa === 'devido' ? oc.devido : oc.diferenca;
+          let baseValor = reflexa.gerar_verba_reflexa === 'devido' ? oc.devido : oc.diferenca;
+          // Integralization: se o mês principal teve fração, integralizar para mês completo
+          if (shouldIntegralizar && oc.quantidade > 0 && oc.quantidade < 1) {
+            baseValor = Number(new Decimal(baseValor).div(oc.quantidade).toDP(2));
+          }
           const result = this.calcularOcorrencia(reflexa, oc.competencia, baseValor);
           ocorrencias.push(result);
           totalDevido += result.devido;
@@ -1864,6 +1975,27 @@ export class PjeCalcEngine {
         const media = valores.length > 0 ? valores.reduce((s, v) => s + v, 0) / valores.length : 0;
         const comp = this.params.data_demissao?.slice(0, 7) || new Date().toISOString().slice(0, 7);
         const result = this.calcularOcorrencia(reflexa, comp, media);
+        ocorrencias.push(result);
+        totalDevido += result.devido;
+        totalPago += result.pago;
+        totalDiferenca += result.diferenca;
+        break;
+      }
+      case 'media_valor_corrigido': {
+        // Média dos valores corrigidos monetariamente (Fase 6)
+        // Usa o índice de correção para trazer cada ocorrência a valor presente antes de calcular a média
+        const compLiq = this.correcaoConfig.data_liquidacao.slice(0, 7);
+        const valoresCorrigidos = principalResult.ocorrencias
+          .filter(o => (reflexa.gerar_verba_reflexa === 'devido' ? o.devido : o.diferenca) > 0)
+          .map(o => {
+            const val = reflexa.gerar_verba_reflexa === 'devido' ? o.devido : o.diferenca;
+            const fator = this.getIndiceCorrecaoDB(this.correcaoConfig.indice, o.competencia, compLiq);
+            return fator !== null ? val * fator : val;
+          });
+        const mediaCorr = valoresCorrigidos.length > 0 
+          ? valoresCorrigidos.reduce((s, v) => s + v, 0) / valoresCorrigidos.length : 0;
+        const comp = this.params.data_demissao?.slice(0, 7) || new Date().toISOString().slice(0, 7);
+        const result = this.calcularOcorrencia(reflexa, comp, mediaCorr);
         ocorrencias.push(result);
         totalDevido += result.devido;
         totalPago += result.pago;
