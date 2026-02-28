@@ -330,16 +330,17 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
                 ))}
               </tbody>
               <tfoot>
-              <tr className="bg-muted/30 font-bold">
-                <td colSpan={8} className="p-2 text-right">TOTAIS</td>
-                <td className="p-2 text-right font-mono">{totalDevido.toFixed(2)}</td>
-                <td className="p-2 text-center font-mono">{totalPago.toFixed(2)}</td>
-                <td className="p-2 text-right font-mono text-primary">{totalDif.toFixed(2)}</td>
-                <td></td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+                <tr className="bg-muted/30 font-bold">
+                  <td colSpan={9} className="p-2 text-right">TOTAIS</td>
+                  <td className="p-2 text-right font-mono">{totalDevido.toFixed(2)}</td>
+                  <td className="p-2 text-center font-mono">{totalPago.toFixed(2)}</td>
+                  <td className="p-2 text-right font-mono text-primary">{totalDif.toFixed(2)}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </>
       )}
 
       {/* Dialog Regerar */}
