@@ -3843,6 +3843,63 @@ export type Database = {
           },
         ]
       }
+      pjecalc_parametros_extras: {
+        Row: {
+          case_id: string
+          created_at: string
+          data_final: string | null
+          data_inicial: string | null
+          id: string
+          observacao: string | null
+          tipo: string
+          updated_at: string
+          valor_booleano: boolean | null
+          valor_numerico: number | null
+          valor_texto: string | null
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          data_final?: string | null
+          data_inicial?: string | null
+          id?: string
+          observacao?: string | null
+          tipo: string
+          updated_at?: string
+          valor_booleano?: boolean | null
+          valor_numerico?: number | null
+          valor_texto?: string | null
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          data_final?: string | null
+          data_inicial?: string | null
+          id?: string
+          observacao?: string | null
+          tipo?: string
+          updated_at?: string
+          valor_booleano?: boolean | null
+          valor_numerico?: number | null
+          valor_texto?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pjecalc_parametros_extras_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "pjecalc_parametros_extras_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pjecalc_pensao_config: {
         Row: {
           apurar: boolean | null
