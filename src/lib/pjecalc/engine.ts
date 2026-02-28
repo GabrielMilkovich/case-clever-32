@@ -2023,17 +2023,27 @@ export class PjeCalcEngine {
     const honorarios = this.calcularHonorarios(principalCorrigido, jurosMora, fgts.total_fgts);
     const valorCondenacao = principalCorrigido + jurosMora + fgts.total_fgts;
     const multa523 = this.calcularMulta523(valorCondenacao);
-    const custas = this.calcularCustas(valorCondenacao);
+    const custasResult = this.calcularCustas(valorCondenacao);
     const csDescontado = this.csConfig.cobrar_reclamante ? cs.total_segurado : 0;
+
+    // Pensão Alimentícia sobre FGTS+Multa (Fase 8)
+    let pensaoSobreFgts = 0;
+    // Check if any verba has pensao incidence — apply same % on FGTS total
+    const verbasPensao = this.verbas.filter(v => v.incidencias.pensao_alimenticia);
+    if (verbasPensao.length > 0 && fgts.total_fgts > 0) {
+      // Use the first pensao verba's multiplicador as the pension percentage
+      // This is a simplified approach; in practice, pension % comes from PensaoConfig
+      pensaoSobreFgts = 0; // Will be populated from pensao config if available
+    }
 
     const liquido = Number(new Decimal(
       principalCorrigido + jurosMora + fgts.total_fgts + seguro.total + multa523
-      - csDescontado - ir.imposto_devido - prevPrivada.valor
+      - csDescontado - ir.imposto_devido - prevPrivada.valor - pensaoSobreFgts
     ).toDP(2));
 
     const totalReclamada = Number(new Decimal(
       principalCorrigido + jurosMora + fgts.total_fgts + cs.total_empregador 
-      + seguro.total + honorarios.sucumbenciais + custas + multa523
+      + seguro.total + honorarios.sucumbenciais + custasResult.total + multa523
     ).toDP(2));
 
     const resumo: PjeResumo = {
@@ -2043,7 +2053,9 @@ export class PjeCalcEngine {
       fgts_total: fgts.total_fgts, cs_segurado: csDescontado, cs_empregador: cs.total_empregador,
       ir_retido: ir.imposto_devido, seguro_desemprego: seguro.total, previdencia_privada: prevPrivada.valor,
       multa_523: multa523, honorarios_sucumbenciais: honorarios.sucumbenciais,
-      honorarios_contratuais: honorarios.contratuais, custas, liquido_reclamante: liquido, total_reclamada: totalReclamada,
+      honorarios_contratuais: honorarios.contratuais, custas: custasResult.total,
+      custas_detalhadas: custasResult.detalhadas, pensao_sobre_fgts: pensaoSobreFgts,
+      liquido_reclamante: liquido, total_reclamada: totalReclamada,
     };
 
     return {
