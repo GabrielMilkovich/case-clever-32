@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Play, Loader2, FileBarChart, Printer, FileCode, AlertTriangle, CheckCircle2, Info, XCircle } from "lucide-react";
+import { Play, Loader2, FileBarChart, Printer, FileCode, AlertTriangle, CheckCircle2, Info, XCircle, Lock, Unlock, Copy, MoreVertical, FileText, FileSpreadsheet } from "lucide-react";
 import {
   PjeCalcEngine,
   type PjeParametros, type PjeHistoricoSalarial, type PjeFalta, type PjeFerias,
@@ -16,14 +18,20 @@ import {
   type PjeValidationResult,
 } from "@/lib/pjecalc/engine";
 import { gerarRelatorioPDF } from "@/lib/pjecalc/pdf-report";
+import { gerarRelatorioMemoriaCalculo } from "@/lib/pjecalc/pdf-report-memoria";
+import { gerarRelatorioDiferenca } from "@/lib/pjecalc/pdf-report-diferenca";
+import { gerarRelatorioCriteriosLegais } from "@/lib/pjecalc/relatorio-criterios";
 import { downloadXML } from "@/lib/pjecalc/xml-export";
+import { fecharCalculo, reabrirCalculo, duplicarCalculo } from "@/lib/pjecalc/calc-operations";
 
 interface Props { caseId: string; }
 
 export function ModuloResumo({ caseId }: Props) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [liquidando, setLiquidando] = useState(false);
   const [validacao, setValidacao] = useState<PjeValidationResult | null>(null);
+  const [operando, setOperando] = useState(false);
 
   const { data: caseData } = useQuery({
     queryKey: ["case", caseId],
