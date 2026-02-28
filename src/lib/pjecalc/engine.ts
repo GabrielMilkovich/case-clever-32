@@ -1906,10 +1906,19 @@ export class PjeCalcEngine {
     const ocorrencias: PjeOcorrenciaResult[] = [];
     let totalDevido = 0, totalPago = 0, totalDiferenca = 0;
 
+    // Base Integralization (Fase 6): converter meses fracionários em meses completos
+    // para reflexos em férias e 13º (PJe-Calc integraliza a base antes de aplicar a fórmula)
+    const shouldIntegralizar = reflexa.base_calculo.integralizar && 
+      (reflexa.caracteristica === 'ferias' || reflexa.caracteristica === '13_salario');
+
     switch (comportamento) {
       case 'valor_mensal': {
         for (const oc of principalResult.ocorrencias) {
-          const baseValor = reflexa.gerar_verba_reflexa === 'devido' ? oc.devido : oc.diferenca;
+          let baseValor = reflexa.gerar_verba_reflexa === 'devido' ? oc.devido : oc.diferenca;
+          // Integralization: se o mês principal teve fração, integralizar para mês completo
+          if (shouldIntegralizar && oc.quantidade > 0 && oc.quantidade < 1) {
+            baseValor = Number(new Decimal(baseValor).div(oc.quantidade).toDP(2));
+          }
           const result = this.calcularOcorrencia(reflexa, oc.competencia, baseValor);
           ocorrencias.push(result);
           totalDevido += result.devido;
@@ -1925,6 +1934,27 @@ export class PjeCalcEngine {
         const media = valores.length > 0 ? valores.reduce((s, v) => s + v, 0) / valores.length : 0;
         const comp = this.params.data_demissao?.slice(0, 7) || new Date().toISOString().slice(0, 7);
         const result = this.calcularOcorrencia(reflexa, comp, media);
+        ocorrencias.push(result);
+        totalDevido += result.devido;
+        totalPago += result.pago;
+        totalDiferenca += result.diferenca;
+        break;
+      }
+      case 'media_valor_corrigido': {
+        // Média dos valores corrigidos monetariamente (Fase 6)
+        // Usa o índice de correção para trazer cada ocorrência a valor presente antes de calcular a média
+        const compLiq = this.correcaoConfig.data_liquidacao.slice(0, 7);
+        const valoresCorrigidos = principalResult.ocorrencias
+          .filter(o => (reflexa.gerar_verba_reflexa === 'devido' ? o.devido : o.diferenca) > 0)
+          .map(o => {
+            const val = reflexa.gerar_verba_reflexa === 'devido' ? o.devido : o.diferenca;
+            const fator = this.getIndiceCorrecaoDB(this.correcaoConfig.indice, o.competencia, compLiq);
+            return fator !== null ? val * fator : val;
+          });
+        const mediaCorr = valoresCorrigidos.length > 0 
+          ? valoresCorrigidos.reduce((s, v) => s + v, 0) / valoresCorrigidos.length : 0;
+        const comp = this.params.data_demissao?.slice(0, 7) || new Date().toISOString().slice(0, 7);
+        const result = this.calcularOcorrencia(reflexa, comp, mediaCorr);
         ocorrencias.push(result);
         totalDevido += result.devido;
         totalPago += result.pago;
