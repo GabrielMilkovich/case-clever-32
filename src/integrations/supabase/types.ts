@@ -3482,6 +3482,7 @@ export type Database = {
           case_id: string
           created_at: string
           data_liquidacao: string | null
+          duplicado_de: string | null
           engine_version: string | null
           fechado_em: string | null
           fechado_por: string | null
@@ -3497,6 +3498,7 @@ export type Database = {
           case_id: string
           created_at?: string
           data_liquidacao?: string | null
+          duplicado_de?: string | null
           engine_version?: string | null
           fechado_em?: string | null
           fechado_por?: string | null
@@ -3512,6 +3514,7 @@ export type Database = {
           case_id?: string
           created_at?: string
           data_liquidacao?: string | null
+          duplicado_de?: string | null
           engine_version?: string | null
           fechado_em?: string | null
           fechado_por?: string | null
@@ -4344,18 +4347,22 @@ export type Database = {
           id: string
           incidencias: Json
           juros_ajuizamento: string
+          media_quantidade: boolean | null
           multiplicador: number
           nome: string
           ocorrencia_pagamento: string
           ordem: number
           periodo_fim: string
           periodo_inicio: string
+          proporcionalizar_devido: boolean | null
+          proporcionalizar_pago: boolean | null
           quantidade_calendario_tipo: string | null
           quantidade_cartao_colunas: Json | null
           quantidade_informada: number | null
           quantidade_proporcionalizar: boolean | null
           tipo: string
           tipo_divisor: string
+          tipo_multiplicador: string | null
           tipo_quantidade: string
           updated_at: string
           valor: string
@@ -4383,18 +4390,22 @@ export type Database = {
           id?: string
           incidencias?: Json
           juros_ajuizamento?: string
+          media_quantidade?: boolean | null
           multiplicador?: number
           nome: string
           ocorrencia_pagamento?: string
           ordem?: number
           periodo_fim: string
           periodo_inicio: string
+          proporcionalizar_devido?: boolean | null
+          proporcionalizar_pago?: boolean | null
           quantidade_calendario_tipo?: string | null
           quantidade_cartao_colunas?: Json | null
           quantidade_informada?: number | null
           quantidade_proporcionalizar?: boolean | null
           tipo?: string
           tipo_divisor?: string
+          tipo_multiplicador?: string | null
           tipo_quantidade?: string
           updated_at?: string
           valor?: string
@@ -4422,18 +4433,22 @@ export type Database = {
           id?: string
           incidencias?: Json
           juros_ajuizamento?: string
+          media_quantidade?: boolean | null
           multiplicador?: number
           nome?: string
           ocorrencia_pagamento?: string
           ordem?: number
           periodo_fim?: string
           periodo_inicio?: string
+          proporcionalizar_devido?: boolean | null
+          proporcionalizar_pago?: boolean | null
           quantidade_calendario_tipo?: string | null
           quantidade_cartao_colunas?: Json | null
           quantidade_informada?: number | null
           quantidade_proporcionalizar?: boolean | null
           tipo?: string
           tipo_divisor?: string
+          tipo_multiplicador?: string | null
           tipo_quantidade?: string
           updated_at?: string
           valor?: string

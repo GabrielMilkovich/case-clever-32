@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Play, Loader2, FileBarChart, Printer, FileCode, AlertTriangle, CheckCircle2, Info, XCircle } from "lucide-react";
+import { Play, Loader2, FileBarChart, Printer, FileCode, AlertTriangle, CheckCircle2, Info, XCircle, Lock, Unlock, Copy, MoreVertical, FileText, FileSpreadsheet } from "lucide-react";
 import {
   PjeCalcEngine,
   type PjeParametros, type PjeHistoricoSalarial, type PjeFalta, type PjeFerias,
@@ -16,14 +18,20 @@ import {
   type PjeValidationResult,
 } from "@/lib/pjecalc/engine";
 import { gerarRelatorioPDF } from "@/lib/pjecalc/pdf-report";
+import { gerarRelatorioMemoriaCalculo } from "@/lib/pjecalc/pdf-report-memoria";
+import { gerarRelatorioDiferenca } from "@/lib/pjecalc/pdf-report-diferenca";
+import { gerarRelatorioCriteriosLegais } from "@/lib/pjecalc/relatorio-criterios";
 import { downloadXML } from "@/lib/pjecalc/xml-export";
+import { fecharCalculo, reabrirCalculo, duplicarCalculo } from "@/lib/pjecalc/calc-operations";
 
 interface Props { caseId: string; }
 
 export function ModuloResumo({ caseId }: Props) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [liquidando, setLiquidando] = useState(false);
   const [validacao, setValidacao] = useState<PjeValidationResult | null>(null);
+  const [operando, setOperando] = useState(false);
 
   const { data: caseData } = useQuery({
     queryKey: ["case", caseId],
@@ -277,39 +285,118 @@ export function ModuloResumo({ caseId }: Props) {
 
   const res: PjeLiquidacaoResult | null = resultado?.resultado || null;
   const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
+  const isFechado = resultado?.status === 'fechado';
+  const reportMeta = {
+    cliente: caseData?.cliente,
+    processo: caseData?.numero_processo,
+    dataLiquidacao: resultado?.data_liquidacao,
+    engineVersion: resultado?.engine_version,
+  };
+
+  const handleFechar = async () => {
+    if (!resultado?.id) return;
+    setOperando(true);
+    try {
+      await fecharCalculo(resultado.id);
+      qc.invalidateQueries({ queryKey: ["pjecalc_liquidacao", caseId] });
+      toast.success("Cálculo fechado — edições bloqueadas.");
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setOperando(false); }
+  };
+
+  const handleReabrir = async () => {
+    if (!resultado?.id) return;
+    setOperando(true);
+    try {
+      await reabrirCalculo(resultado.id);
+      qc.invalidateQueries({ queryKey: ["pjecalc_liquidacao", caseId] });
+      toast.success("Cálculo reaberto — edições permitidas.");
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setOperando(false); }
+  };
+
+  const handleDuplicar = async () => {
+    setOperando(true);
+    try {
+      const newCaseId = await duplicarCalculo(caseId);
+      toast.success("Cálculo duplicado com sucesso!");
+      navigate(`/pjecalc/${newCaseId}`);
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setOperando(false); }
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Resumo da Liquidação</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold">Resumo da Liquidação</h2>
+          {isFechado && <Badge variant="destructive" className="text-[10px]"><Lock className="h-3 w-3 mr-1" />Fechado</Badge>}
+        </div>
         <div className="flex gap-2">
           {res && (
             <>
-              <Button variant="outline" size="sm" onClick={() => {
-                gerarRelatorioPDF(res, {
-                  cliente: caseData?.cliente,
-                  processo: caseData?.numero_processo,
-                  dataLiquidacao: resultado?.data_liquidacao,
-                  engineVersion: resultado?.engine_version,
-                });
-              }}>
-                <Printer className="h-4 w-4 mr-1" /> PDF
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => {
-                downloadXML(res, {
-                  cliente: caseData?.cliente,
-                  processo: caseData?.numero_processo,
-                  dataLiquidacao: resultado?.data_liquidacao,
-                  engineVersion: resultado?.engine_version,
-                });
-              }}>
-                <FileCode className="h-4 w-4 mr-1" /> XML
-              </Button>
+              {/* Reports dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm"><Printer className="h-4 w-4 mr-1" /> Relatórios</Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => gerarRelatorioPDF(res, reportMeta)}>
+                    <FileBarChart className="h-4 w-4 mr-2" /> Resumo da Liquidação
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => gerarRelatorioMemoriaCalculo(res, reportMeta)}>
+                    <FileText className="h-4 w-4 mr-2" /> Memória de Cálculo
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => gerarRelatorioDiferenca(res, reportMeta)}>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" /> Relatório por Diferença
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => {
+                    // Need to load configs for criterios report
+                    gerarRelatorioCriteriosLegais(
+                      res,
+                      resultado?.resultado ? { case_id: caseId, data_admissao: '', data_ajuizamento: '', estado: '', municipio: '', regime_trabalho: 'tempo_integral', carga_horaria_padrao: 220, prescricao_quinquenal: false, prescricao_fgts: false, prazo_aviso_previo: 'nao_apurar', projetar_aviso_indenizado: false, limitar_avos_periodo: false, zerar_valor_negativo: false, sabado_dia_util: true, considerar_feriado_estadual: false, considerar_feriado_municipal: false } as any : {} as any,
+                      { indice: 'IPCA-E', epoca: 'mensal', juros_tipo: 'simples_mensal', juros_percentual: 1, juros_inicio: 'ajuizamento', multa_523: false, multa_523_percentual: 10, data_liquidacao: resultado?.data_liquidacao || '' },
+                      { apurar: true, incidir_sobre_juros: false, cobrar_reclamado: false, tributacao_exclusiva_13: true, tributacao_separada_ferias: false, deduzir_cs: true, deduzir_prev_privada: false, deduzir_pensao: false, deduzir_honorarios: false, aposentado_65: false, dependentes: 0 },
+                      { apurar_segurado: true, cobrar_reclamante: true, cs_sobre_salarios_pagos: false, aliquota_segurado_tipo: 'empregado', limitar_teto: true, apurar_empresa: true, apurar_sat: true, apurar_terceiros: true, aliquota_empregador_tipo: 'fixa', aliquota_empresa_fixa: 20, aliquota_sat_fixa: 2, aliquota_terceiros_fixa: 5.8, periodos_simples: [] },
+                      { apurar: true, destino: 'pagar_reclamante', compor_principal: true, multa_apurar: true, multa_tipo: 'calculada', multa_percentual: 40, multa_base: 'devido', saldos_saques: [], deduzir_saldo: false, lc110_10: false, lc110_05: false },
+                      reportMeta,
+                    );
+                  }}>
+                    <FileText className="h-4 w-4 mr-2" /> Critérios Legais
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => downloadXML(res, reportMeta)}>
+                    <FileCode className="h-4 w-4 mr-2" /> Exportar XML
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Operations dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm"><MoreVertical className="h-4 w-4" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {isFechado ? (
+                    <DropdownMenuItem onClick={handleReabrir} disabled={operando}>
+                      <Unlock className="h-4 w-4 mr-2" /> Reabrir Cálculo
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem onClick={handleFechar} disabled={operando}>
+                      <Lock className="h-4 w-4 mr-2" /> Fechar Cálculo
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleDuplicar} disabled={operando}>
+                    <Copy className="h-4 w-4 mr-2" /> Duplicar Cálculo
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </>
           )}
-          <Button onClick={executarLiquidacao} disabled={liquidando} size="sm">
+          <Button onClick={executarLiquidacao} disabled={liquidando || isFechado} size="sm">
             {liquidando ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Play className="h-4 w-4 mr-1" />}
-            Liquidar
+            {isFechado ? 'Fechado' : 'Liquidar'}
           </Button>
         </div>
       </div>
