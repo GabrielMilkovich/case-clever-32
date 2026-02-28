@@ -21,6 +21,7 @@ import { gerarRelatorioPDF } from "@/lib/pjecalc/pdf-report";
 import { gerarRelatorioMemoriaCalculo } from "@/lib/pjecalc/pdf-report-memoria";
 import { gerarRelatorioDiferenca } from "@/lib/pjecalc/pdf-report-diferenca";
 import { gerarRelatorioCriteriosLegais } from "@/lib/pjecalc/relatorio-criterios";
+import { gerarRelatorioConsolidado } from "@/lib/pjecalc/pdf-report-consolidado";
 import { downloadXML } from "@/lib/pjecalc/xml-export";
 import { fecharCalculo, reabrirCalculo, duplicarCalculo } from "@/lib/pjecalc/calc-operations";
 
