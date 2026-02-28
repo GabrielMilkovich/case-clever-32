@@ -121,6 +121,8 @@ export interface PjeVerba {
   quantidade_informada: number;
   quantidade_cartao_colunas?: string[];
   quantidade_proporcionalizar: boolean;
+  proporcionalizar_devido: boolean;
+  proporcionalizar_pago: boolean;
   
   exclusoes: {
     faltas_justificadas: boolean;
