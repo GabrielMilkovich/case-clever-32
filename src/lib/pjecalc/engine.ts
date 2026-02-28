@@ -785,7 +785,7 @@ export class PjeCalcEngine {
       qtd = new Decimal(this.calcularPrazoAviso());
     }
 
-    // Proporcionalizar meses incompletos
+    // Proporcionalizar QUANTIDADE em meses incompletos
     if (verba.quantidade_proporcionalizar) {
       const [ano, mes] = competencia.split('-').map(Number);
       const diasNoMes = new Date(ano, mes, 0).getDate();
@@ -808,6 +808,21 @@ export class PjeCalcEngine {
       devido = base.times(mult).div(div).times(qtd).times(dobra);
     }
 
+    // Proporcionalizar DEVIDO separadamente (Fase 6 - PJe-Calc)
+    if (verba.proporcionalizar_devido) {
+      const [ano, mes] = competencia.split('-').map(Number);
+      const diasNoMes = new Date(ano, mes, 0).getDate();
+      const admDate = new Date(this.params.data_admissao);
+      const demDate = this.params.data_demissao ? new Date(this.params.data_demissao) : null;
+      let diaInicio = 1, diaFim = diasNoMes;
+      if (admDate.getFullYear() === ano && admDate.getMonth() + 1 === mes) diaInicio = admDate.getDate();
+      if (demDate && demDate.getFullYear() === ano && demDate.getMonth() + 1 === mes) diaFim = demDate.getDate();
+      const diasTrabalhados = diaFim - diaInicio + 1;
+      if (diasTrabalhados < diasNoMes) {
+        devido = devido.times(diasTrabalhados).div(diasNoMes);
+      }
+    }
+
     if (verba.zerar_valor_negativo && devido.isNegative()) {
       devido = new Decimal(0);
     }
@@ -823,6 +838,22 @@ export class PjeCalcEngine {
     } else {
       pago = new Decimal(verba.valor_informado_pago || 0);
     }
+
+    // Proporcionalizar PAGO separadamente (Fase 6 - PJe-Calc)
+    if (verba.proporcionalizar_pago && pago.greaterThan(0)) {
+      const [ano, mes] = competencia.split('-').map(Number);
+      const diasNoMes = new Date(ano, mes, 0).getDate();
+      const admDate = new Date(this.params.data_admissao);
+      const demDate = this.params.data_demissao ? new Date(this.params.data_demissao) : null;
+      let diaInicio = 1, diaFim = diasNoMes;
+      if (admDate.getFullYear() === ano && admDate.getMonth() + 1 === mes) diaInicio = admDate.getDate();
+      if (demDate && demDate.getFullYear() === ano && demDate.getMonth() + 1 === mes) diaFim = demDate.getDate();
+      const diasTrabalhados = diaFim - diaInicio + 1;
+      if (diasTrabalhados < diasNoMes) {
+        pago = pago.times(diasTrabalhados).div(diasNoMes);
+      }
+    }
+
     const diferenca = devido.minus(pago);
 
     const formula = verba.valor === 'calculado'
