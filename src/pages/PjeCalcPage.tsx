@@ -20,7 +20,7 @@ import {
   ChevronRight, Check, AlertTriangle, Plus, Trash2, Loader2,
   Building2, Receipt, Scale, Percent, TrendingUp, FileBarChart,
   Eye, GitCompareArrows, ClipboardCheck, History, MessageSquare,
-  Lightbulb, XCircle, CheckCircle2, Info, Search,
+  Lightbulb, XCircle, CheckCircle2, Info, Search, MapPin,
 } from "lucide-react";
 
 // Module components
@@ -40,6 +40,8 @@ import { GradeOcorrencias } from "@/components/cases/pjecalc/GradeOcorrencias";
 import { CatalogoVerbas } from "@/components/cases/pjecalc/CatalogoVerbas";
 import { ModuloDadosProcesso } from "@/components/cases/pjecalc/ModuloDadosProcesso";
 import { ModuloPrevidenciaPrivada } from "@/components/cases/pjecalc/ModuloPrevidenciaPrivada";
+import { ModuloTabelasRegionais } from "@/components/cases/pjecalc/ModuloTabelasRegionais";
+import { ExcecoesSabado } from "@/components/cases/pjecalc/ExcecoesSabado";
 
 // Phase 4 components
 import { VerbaPreview } from "@/components/cases/pjecalc/VerbaPreview";
@@ -72,6 +74,7 @@ const MODULOS = [
   { id: 'honorarios', label: 'Honorários', icon: Scale, desc: 'Sucumbenciais e contratuais' },
   { id: 'custas', label: 'Custas', icon: Receipt, desc: 'Custas processuais' },
   { id: 'resumo', label: 'Resumo', icon: FileBarChart, desc: 'Resultado da liquidação' },
+  { id: 'tabelas_regionais', label: 'Tabelas Regionais', icon: MapPin, desc: 'Pisos, VT e Sal. Família' },
   // Phase 4 extra modules
   { id: 'memoria', label: 'Memória de Cálculo', icon: FileText, desc: 'Detalhamento linha a linha' },
   { id: 'comparacao', label: 'Comparar Cenários', icon: GitCompareArrows, desc: 'Lado a lado' },
@@ -101,6 +104,8 @@ export default function PjeCalcPage() {
   const [selectedVerbaForGrid, setSelectedVerbaForGrid] = useState<any>(null);
   const [previewVerbaId, setPreviewVerbaId] = useState<string | null>(null);
   const [verbaSearch, setVerbaSearch] = useState('');
+  const [verbaFilterTipo, setVerbaFilterTipo] = useState<'all' | 'principal' | 'reflexa'>('all');
+  const [verbaFilterCarac, setVerbaFilterCarac] = useState<string>('all');
   const [expandedFeriasId, setExpandedFeriasId] = useState<string | null>(null);
   // DATA
   // =====================================================
@@ -301,6 +306,7 @@ export default function PjeCalcPage() {
         case 'prev_privada': return <ModuloPrevidenciaPrivada caseId={caseId!} />;
         case 'custas': return <ModuloCustas caseId={caseId!} />;
         case 'resumo': return <ModuloResumo caseId={caseId!} />;
+        case 'tabelas_regionais': return <ModuloTabelasRegionais caseId={caseId!} estado={formParams.estado} municipio={formParams.municipio} />;
         // Phase 4 modules
         case 'memoria': return resultado?.resultado ? <MemoriaCalculoExpandida resultado={resultado.resultado} /> : <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Execute a liquidação primeiro.</CardContent></Card>;
         case 'comparacao': return <ComparacaoCenarios caseId={caseId!} />;
@@ -456,6 +462,8 @@ export default function PjeCalcPage() {
           <div className="flex items-center gap-2"><Checkbox checked={formParams.considerar_feriado_municipal} onCheckedChange={v => setFormParams(p => ({ ...p, considerar_feriado_municipal: !!v }))} /><Label className="text-xs">Considerar Feriado Municipal</Label></div>
         </CardContent>
       </Card>
+      {/* Phase 10: Saturday exceptions per period */}
+      <ExcecoesSabado caseId={caseId!} globalSabadoDiaUtil={formParams.sabado_dia_util} />
     </div>
   );
 
@@ -645,6 +653,8 @@ export default function PjeCalcPage() {
   // =====================================================
   const renderVerbas = () => {
     const filteredVerbas = verbas.filter((v: any) => {
+      if (verbaFilterTipo !== 'all' && v.tipo !== verbaFilterTipo) return false;
+      if (verbaFilterCarac !== 'all' && v.caracteristica !== verbaFilterCarac) return false;
       if (!verbaSearch) return true;
       const s = verbaSearch.toLowerCase();
       return v.nome?.toLowerCase().includes(s) || v.tipo?.toLowerCase().includes(s) || v.caracteristica?.toLowerCase().includes(s);
@@ -685,9 +695,30 @@ export default function PjeCalcPage() {
 
       {/* Search bar */}
       {verbas.length > 0 && (
-        <div className="relative max-w-xs">
-          <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input placeholder="Buscar verba..." value={verbaSearch} onChange={e => setVerbaSearch(e.target.value)} className="pl-8 h-7 text-xs" />
+        <div className="flex gap-2 items-center flex-wrap">
+          <div className="relative flex-1 min-w-[160px] max-w-xs">
+            <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input placeholder="Buscar verba..." value={verbaSearch} onChange={e => setVerbaSearch(e.target.value)} className="pl-8 h-7 text-xs" />
+          </div>
+          <Select value={verbaFilterTipo} onValueChange={(v: any) => setVerbaFilterTipo(v)}>
+            <SelectTrigger className="h-7 text-xs w-28"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos tipos</SelectItem>
+              <SelectItem value="principal">Principal</SelectItem>
+              <SelectItem value="reflexa">Reflexa</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={verbaFilterCarac} onValueChange={(v: any) => setVerbaFilterCarac(v)}>
+            <SelectTrigger className="h-7 text-xs w-32"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas caract.</SelectItem>
+              <SelectItem value="comum">Comum</SelectItem>
+              <SelectItem value="13_salario">13º Salário</SelectItem>
+              <SelectItem value="ferias">Férias</SelectItem>
+              <SelectItem value="aviso_previo">Aviso Prévio</SelectItem>
+            </SelectContent>
+          </Select>
+          <Badge variant="outline" className="text-[10px]">{filteredVerbas.length}/{verbas.length}</Badge>
         </div>
       )}
 
