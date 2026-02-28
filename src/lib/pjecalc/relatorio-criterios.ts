@@ -120,7 +120,7 @@ export function gerarRelatorioCriteriosLegais(
   <h2>3. Juros de Mora</h2>
   <div class="section">
     <table>
-      <tr><th>Tipo</th><td>${correcao.juros_tipo === 'simples_mensal' ? `Simples — ${pct(correcao.juros_percentual)} a.m.` : correcao.juros_tipo === 'selic' ? 'Taxa SELIC (engloba correção)' : correcao.juros_tipo === 'composto' ? 'Composto' : 'Não aplicado'}</td></tr>
+      <tr><th>Tipo</th><td>${correcao.juros_tipo === 'simples_mensal' ? `Simples — ${pct(correcao.juros_percentual)} a.m.` : correcao.juros_tipo === 'selic' ? 'Taxa SELIC (engloba correção)' : (correcao as any).juros_tipo === 'composto' ? 'Composto' : 'Não aplicado'}</td></tr>
       <tr><th>Início dos Juros</th><td>${correcao.juros_inicio === 'ajuizamento' ? 'Ajuizamento (Art. 883 CLT)' : correcao.juros_inicio === 'citacao' ? 'Citação (Art. 405 CC)' : 'Vencimento de cada parcela'}</td></tr>
       <tr><th>Pro Rata Die</th><td>${(correcao as any).juros_pro_rata !== false ? 'Sim (Art. 39, §1º, Lei 8.177/91)' : 'Não'}</td></tr>
     </table>
@@ -238,15 +238,13 @@ export function gerarRelatorioCriteriosLegais(
       <tr><th>Correção Monetária</th><td>${fmt(result.resumo.principal_corrigido - result.resumo.principal_bruto)}</td></tr>
       <tr><th>Principal Corrigido</th><td>${fmt(result.resumo.principal_corrigido)}</td></tr>
       <tr><th>Juros de Mora</th><td>${fmt(result.resumo.juros_mora)}</td></tr>
-      <tr><th>FGTS (depósitos)</th><td>${fmt(result.resumo.fgts_depositos)}</td></tr>
-      <tr><th>FGTS Multa</th><td>${fmt(result.resumo.fgts_multa)}</td></tr>
       <tr><th>FGTS Total</th><td>${fmt(result.resumo.fgts_total)}</td></tr>
       <tr><th>CS Segurado (desconto)</th><td>${fmt(result.resumo.cs_segurado)}</td></tr>
       <tr><th>CS Empregador</th><td>${fmt(result.resumo.cs_empregador)}</td></tr>
       <tr><th>IRRF (desconto)</th><td>${fmt(result.resumo.ir_retido)}</td></tr>
       ${result.resumo.honorarios_sucumbenciais ? `<tr><th>Honorários Sucumbenciais</th><td>${fmt(result.resumo.honorarios_sucumbenciais)}</td></tr>` : ''}
       ${result.resumo.honorarios_contratuais ? `<tr><th>Honorários Contratuais</th><td>${fmt(result.resumo.honorarios_contratuais)}</td></tr>` : ''}
-      ${result.resumo.custas_total ? `<tr><th>Custas Processuais</th><td>${fmt(result.resumo.custas_total)}</td></tr>` : ''}
+      ${result.resumo.custas ? `<tr><th>Custas Processuais</th><td>${fmt(result.resumo.custas)}</td></tr>` : ''}
       <tr class="destaque"><th>Líquido Reclamante</th><td><strong>${fmt(result.resumo.liquido_reclamante)}</strong></td></tr>
       <tr class="destaque"><th>Total Reclamada</th><td><strong>${fmt(result.resumo.total_reclamada)}</strong></td></tr>
     </table>
