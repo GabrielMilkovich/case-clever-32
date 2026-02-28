@@ -37,6 +37,7 @@ import { ModuloMultasCLT } from "@/components/cases/pjecalc/ModuloMultasCLT";
 import { ModuloSalarioFamilia } from "@/components/cases/pjecalc/ModuloSalarioFamilia";
 import { ModuloPensaoAlimenticia } from "@/components/cases/pjecalc/ModuloPensaoAlimenticia";
 import { GradeOcorrencias } from "@/components/cases/pjecalc/GradeOcorrencias";
+import { CatalogoVerbas } from "@/components/cases/pjecalc/CatalogoVerbas";
 import { ModuloDadosProcesso } from "@/components/cases/pjecalc/ModuloDadosProcesso";
 import { ModuloPrevidenciaPrivada } from "@/components/cases/pjecalc/ModuloPrevidenciaPrivada";
 
@@ -99,7 +100,7 @@ export default function PjeCalcPage() {
   const [saving, setSaving] = useState(false);
   const [selectedVerbaForGrid, setSelectedVerbaForGrid] = useState<any>(null);
   const [previewVerbaId, setPreviewVerbaId] = useState<string | null>(null);
-
+  const [verbaSearch, setVerbaSearch] = useState('');
   // =====================================================
   // DATA
   // =====================================================
