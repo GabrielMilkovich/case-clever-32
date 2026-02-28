@@ -489,10 +489,10 @@ export default function PjeCalcPage() {
         <div className="space-y-2">
           {faltas.map((f: any) => (
             <Card key={f.id}><CardContent className="p-3 flex items-center gap-3">
-              <Input type="date" defaultValue={f.data_inicial} className="h-8 text-xs w-36" onBlur={e => supabase.from("pjecalc_faltas").update({ data_inicial: e.target.value }).eq("id", f.id)} />
+              <Input type="date" defaultValue={f.data_inicial} className="h-8 text-xs w-36" onBlur={async e => { await supabase.from("pjecalc_faltas").update({ data_inicial: e.target.value }).eq("id", f.id); queryClient.invalidateQueries({ queryKey: ["pjecalc_faltas", caseId] }); }} />
               <span className="text-xs text-muted-foreground">a</span>
-              <Input type="date" defaultValue={f.data_final} className="h-8 text-xs w-36" onBlur={e => supabase.from("pjecalc_faltas").update({ data_final: e.target.value }).eq("id", f.id)} />
-              <div className="flex items-center gap-1"><Checkbox defaultChecked={f.justificada} onCheckedChange={v => supabase.from("pjecalc_faltas").update({ justificada: !!v }).eq("id", f.id)} /><Label className="text-xs">Justificada</Label></div>
+              <Input type="date" defaultValue={f.data_final} className="h-8 text-xs w-36" onBlur={async e => { await supabase.from("pjecalc_faltas").update({ data_final: e.target.value }).eq("id", f.id); queryClient.invalidateQueries({ queryKey: ["pjecalc_faltas", caseId] }); }} />
+              <div className="flex items-center gap-1"><Checkbox defaultChecked={f.justificada} onCheckedChange={async v => { await supabase.from("pjecalc_faltas").update({ justificada: !!v }).eq("id", f.id); queryClient.invalidateQueries({ queryKey: ["pjecalc_faltas", caseId] }); }} /><Label className="text-xs">Justificada</Label></div>
               <Button variant="ghost" size="icon" className="h-7 w-7 ml-auto" onClick={async () => { await supabase.from("pjecalc_faltas").delete().eq("id", f.id); queryClient.invalidateQueries({ queryKey: ["pjecalc_faltas", caseId] }); }}><Trash2 className="h-3 w-3" /></Button>
             </CardContent></Card>
           ))}

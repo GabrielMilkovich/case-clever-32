@@ -12,6 +12,11 @@ interface CompletionInput {
   historicos: any[];
   verbas: any[];
   resultado: any;
+  fgtsConfig?: any;
+  csConfig?: any;
+  irConfig?: any;
+  correcaoConfig?: any;
+  pensaoConfig?: any;
 }
 
 export function calcularCompletude(input: CompletionInput): Record<string, ModuleStatus> {
@@ -62,15 +67,15 @@ export function calcularCompletude(input: CompletionInput): Record<string, Modul
     status.verbas = hasNoPeriod ? 'incompleto' : 'preenchido';
   }
 
-  // Config modules — default to nao_iniciado, configurable
-  status.fgts = 'nao_iniciado';
-  status.cs = 'nao_iniciado';
-  status.ir = 'nao_iniciado';
-  status.correcao = 'nao_iniciado';
+  // Config modules — read real config when available
+  status.fgts = input.fgtsConfig?.apurar ? 'preenchido' : 'nao_iniciado';
+  status.cs = (input.csConfig?.apurar_segurado || input.csConfig?.apurar_empresa) ? 'preenchido' : 'nao_iniciado';
+  status.ir = input.irConfig?.apurar ? 'preenchido' : 'nao_iniciado';
+  status.correcao = input.correcaoConfig?.data_liquidacao ? 'preenchido' : 'nao_iniciado';
   status.seguro = 'nao_iniciado';
   status.salario_familia = 'nao_iniciado';
   status.multas = 'nao_iniciado';
-  status.pensao = 'nao_iniciado';
+  status.pensao = input.pensaoConfig?.apurar ? 'preenchido' : 'nao_iniciado';
   status.prev_privada = 'nao_iniciado';
   status.honorarios = 'nao_iniciado';
   status.custas = 'nao_iniciado';
