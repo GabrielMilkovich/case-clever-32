@@ -59,7 +59,7 @@ ${v.ocorrencias.map(o => `          <ocorrencia competencia="${o.competencia}" d
     <fgts>
       <total_depositos>${fmtNum(result.fgts.total_depositos)}</total_depositos>
       <multa_valor>${fmtNum(result.fgts.multa_valor)}</multa_valor>
-      <multa_valor>${fmtNum(result.fgts.multa_valor)}</multa_valor>
+      <saldo_deduzido>${fmtNum(result.fgts.saldo_deduzido)}</saldo_deduzido>
       <lc110_10>${fmtNum(result.fgts.lc110_10)}</lc110_10>
       <lc110_05>${fmtNum(result.fgts.lc110_05)}</lc110_05>
       <total_fgts>${fmtNum(result.fgts.total_fgts)}</total_fgts>
