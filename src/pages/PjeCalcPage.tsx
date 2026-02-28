@@ -576,11 +576,25 @@ export default function PjeCalcPage() {
   // =====================================================
   // MÓDULO: VERBAS (with preview - Phase 4 Item 2)
   // =====================================================
-  const renderVerbas = () => (
+  const renderVerbas = () => {
+    const filteredVerbas = verbas.filter((v: any) => {
+      if (!verbaSearch) return true;
+      const s = verbaSearch.toLowerCase();
+      return v.nome?.toLowerCase().includes(s) || v.tipo?.toLowerCase().includes(s) || v.caracteristica?.toLowerCase().includes(s);
+    });
+
+    return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Verbas</h2>
         <div className="flex gap-2">
+          <CatalogoVerbas
+            caseId={caseId!}
+            periodoInicio={formParams.data_admissao}
+            periodoFim={formParams.data_demissao || new Date().toISOString().slice(0,10)}
+            ordemBase={verbas.length}
+            onInsert={() => { queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] }); registrarAuditLog(caseId!, 'Verbas', 'criacao', { valorNovo: 'catálogo' }); }}
+          />
           <Button size="sm" variant="outline" onClick={async () => {
             const verbasExpresso = [
               { nome: 'Horas Extras 50%', caracteristica: 'comum', ocorrencia_pagamento: 'mensal', tipo: 'principal', multiplicador: 1.5, divisor_informado: formParams.carga_horaria_padrao },
@@ -601,11 +615,22 @@ export default function PjeCalcPage() {
           }}><Plus className="h-4 w-4 mr-1" /> Manual</Button>
         </div>
       </div>
+
+      {/* Search bar */}
+      {verbas.length > 0 && (
+        <div className="relative max-w-xs">
+          <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input placeholder="Buscar verba..." value={verbaSearch} onChange={e => setVerbaSearch(e.target.value)} className="pl-8 h-7 text-xs" />
+        </div>
+      )}
+
       {verbas.length === 0 ? (
-        <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Use "Expresso" ou "Manual".</CardContent></Card>
+        <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Use "Catálogo", "Expresso" ou "Manual".</CardContent></Card>
+      ) : filteredVerbas.length === 0 ? (
+        <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Nenhuma verba encontrada para "{verbaSearch}".</CardContent></Card>
       ) : (
         <div className="space-y-2">
-          {verbas.map((v: any) => (
+          {filteredVerbas.map((v: any) => (
             <div key={v.id}>
               <Card className="hover:border-primary/30 transition-colors">
                 <CardContent className="p-3">
@@ -630,14 +655,9 @@ export default function PjeCalcPage() {
                   </div>
                 </CardContent>
               </Card>
-              {/* Phase 4 Item 2: Verba Preview */}
               {previewVerbaId === v.id && (
                 <div className="mt-1">
-                  <VerbaPreview
-                    verba={v as any}
-                    engine={null}
-                    onClose={() => setPreviewVerbaId(null)}
-                  />
+                  <VerbaPreview verba={v as any} engine={null} onClose={() => setPreviewVerbaId(null)} />
                 </div>
               )}
             </div>
@@ -645,7 +665,8 @@ export default function PjeCalcPage() {
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   // =====================================================
   // MAIN RENDER
