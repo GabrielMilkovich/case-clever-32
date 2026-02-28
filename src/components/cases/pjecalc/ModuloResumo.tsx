@@ -367,6 +367,16 @@ export function ModuloResumo({ caseId }: Props) {
                     <FileText className="h-4 w-4 mr-2" /> Critérios Legais
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => {
+                    // Consolidated report using current calculation
+                    gerarRelatorioConsolidado(
+                      [{ id: caseId, nome: caseData?.cliente || 'Cálculo Principal', resultado: res, dataLiquidacao: resultado?.data_liquidacao || '' }],
+                      reportMeta,
+                    );
+                  }}>
+                    <FileBarChart className="h-4 w-4 mr-2" /> Consolidado por Processo
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => downloadXML(res, reportMeta)}>
                     <FileCode className="h-4 w-4 mr-2" /> Exportar XML
                   </DropdownMenuItem>
