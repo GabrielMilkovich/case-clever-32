@@ -1780,6 +1780,35 @@ export class PjeCalcEngine {
       itens.push({ tipo: 'alerta', modulo: 'FGTS', mensagem: 'Multa FGTS definida como informada mas sem valor' });
     }
 
+    // ── Cartão de Ponto vs Verbas ──
+    const verbasCartao = this.verbas.filter(v => v.tipo_quantidade === 'cartao_ponto' || v.tipo_divisor === 'cartao_ponto');
+    if (verbasCartao.length > 0 && this.cartaoPonto.length === 0) {
+      itens.push({ tipo: 'erro', modulo: 'Cartão de Ponto', mensagem: `${verbasCartao.length} verba(s) usam cartão de ponto como fonte, mas nenhum registro foi informado`, detalhe: verbasCartao.map(v => v.nome).join(', ') });
+    }
+
+    // ── Histórico gaps ──
+    if (this.historicos.length > 1) {
+      const sorted = [...this.historicos].sort((a, b) => a.periodo_inicio.localeCompare(b.periodo_inicio));
+      for (let i = 1; i < sorted.length; i++) {
+        const prevFim = new Date(sorted[i - 1].periodo_fim);
+        const curInicio = new Date(sorted[i].periodo_inicio);
+        const diffDays = (curInicio.getTime() - prevFim.getTime()) / 86400000;
+        if (diffDays > 32) {
+          itens.push({ tipo: 'alerta', modulo: 'Histórico', mensagem: `Gap de ${Math.round(diffDays)} dias entre "${sorted[i - 1].nome}" e "${sorted[i].nome}"`, detalhe: `${sorted[i - 1].periodo_fim} → ${sorted[i].periodo_inicio}` });
+        }
+      }
+    }
+
+    // ── IRRF sem CS dedutível ──
+    if (this.irConfig.apurar && this.irConfig.deduzir_cs && !this.csConfig.apurar_segurado) {
+      itens.push({ tipo: 'alerta', modulo: 'Imposto de Renda', mensagem: 'IR configurado para deduzir CS, mas CS do segurado não está ativada' });
+    }
+
+    // ── Correção sem data de citação para ADC 58/59 ──
+    if ((this.correcaoConfig.indice === 'IPCA-E' || this.correcaoConfig.indice === 'SELIC') && !this.params.data_citacao) {
+      itens.push({ tipo: 'alerta', modulo: 'Correção', mensagem: 'Usando índice ADC 58/59 sem data de citação — será estimada a partir do ajuizamento + 60 dias' });
+    }
+
     const erros = itens.filter(i => i.tipo === 'erro').length;
     const alertas = itens.filter(i => i.tipo === 'alerta').length;
     const observacoes = itens.filter(i => i.tipo === 'observacao').length;
