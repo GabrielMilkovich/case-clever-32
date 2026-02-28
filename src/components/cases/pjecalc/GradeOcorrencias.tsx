@@ -240,64 +240,96 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
           Clique em "Regerar" para criar as ocorrências mensais.
         </CardContent></Card>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs border-collapse">
-            <thead>
-              <tr className="bg-muted/50">
-                <th className="p-2 text-center font-medium w-6">✓</th>
-                <th className="p-2 text-left font-medium">Comp.</th>
-                <th className="p-2 text-center font-medium w-14">Origem</th>
-                <th className="p-2 text-center font-medium">Base</th>
-                <th className="p-2 text-center font-medium">÷ Div.</th>
-                <th className="p-2 text-center font-medium">× Mult.</th>
-                <th className="p-2 text-center font-medium">× Qtd.</th>
-                <th className="p-2 text-center font-medium">× Dobra</th>
-                <th className="p-2 text-right font-medium">Devido</th>
-                <th className="p-2 text-center font-medium">Pago</th>
-                <th className="p-2 text-right font-medium">Diferença</th>
-                <th className="p-2 w-8"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {ocorrencias.map((o) => (
-                <tr key={o.id} className={`border-b border-border/30 hover:bg-muted/20 ${!o.ativa ? 'opacity-40' : ''}`}>
-                  <td className="p-1 text-center">
-                    <Checkbox checked={o.ativa} onCheckedChange={v => updateCell(o.id, 'ativa', !!v)} />
-                  </td>
-                  <td className="p-2 font-mono font-medium">{o.competencia}</td>
-                  <td className="p-1 text-center">
-                    <Badge variant={o.origem === 'INFORMADA' ? 'default' : 'secondary'} className="text-[9px] px-1">
-                      {o.origem === 'INFORMADA' ? 'INF' : 'CALC'}
-                    </Badge>
-                  </td>
-                  {(['base_valor', 'divisor_valor', 'multiplicador_valor', 'quantidade_valor', 'dobra'] as const).map(field => (
-                    <td key={field} className="p-1 text-center">
-                      <Input type="number" step="0.01" defaultValue={o[field] || 0}
+        <>
+          {/* Search & Filter Bar */}
+          <div className="flex gap-2 items-center flex-wrap">
+            <div className="relative flex-1 min-w-[160px] max-w-[240px]">
+              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input placeholder="Buscar competência..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-8 h-7 text-xs" />
+            </div>
+            <Select value={filterAtiva} onValueChange={(v: any) => setFilterAtiva(v)}>
+              <SelectTrigger className="h-7 text-xs w-28"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="ativa">Ativas</SelectItem>
+                <SelectItem value="inativa">Inativas</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterOrigem} onValueChange={(v: any) => setFilterOrigem(v)}>
+              <SelectTrigger className="h-7 text-xs w-32"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas origens</SelectItem>
+                <SelectItem value="CALCULADA">Calculadas</SelectItem>
+                <SelectItem value="INFORMADA">Informadas</SelectItem>
+              </SelectContent>
+            </Select>
+            <Badge variant="outline" className="text-[10px]">{filtered.length}/{ocorrencias.length}</Badge>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-muted/50">
+                  <th className="p-1 text-center w-6">
+                    <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
+                  </th>
+                  <th className="p-2 text-center font-medium w-6">✓</th>
+                  <th className="p-2 text-left font-medium">Comp.</th>
+                  <th className="p-2 text-center font-medium w-14">Origem</th>
+                  <th className="p-2 text-center font-medium">Base</th>
+                  <th className="p-2 text-center font-medium">÷ Div.</th>
+                  <th className="p-2 text-center font-medium">× Mult.</th>
+                  <th className="p-2 text-center font-medium">× Qtd.</th>
+                  <th className="p-2 text-center font-medium">× Dobra</th>
+                  <th className="p-2 text-right font-medium">Devido</th>
+                  <th className="p-2 text-center font-medium">Pago</th>
+                  <th className="p-2 text-right font-medium">Diferença</th>
+                  <th className="p-2 w-8"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((o) => (
+                  <tr key={o.id} className={`border-b border-border/30 hover:bg-muted/20 ${!o.ativa ? 'opacity-40' : ''} ${selectedRows.has(o.id) ? 'bg-primary/5' : ''}`}>
+                    <td className="p-1 text-center">
+                      <Checkbox checked={selectedRows.has(o.id)} onCheckedChange={() => toggleRow(o.id)} />
+                    </td>
+                    <td className="p-1 text-center">
+                      <Checkbox checked={o.ativa} onCheckedChange={v => updateCell(o.id, 'ativa', !!v)} />
+                    </td>
+                    <td className="p-2 font-mono font-medium">{o.competencia}</td>
+                    <td className="p-1 text-center">
+                      <Badge variant={o.origem === 'INFORMADA' ? 'default' : 'secondary'} className="text-[9px] px-1">
+                        {o.origem === 'INFORMADA' ? 'INF' : 'CALC'}
+                      </Badge>
+                    </td>
+                    {(['base_valor', 'divisor_valor', 'multiplicador_valor', 'quantidade_valor', 'dobra'] as const).map(field => (
+                      <td key={field} className="p-1 text-center">
+                        <Input type="number" step="0.01" defaultValue={o[field] || 0}
+                          className="h-7 text-xs w-20 text-center mx-auto"
+                          onBlur={e => updateCell(o.id, field, parseFloat(e.target.value) || 0)}
+                          onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                        />
+                      </td>
+                    ))}
+                    <td className="p-2 text-right font-mono">{(o.devido || 0).toFixed(2)}</td>
+                    <td className="p-1 text-center">
+                      <Input type="number" step="0.01" defaultValue={o.pago || 0}
                         className="h-7 text-xs w-20 text-center mx-auto"
-                        onBlur={e => updateCell(o.id, field, parseFloat(e.target.value) || 0)}
+                        onBlur={e => updateCell(o.id, 'pago', parseFloat(e.target.value) || 0)}
                         onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
                       />
                     </td>
-                  ))}
-                  <td className="p-2 text-right font-mono">{(o.devido || 0).toFixed(2)}</td>
-                  <td className="p-1 text-center">
-                    <Input type="number" step="0.01" defaultValue={o.pago || 0}
-                      className="h-7 text-xs w-20 text-center mx-auto"
-                      onBlur={e => updateCell(o.id, 'pago', parseFloat(e.target.value) || 0)}
-                      onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-                    />
-                  </td>
-                  <td className="p-2 text-right font-mono font-medium">{(o.diferenca || 0).toFixed(2)}</td>
-                  <td className="p-1">
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={async () => {
-                      await supabase.from("pjecalc_ocorrencias").delete().eq("id", o.id);
-                      qc.invalidateQueries({ queryKey });
-                    }}><Trash2 className="h-3 w-3" /></Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
+                    <td className="p-2 text-right font-mono font-medium">{(o.diferenca || 0).toFixed(2)}</td>
+                    <td className="p-1">
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={async () => {
+                        await supabase.from("pjecalc_ocorrencias").delete().eq("id", o.id);
+                        qc.invalidateQueries({ queryKey });
+                      }}><Trash2 className="h-3 w-3" /></Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
               <tr className="bg-muted/30 font-bold">
                 <td colSpan={8} className="p-2 text-right">TOTAIS</td>
                 <td className="p-2 text-right font-mono">{totalDevido.toFixed(2)}</td>
