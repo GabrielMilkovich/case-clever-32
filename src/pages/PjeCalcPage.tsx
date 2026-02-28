@@ -40,6 +40,8 @@ import { GradeOcorrencias } from "@/components/cases/pjecalc/GradeOcorrencias";
 import { CatalogoVerbas } from "@/components/cases/pjecalc/CatalogoVerbas";
 import { ModuloDadosProcesso } from "@/components/cases/pjecalc/ModuloDadosProcesso";
 import { ModuloPrevidenciaPrivada } from "@/components/cases/pjecalc/ModuloPrevidenciaPrivada";
+import { ModuloTabelasRegionais } from "@/components/cases/pjecalc/ModuloTabelasRegionais";
+import { ExcecoesSabado } from "@/components/cases/pjecalc/ExcecoesSabado";
 
 // Phase 4 components
 import { VerbaPreview } from "@/components/cases/pjecalc/VerbaPreview";
