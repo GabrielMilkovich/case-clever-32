@@ -227,6 +227,9 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
         const { error } = await supabase.from("pjecalc_parametros").update(autoParams).eq("id", params.id);
         if (error) errors.push(`Parâmetros: ${error.message}`);
       } else {
+        // Ensure NOT NULL columns have fallback values
+        if (!autoParams.data_admissao) autoParams.data_admissao = new Date().toISOString().slice(0, 10);
+        if (!autoParams.data_ajuizamento) autoParams.data_ajuizamento = new Date().toISOString().slice(0, 10);
         autoParams.regime_trabalho = 'tempo_integral';
         autoParams.sabado_dia_util = true;
         const { error } = await supabase.from("pjecalc_parametros").insert(autoParams);
