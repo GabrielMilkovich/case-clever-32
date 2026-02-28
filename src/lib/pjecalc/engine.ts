@@ -121,8 +121,8 @@ export interface PjeVerba {
   quantidade_informada: number;
   quantidade_cartao_colunas?: string[];
   quantidade_proporcionalizar: boolean;
-  proporcionalizar_devido: boolean;
-  proporcionalizar_pago: boolean;
+  proporcionalizar_devido?: boolean;
+  proporcionalizar_pago?: boolean;
   
   exclusoes: {
     faltas_justificadas: boolean;
@@ -353,8 +353,11 @@ export interface PjeFGTSResult {
 }
 
 export interface PjeCSResult {
-  segurado: { competencia: string; base: number; aliquota: number; valor: number; recolhido: number; diferenca: number }[];
+  segurado_devidos: { competencia: string; base: number; aliquota: number; valor: number; recolhido: number; diferenca: number }[];
+  segurado_pagos: { competencia: string; base: number; aliquota: number; valor: number; recolhido: number; diferenca: number }[];
   empregador: { competencia: string; empresa: number; sat: number; terceiros: number }[];
+  total_segurado_devidos: number;
+  total_segurado_pagos: number;
   total_segurado: number;
   total_empregador: number;
 }
