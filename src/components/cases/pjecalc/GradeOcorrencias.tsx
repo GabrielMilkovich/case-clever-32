@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Calculator, Loader2, ArrowLeft, Trash2, RefreshCw, Edit3 } from "lucide-react";
+import { Calculator, Loader2, ArrowLeft, Trash2, RefreshCw, Edit3, Search, Filter, CheckSquare, Square } from "lucide-react";
 
 interface Props {
   caseId: string;
@@ -51,6 +51,10 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
   const [batchCompInicio, setBatchCompInicio] = useState('');
   const [batchCompFim, setBatchCompFim] = useState('');
   const [batchLoading, setBatchLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterAtiva, setFilterAtiva] = useState<'all' | 'ativa' | 'inativa'>('all');
+  const [filterOrigem, setFilterOrigem] = useState<'all' | 'CALCULADA' | 'INFORMADA'>('all');
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
 
   const queryKey = ["pjecalc_ocorrencias", caseId, verbaId];
 
