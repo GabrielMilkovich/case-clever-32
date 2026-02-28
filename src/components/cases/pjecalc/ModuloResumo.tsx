@@ -21,6 +21,7 @@ import { gerarRelatorioPDF } from "@/lib/pjecalc/pdf-report";
 import { gerarRelatorioMemoriaCalculo } from "@/lib/pjecalc/pdf-report-memoria";
 import { gerarRelatorioDiferenca } from "@/lib/pjecalc/pdf-report-diferenca";
 import { gerarRelatorioCriteriosLegais } from "@/lib/pjecalc/relatorio-criterios";
+import { gerarRelatorioConsolidado } from "@/lib/pjecalc/pdf-report-consolidado";
 import { downloadXML } from "@/lib/pjecalc/xml-export";
 import { fecharCalculo, reabrirCalculo, duplicarCalculo } from "@/lib/pjecalc/calc-operations";
 
@@ -364,6 +365,16 @@ export function ModuloResumo({ caseId }: Props) {
                     );
                   }}>
                     <FileText className="h-4 w-4 mr-2" /> Critérios Legais
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => {
+                    // Consolidated report using current calculation
+                    gerarRelatorioConsolidado(
+                      [{ id: caseId, nome: caseData?.cliente || 'Cálculo Principal', resultado: res, dataLiquidacao: resultado?.data_liquidacao || '' }],
+                      reportMeta,
+                    );
+                  }}>
+                    <FileBarChart className="h-4 w-4 mr-2" /> Consolidado por Processo
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => downloadXML(res, reportMeta)}>

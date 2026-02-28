@@ -101,7 +101,7 @@ export default function PjeCalcPage() {
   const [selectedVerbaForGrid, setSelectedVerbaForGrid] = useState<any>(null);
   const [previewVerbaId, setPreviewVerbaId] = useState<string | null>(null);
   const [verbaSearch, setVerbaSearch] = useState('');
-  // =====================================================
+  const [expandedFeriasId, setExpandedFeriasId] = useState<string | null>(null);
   // DATA
   // =====================================================
   const { data: caseData } = useQuery({
@@ -494,7 +494,36 @@ export default function PjeCalcPage() {
   // =====================================================
   // MÓDULO: FÉRIAS
   // =====================================================
-  const renderFerias = () => (
+  const renderFerias = () => {
+    const expandedId = expandedFeriasId;
+    const setExpandedId = setExpandedFeriasId;
+
+    const addGozoPeriodo = async (feriaId: string, currentPeriodos: any[]) => {
+      if (currentPeriodos.length >= 3) { toast.error("Máximo de 3 períodos (CLT Art. 134 §1º)"); return; }
+      const updated = [...currentPeriodos, { inicio: '', fim: '', dias: 0 }];
+      await supabase.from("pjecalc_ferias").update({ periodos_gozo: updated }).eq("id", feriaId);
+      queryClient.invalidateQueries({ queryKey: ["pjecalc_ferias", caseId] });
+    };
+
+    const updateGozoPeriodo = async (feriaId: string, periodos: any[], idx: number, field: string, value: string) => {
+      const updated = [...periodos];
+      updated[idx] = { ...updated[idx], [field]: value };
+      // Auto-calc dias
+      if (updated[idx].inicio && updated[idx].fim) {
+        const d1 = new Date(updated[idx].inicio), d2 = new Date(updated[idx].fim);
+        updated[idx].dias = Math.max(0, Math.floor((d2.getTime() - d1.getTime()) / 86400000) + 1);
+      }
+      await supabase.from("pjecalc_ferias").update({ periodos_gozo: updated }).eq("id", feriaId);
+      queryClient.invalidateQueries({ queryKey: ["pjecalc_ferias", caseId] });
+    };
+
+    const removeGozoPeriodo = async (feriaId: string, periodos: any[], idx: number) => {
+      const updated = periodos.filter((_: any, i: number) => i !== idx);
+      await supabase.from("pjecalc_ferias").update({ periodos_gozo: updated }).eq("id", feriaId);
+      queryClient.invalidateQueries({ queryKey: ["pjecalc_ferias", caseId] });
+    };
+
+    return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Férias</h2>
@@ -502,13 +531,13 @@ export default function PjeCalcPage() {
           if (!formParams.data_admissao || !formParams.data_demissao) { toast.error("Preencha as datas de admissão e demissão."); return; }
           await supabase.from("pjecalc_ferias").delete().eq("case_id", caseId!);
           const adm = new Date(formParams.data_admissao); const dem = new Date(formParams.data_demissao);
-          const periodos = []; let aqInicio = new Date(adm);
+          const periodos: any[] = []; let aqInicio = new Date(adm);
           while (aqInicio < dem) {
             const aqFim = new Date(aqInicio); aqFim.setFullYear(aqFim.getFullYear() + 1); aqFim.setDate(aqFim.getDate() - 1);
             const concInicio = new Date(aqFim); concInicio.setDate(concInicio.getDate() + 1);
             const concFim = new Date(concInicio); concFim.setFullYear(concFim.getFullYear() + 1); concFim.setDate(concFim.getDate() - 1);
             const situacao = concFim <= dem ? 'gozadas' : 'indenizadas';
-            periodos.push({ case_id: caseId!, relativas: `${aqInicio.getFullYear()}/${aqFim.getFullYear()}`, periodo_aquisitivo_inicio: aqInicio.toISOString().slice(0, 10), periodo_aquisitivo_fim: aqFim > dem ? dem.toISOString().slice(0, 10) : aqFim.toISOString().slice(0, 10), periodo_concessivo_inicio: concInicio.toISOString().slice(0, 10), periodo_concessivo_fim: concFim.toISOString().slice(0, 10), prazo_dias: formParams.regime_trabalho === 'tempo_integral' ? 30 : 18, situacao, dobra: situacao === 'indenizadas' ? false : (concFim > dem) });
+            periodos.push({ case_id: caseId!, relativas: `${aqInicio.getFullYear()}/${aqFim.getFullYear()}`, periodo_aquisitivo_inicio: aqInicio.toISOString().slice(0, 10), periodo_aquisitivo_fim: aqFim > dem ? dem.toISOString().slice(0, 10) : aqFim.toISOString().slice(0, 10), periodo_concessivo_inicio: concInicio.toISOString().slice(0, 10), periodo_concessivo_fim: concFim.toISOString().slice(0, 10), prazo_dias: formParams.regime_trabalho === 'tempo_integral' ? 30 : 18, situacao, dobra: situacao === 'indenizadas' ? false : (concFim > dem), periodos_gozo: [] });
             aqInicio = new Date(aqFim); aqInicio.setDate(aqInicio.getDate() + 1);
           }
           if (periodos.length > 0) await supabase.from("pjecalc_ferias").insert(periodos);
@@ -517,35 +546,73 @@ export default function PjeCalcPage() {
           toast.success(`${periodos.length} período(s) gerado(s)`);
         }}><Calculator className="h-4 w-4 mr-1" /> Gerar Automaticamente</Button>
       </div>
+      <p className="text-[10px] text-muted-foreground">CLT Art. 134 §1º (Reforma Trabalhista): Férias podem ser fracionadas em até 3 períodos, sendo um deles ≥ 14 dias e os demais ≥ 5 dias.</p>
       {ferias.length === 0 ? (
         <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Clique em "Gerar Automaticamente".</CardContent></Card>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs border-collapse">
-            <thead><tr className="bg-muted/50"><th className="p-2 text-left font-medium">Relativas</th><th className="p-2 text-left font-medium">P. Aquisitivo</th><th className="p-2 text-left font-medium">P. Concessivo</th><th className="p-2 text-center font-medium">Prazo</th><th className="p-2 text-center font-medium">Situação</th><th className="p-2 text-center font-medium">Dobra</th><th className="p-2 text-center font-medium">Abono</th></tr></thead>
-            <tbody>
-              {ferias.map((f: any) => (
-                <tr key={f.id} className="border-b border-border/50 hover:bg-muted/20">
-                  <td className="p-2">{f.relativas}</td>
-                  <td className="p-2 font-mono">{f.periodo_aquisitivo_inicio} a {f.periodo_aquisitivo_fim}</td>
-                  <td className="p-2 font-mono">{f.periodo_concessivo_inicio} a {f.periodo_concessivo_fim}</td>
-                  <td className="p-2 text-center">{f.prazo_dias}d</td>
-                  <td className="p-2 text-center">
+        <div className="space-y-2">
+          {ferias.map((f: any) => {
+            const periodos = f.periodos_gozo || [];
+            const totalDiasGozo = periodos.reduce((s: number, p: any) => s + (p.dias || 0), 0);
+            const isExpanded = expandedId === f.id;
+            return (
+              <Card key={f.id}>
+                <CardContent className="p-3 space-y-2">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="text-xs font-medium min-w-[80px]">{f.relativas}</div>
+                    <div className="text-[10px] font-mono text-muted-foreground">{f.periodo_aquisitivo_inicio} a {f.periodo_aquisitivo_fim}</div>
+                    <Input type="number" defaultValue={f.prazo_dias} className="h-7 text-xs w-16 text-center" onBlur={e => supabase.from("pjecalc_ferias").update({ prazo_dias: parseInt(e.target.value) || 30 }).eq("id", f.id)} />
                     <Select defaultValue={f.situacao} onValueChange={async v => { await supabase.from("pjecalc_ferias").update({ situacao: v }).eq("id", f.id); queryClient.invalidateQueries({ queryKey: ["pjecalc_ferias", caseId] }); }}>
                       <SelectTrigger className="h-7 text-xs w-28"><SelectValue /></SelectTrigger>
-                      <SelectContent><SelectItem value="gozadas">Gozadas</SelectItem><SelectItem value="indenizadas">Indenizadas</SelectItem><SelectItem value="perdidas">Perdidas</SelectItem><SelectItem value="gozadas_parcialmente">Goz. Parcial</SelectItem></SelectContent>
+                      <SelectContent>
+                        <SelectItem value="gozadas">Gozadas</SelectItem>
+                        <SelectItem value="indenizadas">Indenizadas</SelectItem>
+                        <SelectItem value="perdidas">Perdidas</SelectItem>
+                        <SelectItem value="gozadas_parcialmente">Goz. Parcial</SelectItem>
+                      </SelectContent>
                     </Select>
-                  </td>
-                  <td className="p-2 text-center"><Checkbox defaultChecked={f.dobra} onCheckedChange={v => supabase.from("pjecalc_ferias").update({ dobra: !!v }).eq("id", f.id)} /></td>
-                  <td className="p-2 text-center"><Checkbox defaultChecked={f.abono} onCheckedChange={v => supabase.from("pjecalc_ferias").update({ abono: !!v }).eq("id", f.id)} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    <div className="flex items-center gap-1"><Checkbox defaultChecked={f.dobra} onCheckedChange={v => supabase.from("pjecalc_ferias").update({ dobra: !!v }).eq("id", f.id)} /><Label className="text-[10px]">Dobra</Label></div>
+                    <div className="flex items-center gap-1"><Checkbox defaultChecked={f.abono} onCheckedChange={v => supabase.from("pjecalc_ferias").update({ abono: !!v }).eq("id", f.id)} /><Label className="text-[10px]">Abono</Label></div>
+                    <Button variant="ghost" size="sm" className="h-6 text-[10px] ml-auto" onClick={() => setExpandedId(isExpanded ? null : f.id)}>
+                      {periodos.length > 0 ? `${periodos.length} período(s)` : 'Fracionar'} <ChevronRight className={cn("h-3 w-3 ml-1 transition-transform", isExpanded && "rotate-90")} />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={async () => { await supabase.from("pjecalc_ferias").delete().eq("id", f.id); queryClient.invalidateQueries({ queryKey: ["pjecalc_ferias", caseId] }); }}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  {isExpanded && (
+                    <div className="pl-4 border-l-2 border-primary/20 space-y-2 mt-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-medium text-muted-foreground">Períodos de Gozo (Art. 134 §1º CLT)</span>
+                        <div className="flex items-center gap-2">
+                          {totalDiasGozo > 0 && <Badge variant="outline" className="text-[9px]">{totalDiasGozo}/{f.prazo_dias}d</Badge>}
+                          <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={() => addGozoPeriodo(f.id, periodos)} disabled={periodos.length >= 3}>
+                            <Plus className="h-3 w-3 mr-1" /> Período
+                          </Button>
+                        </div>
+                      </div>
+                      {periodos.map((p: any, idx: number) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <Badge variant="secondary" className="text-[9px] w-5 justify-center">{idx + 1}</Badge>
+                          <Input type="date" value={p.inicio || ''} onChange={e => updateGozoPeriodo(f.id, periodos, idx, 'inicio', e.target.value)} className="h-7 text-xs w-32" />
+                          <span className="text-[10px] text-muted-foreground">a</span>
+                          <Input type="date" value={p.fim || ''} onChange={e => updateGozoPeriodo(f.id, periodos, idx, 'fim', e.target.value)} className="h-7 text-xs w-32" />
+                          <Badge variant={p.dias >= 14 || (idx > 0 && p.dias >= 5) ? 'default' : 'destructive'} className="text-[9px]">{p.dias || 0}d</Badge>
+                          <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => removeGozoPeriodo(f.id, periodos, idx)}><Trash2 className="h-3 w-3" /></Button>
+                        </div>
+                      ))}
+                      {periodos.length === 0 && <p className="text-[10px] text-muted-foreground">Nenhum período cadastrado. Gozo integral presumido.</p>}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   // =====================================================
   // MÓDULO: HISTÓRICO SALARIAL

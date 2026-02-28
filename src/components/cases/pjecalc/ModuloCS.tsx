@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,16 +6,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Save, Loader2 } from "lucide-react";
+import { Save, Loader2, Search, Building2 } from "lucide-react";
 import { GradeCSOcorrencias } from "./GradeCSOcorrencias";
+import { CNAE_ALIQUOTAS_COMUNS, type PjeCNAEAliquotas } from "@/lib/pjecalc/engine";
 
 interface Props { caseId: string; }
 
 export function ModuloCS({ caseId }: Props) {
   const qc = useQueryClient();
   const [saving, setSaving] = useState(false);
+  const [showCNAE, setShowCNAE] = useState(false);
+  const [cnaeSearch, setCnaeSearch] = useState('');
 
   const { data } = useQuery({
     queryKey: ["pjecalc_cs_config", caseId],
@@ -31,6 +35,7 @@ export function ModuloCS({ caseId }: Props) {
     limitar_teto: true, apurar_empresa: true, apurar_sat: true, apurar_terceiros: true,
     aliquota_empresa_fixa: '20', aliquota_sat_fixa: '2', aliquota_terceiros_fixa: '5.8',
     simples_nacional: false, simples_inicio: '', simples_fim: '',
+    cnae: '',
   });
 
   useEffect(() => {
@@ -49,9 +54,29 @@ export function ModuloCS({ caseId }: Props) {
         simples_nacional: periodos.length > 0,
         simples_inicio: periodos[0]?.inicio || '',
         simples_fim: periodos[0]?.fim || '',
+        cnae: data.cnae || '',
       });
     }
   }, [data]);
+
+  const filteredCNAE = useMemo(() => {
+    if (!cnaeSearch) return CNAE_ALIQUOTAS_COMUNS;
+    const s = cnaeSearch.toLowerCase();
+    return CNAE_ALIQUOTAS_COMUNS.filter(c =>
+      c.cnae.includes(s) || c.descricao.toLowerCase().includes(s)
+    );
+  }, [cnaeSearch]);
+
+  const applyCNAE = (cnae: PjeCNAEAliquotas) => {
+    setForm(p => ({
+      ...p,
+      cnae: cnae.cnae,
+      aliquota_sat_fixa: cnae.sat_rat.toString(),
+      aliquota_terceiros_fixa: cnae.terceiros.toString(),
+    }));
+    setShowCNAE(false);
+    toast.success(`CNAE ${cnae.cnae} aplicado — SAT/RAT: ${cnae.sat_rat}%, Terceiros: ${cnae.terceiros}%`);
+  };
 
   const save = async () => {
     setSaving(true);
@@ -68,6 +93,7 @@ export function ModuloCS({ caseId }: Props) {
         aliquota_sat_fixa: parseFloat(form.aliquota_sat_fixa) || 2,
         aliquota_terceiros_fixa: parseFloat(form.aliquota_terceiros_fixa) || 5.8,
         periodos_simples,
+        cnae: form.cnae || null,
       };
       if (data?.id) await supabase.from("pjecalc_cs_config" as any).update(payload).eq("id", data.id);
       else await supabase.from("pjecalc_cs_config" as any).insert(payload);
@@ -109,8 +135,21 @@ export function ModuloCS({ caseId }: Props) {
         </CardContent>
       </Card>
       <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-sm">Empregador</CardTitle></CardHeader>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm">Empregador</CardTitle>
+            <Button size="sm" variant="outline" onClick={() => setShowCNAE(true)}>
+              <Building2 className="h-3.5 w-3.5 mr-1" /> Buscar CNAE
+            </Button>
+          </div>
+        </CardHeader>
         <CardContent className="space-y-3">
+          {form.cnae && (
+            <div className="text-xs text-muted-foreground bg-muted/50 rounded px-2 py-1">
+              CNAE aplicado: <span className="font-mono font-medium">{form.cnae}</span>
+              {' — '}{CNAE_ALIQUOTAS_COMUNS.find(c => c.cnae === form.cnae)?.descricao || ''}
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-3">
             <div>
               <div className="flex items-center gap-2 mb-2"><Checkbox checked={form.apurar_empresa} onCheckedChange={v => setForm(p => ({ ...p, apurar_empresa: !!v }))} /><Label className="text-xs">Empresa</Label></div>
@@ -139,8 +178,36 @@ export function ModuloCS({ caseId }: Props) {
           )}
         </CardContent>
       </Card>
-      {/* Grade editável de CS com 2 abas: Devidos x Pagos */}
       <GradeCSOcorrencias caseId={caseId} />
+
+      {/* CNAE Lookup Dialog */}
+      <Dialog open={showCNAE} onOpenChange={setShowCNAE}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Buscar CNAE — Atividade Econômica</DialogTitle></DialogHeader>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Buscar por código ou descrição..." value={cnaeSearch} onChange={e => setCnaeSearch(e.target.value)} className="pl-9 h-9 text-sm" />
+          </div>
+          <div className="max-h-[300px] overflow-y-auto space-y-1">
+            {filteredCNAE.map(c => (
+              <button key={c.cnae} onClick={() => applyCNAE(c)}
+                className="w-full text-left p-2 rounded hover:bg-muted/50 flex items-center justify-between text-xs border border-transparent hover:border-border transition-colors">
+                <div>
+                  <span className="font-mono font-medium">{c.cnae}</span>
+                  <span className="ml-2 text-muted-foreground">{c.descricao}</span>
+                </div>
+                <div className="flex gap-2 text-[10px] text-muted-foreground flex-shrink-0">
+                  <span>SAT: {c.sat_rat}%</span>
+                  <span>Terc: {c.terceiros}%</span>
+                </div>
+              </button>
+            ))}
+            {filteredCNAE.length === 0 && (
+              <p className="text-xs text-center text-muted-foreground py-4">Nenhum CNAE encontrado.</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
