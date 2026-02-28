@@ -42,6 +42,7 @@ import { ModuloDadosProcesso } from "@/components/cases/pjecalc/ModuloDadosProce
 import { ModuloPrevidenciaPrivada } from "@/components/cases/pjecalc/ModuloPrevidenciaPrivada";
 import { ModuloTabelasRegionais } from "@/components/cases/pjecalc/ModuloTabelasRegionais";
 import { ExcecoesSabado } from "@/components/cases/pjecalc/ExcecoesSabado";
+import { PerfilAcesso, isModuloVisivel, type PerfilTipo } from "@/components/cases/pjecalc/PerfilAcesso";
 
 // Phase 4 components
 import { VerbaPreview } from "@/components/cases/pjecalc/VerbaPreview";
@@ -107,6 +108,7 @@ export default function PjeCalcPage() {
   const [verbaFilterTipo, setVerbaFilterTipo] = useState<'all' | 'principal' | 'reflexa'>('all');
   const [verbaFilterCarac, setVerbaFilterCarac] = useState<string>('all');
   const [expandedFeriasId, setExpandedFeriasId] = useState<string | null>(null);
+  const [perfilAcesso, setPerfilAcesso] = useState<PerfilTipo>('perito');
   // DATA
   // =====================================================
   const { data: caseData } = useQuery({
