@@ -20,7 +20,7 @@ import {
   ChevronRight, Check, AlertTriangle, Plus, Trash2, Loader2,
   Building2, Receipt, Scale, Percent, TrendingUp, FileBarChart,
   Eye, GitCompareArrows, ClipboardCheck, History, MessageSquare,
-  Lightbulb, XCircle, CheckCircle2, Info,
+  Lightbulb, XCircle, CheckCircle2, Info, Search,
 } from "lucide-react";
 
 // Module components
