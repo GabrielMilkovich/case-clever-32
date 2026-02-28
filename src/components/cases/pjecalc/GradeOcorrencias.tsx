@@ -165,9 +165,41 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
     finally { setBatchLoading(false); }
   };
 
-  const totalDevido = ocorrencias.filter(o => o.ativa).reduce((s, o) => s + (o.devido || 0), 0);
-  const totalPago = ocorrencias.filter(o => o.ativa).reduce((s, o) => s + (o.pago || 0), 0);
-  const totalDif = ocorrencias.filter(o => o.ativa).reduce((s, o) => s + (o.diferenca || 0), 0);
+  const filtered = useMemo(() => {
+    let list = ocorrencias;
+    if (searchTerm) list = list.filter(o => o.competencia.includes(searchTerm));
+    if (filterAtiva === 'ativa') list = list.filter(o => o.ativa);
+    if (filterAtiva === 'inativa') list = list.filter(o => !o.ativa);
+    if (filterOrigem !== 'all') list = list.filter(o => o.origem === filterOrigem);
+    return list;
+  }, [ocorrencias, searchTerm, filterAtiva, filterOrigem]);
+
+  const totalDevido = filtered.filter(o => o.ativa).reduce((s, o) => s + (o.devido || 0), 0);
+  const totalPago = filtered.filter(o => o.ativa).reduce((s, o) => s + (o.pago || 0), 0);
+  const totalDif = filtered.filter(o => o.ativa).reduce((s, o) => s + (o.diferenca || 0), 0);
+
+  const allSelected = filtered.length > 0 && filtered.every(o => selectedRows.has(o.id));
+  const toggleAll = () => {
+    if (allSelected) setSelectedRows(new Set());
+    else setSelectedRows(new Set(filtered.map(o => o.id)));
+  };
+  const toggleRow = (id: string) => {
+    setSelectedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const deleteSelected = async () => {
+    if (selectedRows.size === 0) return;
+    for (const id of selectedRows) {
+      await supabase.from("pjecalc_ocorrencias").delete().eq("id", id);
+    }
+    setSelectedRows(new Set());
+    qc.invalidateQueries({ queryKey });
+    toast.success(`${selectedRows.size} ocorrências excluídas`);
+  };
 
   return (
     <div className="space-y-4">
