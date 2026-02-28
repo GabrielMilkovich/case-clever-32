@@ -495,7 +495,8 @@ export default function PjeCalcPage() {
   // MÓDULO: FÉRIAS
   // =====================================================
   const renderFerias = () => {
-    const [expandedId, setExpandedId] = useState<string | null>(null);
+    const expandedId = expandedFeriasId;
+    const setExpandedId = setExpandedFeriasId;
 
     const addGozoPeriodo = async (feriaId: string, currentPeriodos: any[]) => {
       if (currentPeriodos.length >= 3) { toast.error("Máximo de 3 períodos (CLT Art. 134 §1º)"); return; }
