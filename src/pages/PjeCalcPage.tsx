@@ -101,7 +101,7 @@ export default function PjeCalcPage() {
   const [selectedVerbaForGrid, setSelectedVerbaForGrid] = useState<any>(null);
   const [previewVerbaId, setPreviewVerbaId] = useState<string | null>(null);
   const [verbaSearch, setVerbaSearch] = useState('');
-  // =====================================================
+  const [expandedFeriasId, setExpandedFeriasId] = useState<string | null>(null);
   // DATA
   // =====================================================
   const { data: caseData } = useQuery({
