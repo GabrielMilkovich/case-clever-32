@@ -104,6 +104,8 @@ export default function PjeCalcPage() {
   const [selectedVerbaForGrid, setSelectedVerbaForGrid] = useState<any>(null);
   const [previewVerbaId, setPreviewVerbaId] = useState<string | null>(null);
   const [verbaSearch, setVerbaSearch] = useState('');
+  const [verbaFilterTipo, setVerbaFilterTipo] = useState<'all' | 'principal' | 'reflexa'>('all');
+  const [verbaFilterCarac, setVerbaFilterCarac] = useState<string>('all');
   const [expandedFeriasId, setExpandedFeriasId] = useState<string | null>(null);
   // DATA
   // =====================================================
@@ -651,6 +653,8 @@ export default function PjeCalcPage() {
   // =====================================================
   const renderVerbas = () => {
     const filteredVerbas = verbas.filter((v: any) => {
+      if (verbaFilterTipo !== 'all' && v.tipo !== verbaFilterTipo) return false;
+      if (verbaFilterCarac !== 'all' && v.caracteristica !== verbaFilterCarac) return false;
       if (!verbaSearch) return true;
       const s = verbaSearch.toLowerCase();
       return v.nome?.toLowerCase().includes(s) || v.tipo?.toLowerCase().includes(s) || v.caracteristica?.toLowerCase().includes(s);
@@ -691,9 +695,30 @@ export default function PjeCalcPage() {
 
       {/* Search bar */}
       {verbas.length > 0 && (
-        <div className="relative max-w-xs">
-          <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input placeholder="Buscar verba..." value={verbaSearch} onChange={e => setVerbaSearch(e.target.value)} className="pl-8 h-7 text-xs" />
+        <div className="flex gap-2 items-center flex-wrap">
+          <div className="relative flex-1 min-w-[160px] max-w-xs">
+            <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input placeholder="Buscar verba..." value={verbaSearch} onChange={e => setVerbaSearch(e.target.value)} className="pl-8 h-7 text-xs" />
+          </div>
+          <Select value={verbaFilterTipo} onValueChange={(v: any) => setVerbaFilterTipo(v)}>
+            <SelectTrigger className="h-7 text-xs w-28"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos tipos</SelectItem>
+              <SelectItem value="principal">Principal</SelectItem>
+              <SelectItem value="reflexa">Reflexa</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={verbaFilterCarac} onValueChange={(v: any) => setVerbaFilterCarac(v)}>
+            <SelectTrigger className="h-7 text-xs w-32"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas caract.</SelectItem>
+              <SelectItem value="comum">Comum</SelectItem>
+              <SelectItem value="13_salario">13º Salário</SelectItem>
+              <SelectItem value="ferias">Férias</SelectItem>
+              <SelectItem value="aviso_previo">Aviso Prévio</SelectItem>
+            </SelectContent>
+          </Select>
+          <Badge variant="outline" className="text-[10px]">{filteredVerbas.length}/{verbas.length}</Badge>
         </div>
       )}
 
