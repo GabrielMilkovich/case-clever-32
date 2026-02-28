@@ -1536,7 +1536,8 @@ export class PjeCalcEngine {
 
   calcularIR(verbaResults: PjeVerbaResult[], csResult: PjeCSResult): PjeIRResult {
     if (!this.irConfig.apurar) {
-      return { base_calculo: 0, deducoes: 0, base_tributavel: 0, imposto_devido: 0, meses_rra: 0, metodo: 'tabela_mensal' };
+      return { base_calculo: 0, deducoes: 0, base_tributavel: 0, imposto_devido: 0, meses_rra: 0, metodo: 'tabela_mensal',
+        ir_anos_anteriores: 0, ir_ano_liquidacao: 0, ir_13_exclusivo: 0, ir_ferias_separado: 0, meses_anos_anteriores: 0, meses_ano_liquidacao: 0 };
     }
 
     let baseBruta = 0;
