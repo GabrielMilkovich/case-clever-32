@@ -1170,7 +1170,8 @@ export class PjeCalcEngine {
             indiceCorrecao = fator1 * fator2;
 
             // Juros de mora entre ajuizamento e citação (1% a.m. pro rata die - Art. 39 Lei 8.177/91)
-            if (dataAjuiz && dataCitacao > dataAjuiz) {
+            // Somente quando o índice principal NÃO é SELIC (SELIC já engloba juros)
+            if (this.correcaoConfig.indice !== 'SELIC' && dataAjuiz && dataCitacao > dataAjuiz) {
               const mesesJurosPreCitacao = this.mesesEntre(dataAjuiz, dataCitacao);
               const taxaMensal = (this.correcaoConfig.juros_percentual || 1) / 100;
               const valorCorrigidoParc = Number(new Decimal(oc.diferenca).times(fator1).toDP(2));
