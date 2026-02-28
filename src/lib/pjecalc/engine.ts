@@ -1543,23 +1543,46 @@ export class PjeCalcEngine {
     let baseBruta = 0;
     let base13 = 0;
     let baseFerias = 0;
+    
+    // Art. 12-A: Separar rendimentos por ano para tributação correta
+    const anoLiq = parseInt(this.correcaoConfig.data_liquidacao.slice(0, 4));
+    let baseAnosAnteriores = 0;
+    let baseAnoLiquidacao = 0;
+    let mesesAnosAnteriores = 0;
+    let mesesAnoLiquidacao = 0;
+    const competenciasAnosAnteriores = new Set<string>();
+    const competenciasAnoLiquidacao = new Set<string>();
+
     for (const vr of verbaResults) {
       const verba = this.verbas.find(v => v.id === vr.verba_id);
       if (!verba?.incidencias.irpf) continue;
       if (verba.caracteristica === 'ferias') {
-        // Tributação separada de férias (Fase 3)
         if (this.irConfig.tributacao_separada_ferias) {
           baseFerias += vr.total_diferenca;
         }
-        // Se não separar, não entra na base (férias são isentas por natureza)
         continue;
       }
       if (verba.caracteristica === '13_salario' && this.irConfig.tributacao_exclusiva_13) {
         base13 += vr.total_diferenca;
       } else {
         baseBruta += vr.total_diferenca;
+        // Classificar por ano para Art. 12-A
+        for (const oc of vr.ocorrencias) {
+          if (oc.diferenca <= 0) continue;
+          const anoComp = parseInt(oc.competencia.slice(0, 4));
+          if (anoComp < anoLiq) {
+            baseAnosAnteriores += oc.diferenca;
+            competenciasAnosAnteriores.add(oc.competencia);
+          } else {
+            baseAnoLiquidacao += oc.diferenca;
+            competenciasAnoLiquidacao.add(oc.competencia);
+          }
+        }
       }
     }
+
+    mesesAnosAnteriores = competenciasAnosAnteriores.size;
+    mesesAnoLiquidacao = competenciasAnoLiquidacao.size;
 
     let deducoes = 0;
     if (this.irConfig.deduzir_cs && this.csConfig.cobrar_reclamante) {
@@ -1569,46 +1592,81 @@ export class PjeCalcEngine {
     const periodo = this.getPeriodoCalculo();
     const meses = Math.max(1, this.getCompetencias(periodo.inicio, periodo.fim).length);
     
-    // Buscar tabela IR vigente para a competência de liquidação
     const compLiq = this.correcaoConfig.data_liquidacao.slice(0, 7);
     const tabelaIR = this.getFaixasIRParaCompetencia(compLiq);
     
-    const deducaoDependentes = this.irConfig.dependentes * tabelaIR.deducao_dependente * meses;
-    const baseTributavel = Math.max(0, baseBruta - deducoes - deducaoDependentes);
-    
-    // Tabela progressiva acumulada (Art. 12-A, Lei 7.713/88)
-    let imposto = 0;
-    for (const faixa of tabelaIR.faixas) {
-      if (baseTributavel <= faixa.ate * meses) {
-        imposto = baseTributavel * faixa.aliquota - faixa.deducao * meses;
-        break;
-      }
-    }
-    if (imposto < 0) imposto = 0;
+    let irAnosAnteriores = 0;
+    let irAnoLiquidacao = 0;
+    let ir13Exclusivo = 0;
+    let irFeriasSeparado = 0;
 
-    // 13º tributação exclusiva
+    // ═══ Art. 12-A: Tabela acumulada para anos anteriores (RRA) ═══
+    if (mesesAnosAnteriores > 0 && baseAnosAnteriores > 0) {
+      const propDeducoes = deducoes * (baseAnosAnteriores / Math.max(baseBruta, 1));
+      const deducaoDep = this.irConfig.dependentes * tabelaIR.deducao_dependente * mesesAnosAnteriores;
+      const baseTrib = Math.max(0, baseAnosAnteriores - propDeducoes - deducaoDep);
+      for (const faixa of tabelaIR.faixas) {
+        if (baseTrib <= faixa.ate * mesesAnosAnteriores) {
+          irAnosAnteriores = baseTrib * faixa.aliquota - faixa.deducao * mesesAnosAnteriores;
+          break;
+        }
+      }
+      if (irAnosAnteriores < 0) irAnosAnteriores = 0;
+    }
+
+    // ═══ Ano de liquidação: tabela mensal simples ═══
+    if (mesesAnoLiquidacao > 0 && baseAnoLiquidacao > 0) {
+      const propDeducoes = deducoes * (baseAnoLiquidacao / Math.max(baseBruta, 1));
+      const deducaoDep = this.irConfig.dependentes * tabelaIR.deducao_dependente * mesesAnoLiquidacao;
+      const baseTrib = Math.max(0, baseAnoLiquidacao - propDeducoes - deducaoDep);
+      for (const faixa of tabelaIR.faixas) {
+        if (baseTrib <= faixa.ate * mesesAnoLiquidacao) {
+          irAnoLiquidacao = baseTrib * faixa.aliquota - faixa.deducao * mesesAnoLiquidacao;
+          break;
+        }
+      }
+      if (irAnoLiquidacao < 0) irAnoLiquidacao = 0;
+    }
+
+    // Fallback: se não há separação por ano, aplicar tabela acumulada total
+    if (mesesAnosAnteriores === 0 && mesesAnoLiquidacao === 0 && baseBruta > 0) {
+      const deducaoDependentes = this.irConfig.dependentes * tabelaIR.deducao_dependente * meses;
+      const baseTributavel = Math.max(0, baseBruta - deducoes - deducaoDependentes);
+      for (const faixa of tabelaIR.faixas) {
+        if (baseTributavel <= faixa.ate * meses) {
+          irAnoLiquidacao = baseTributavel * faixa.aliquota - faixa.deducao * meses;
+          break;
+        }
+      }
+      if (irAnoLiquidacao < 0) irAnoLiquidacao = 0;
+      mesesAnoLiquidacao = meses;
+    }
+
+    // 13º tributação exclusiva (tabela mensal simples - sem acumular)
     if (this.irConfig.tributacao_exclusiva_13 && base13 > 0) {
-      let imposto13 = 0;
       for (const faixa of tabelaIR.faixas) {
         if (base13 <= faixa.ate) {
-          imposto13 = base13 * faixa.aliquota - faixa.deducao;
+          ir13Exclusivo = base13 * faixa.aliquota - faixa.deducao;
           break;
         }
       }
-      if (imposto13 > 0) imposto += imposto13;
+      if (ir13Exclusivo < 0) ir13Exclusivo = 0;
     }
 
-    // Tributação separada de férias (Fase 3)
+    // Tributação separada de férias
     if (this.irConfig.tributacao_separada_ferias && baseFerias > 0) {
-      let impostoFerias = 0;
       for (const faixa of tabelaIR.faixas) {
         if (baseFerias <= faixa.ate * meses) {
-          impostoFerias = baseFerias * faixa.aliquota - faixa.deducao * meses;
+          irFeriasSeparado = baseFerias * faixa.aliquota - faixa.deducao * meses;
           break;
         }
       }
-      if (impostoFerias > 0) imposto += impostoFerias;
+      if (irFeriasSeparado < 0) irFeriasSeparado = 0;
     }
+
+    const imposto = irAnosAnteriores + irAnoLiquidacao + ir13Exclusivo + irFeriasSeparado;
+    const deducaoDependentes = this.irConfig.dependentes * tabelaIR.deducao_dependente * meses;
+    const baseTributavel = Math.max(0, baseBruta - deducoes - deducaoDependentes);
 
     return {
       base_calculo: Number(new Decimal(baseBruta + base13 + baseFerias).toDP(2)),
@@ -1617,6 +1675,12 @@ export class PjeCalcEngine {
       imposto_devido: Number(new Decimal(imposto).toDP(2)),
       meses_rra: meses,
       metodo: meses > 1 ? 'art_12a_rra' : 'tabela_mensal',
+      ir_anos_anteriores: Number(new Decimal(irAnosAnteriores).toDP(2)),
+      ir_ano_liquidacao: Number(new Decimal(irAnoLiquidacao).toDP(2)),
+      ir_13_exclusivo: Number(new Decimal(ir13Exclusivo).toDP(2)),
+      ir_ferias_separado: Number(new Decimal(irFeriasSeparado).toDP(2)),
+      meses_anos_anteriores: mesesAnosAnteriores,
+      meses_ano_liquidacao: mesesAnoLiquidacao || meses,
     };
   }
 
@@ -1682,14 +1746,37 @@ export class PjeCalcEngine {
   // CALCULAR CUSTAS (Art. 789 CLT)
   // =====================================================
 
-  calcularCustas(valorCondenacao: number): number {
-    if (!this.custasConfig.apurar || this.custasConfig.isento) return 0;
-    let custas = Number(new Decimal(valorCondenacao).times(this.custasConfig.percentual / 100).toDP(2));
-    custas = Math.max(custas, this.custasConfig.valor_minimo);
+  calcularCustas(valorCondenacao: number): { total: number; detalhadas: PjeCustaResult[] } {
+    if (!this.custasConfig.apurar || this.custasConfig.isento) return { total: 0, detalhadas: [] };
+    
+    const detalhadas: PjeCustaResult[] = [];
+    
+    // Custas judiciais padrão (Art. 789 CLT)
+    let custasJudiciais = Number(new Decimal(valorCondenacao).times(this.custasConfig.percentual / 100).toDP(2));
+    custasJudiciais = Math.max(custasJudiciais, this.custasConfig.valor_minimo);
     if (this.custasConfig.valor_maximo) {
-      custas = Math.min(custas, this.custasConfig.valor_maximo);
+      custasJudiciais = Math.min(custasJudiciais, this.custasConfig.valor_maximo);
     }
-    return Number(new Decimal(custas).toDP(2));
+    detalhadas.push({ tipo: 'judiciais', descricao: `Custas Judiciais (${this.custasConfig.percentual}% Art. 789 CLT)`, valor: custasJudiciais });
+    
+    // Itens adicionais (Periciais, Emolumentos, Postais, Outras)
+    if (this.custasConfig.itens) {
+      for (const item of this.custasConfig.itens) {
+        if (!item.apurar || item.isento) continue;
+        let valor = 0;
+        if (item.valor_fixo && item.valor_fixo > 0) {
+          valor = item.valor_fixo;
+        } else {
+          valor = Number(new Decimal(valorCondenacao).times(item.percentual / 100).toDP(2));
+          valor = Math.max(valor, item.valor_minimo || 0);
+          if (item.valor_maximo) valor = Math.min(valor, item.valor_maximo);
+        }
+        detalhadas.push({ tipo: item.tipo, descricao: item.descricao, valor: Number(new Decimal(valor).toDP(2)) });
+      }
+    }
+    
+    const total = detalhadas.reduce((s, d) => s + d.valor, 0);
+    return { total: Number(new Decimal(total).toDP(2)), detalhadas };
   }
 
   // =====================================================
