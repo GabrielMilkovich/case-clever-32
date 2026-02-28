@@ -9,7 +9,7 @@ import { Scale, Mail, Lock, User, ArrowRight, Shield, BarChart3, FileCheck } fro
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-export default function Auth() {
+const Auth = React.forwardRef<HTMLDivElement, {}>(function Auth(_props, _ref) {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
