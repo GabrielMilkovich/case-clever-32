@@ -208,13 +208,18 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
           <h2 className="text-lg font-semibold">Grade de Ocorrências</h2>
           <p className="text-xs text-muted-foreground">{verbaNome}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button size="sm" variant="outline" onClick={() => setShowRegerar(true)} disabled={generating}>
             <RefreshCw className="h-4 w-4 mr-1" /> Regerar
           </Button>
           <Button size="sm" variant="outline" onClick={() => setShowBatch(true)}>
             <Edit3 className="h-4 w-4 mr-1" /> Lote
           </Button>
+          {selectedRows.size > 0 && (
+            <Button size="sm" variant="destructive" onClick={deleteSelected}>
+              <Trash2 className="h-4 w-4 mr-1" /> Excluir ({selectedRows.size})
+            </Button>
+          )}
           <Button size="sm" variant="ghost" onClick={onClose}>
             <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
           </Button>
