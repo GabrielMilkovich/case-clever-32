@@ -42,6 +42,7 @@ import { ModuloDadosProcesso } from "@/components/cases/pjecalc/ModuloDadosProce
 import { ModuloPrevidenciaPrivada } from "@/components/cases/pjecalc/ModuloPrevidenciaPrivada";
 import { ModuloTabelasRegionais } from "@/components/cases/pjecalc/ModuloTabelasRegionais";
 import { ExcecoesSabado } from "@/components/cases/pjecalc/ExcecoesSabado";
+import { PerfilAcesso, isModuloVisivel, type PerfilTipo } from "@/components/cases/pjecalc/PerfilAcesso";
 
 // Phase 4 components
 import { VerbaPreview } from "@/components/cases/pjecalc/VerbaPreview";
@@ -107,6 +108,7 @@ export default function PjeCalcPage() {
   const [verbaFilterTipo, setVerbaFilterTipo] = useState<'all' | 'principal' | 'reflexa'>('all');
   const [verbaFilterCarac, setVerbaFilterCarac] = useState<string>('all');
   const [expandedFeriasId, setExpandedFeriasId] = useState<string | null>(null);
+  const [perfilAcesso, setPerfilAcesso] = useState<PerfilTipo>('perito');
   // DATA
   // =====================================================
   const { data: caseData } = useQuery({
@@ -791,10 +793,11 @@ export default function PjeCalcPage() {
       <div className="flex gap-4 h-[calc(100vh-140px)]">
         {/* Sidebar de módulos com indicadores de completude (Phase 4 Item 1) */}
         <div className="w-56 flex-shrink-0">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
             <Button variant="ghost" size="sm" onClick={() => navigate(`/casos/${caseId}`)}>
-              <ArrowLeft className="h-4 w-4 mr-1" /> Voltar ao Caso
+              <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
             </Button>
+            <PerfilAcesso currentPerfil={perfilAcesso} onChangePerfil={setPerfilAcesso} />
           </div>
           <ScrollArea className="h-[calc(100vh-200px)]">
             <div className="space-y-0.5 pr-3">
