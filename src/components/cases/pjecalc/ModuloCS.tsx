@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Save, Loader2 } from "lucide-react";
+import { GradeCSOcorrencias } from "./GradeCSOcorrencias";
 
 interface Props { caseId: string; }
 
@@ -138,6 +139,8 @@ export function ModuloCS({ caseId }: Props) {
           )}
         </CardContent>
       </Card>
+      {/* Grade editável de CS com 2 abas: Devidos x Pagos */}
+      <GradeCSOcorrencias caseId={caseId} />
     </div>
   );
 }
