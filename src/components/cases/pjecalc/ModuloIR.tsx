@@ -5,9 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Save, Loader2 } from "lucide-react";
+import { Save, Loader2, Info } from "lucide-react";
 
 interface Props { caseId: string; }
 
@@ -70,11 +71,27 @@ export function ModuloIR({ caseId }: Props) {
         </CardContent>
       </Card>
       <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-sm">Tributação Art. 12-A (RRA)</CardTitle></CardHeader>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            Tributação Art. 12-A (RRA)
+            <Badge variant="outline" className="text-[9px] font-normal">Lei 7.713/88</Badge>
+          </CardTitle>
+        </CardHeader>
         <CardContent className="space-y-3">
+          <div className="bg-muted/50 rounded p-2.5 space-y-1.5">
+            <div className="flex items-start gap-1.5">
+              <Info className="h-3 w-3 text-primary shrink-0 mt-0.5" />
+              <p className="text-[10px] text-muted-foreground leading-relaxed">
+                <strong>Fase 8 — Separação por Ano:</strong> O cálculo agora separa automaticamente os rendimentos em duas faixas:
+              </p>
+            </div>
+            <ul className="text-[10px] text-muted-foreground ml-5 space-y-0.5 list-disc">
+              <li><strong>Anos anteriores ao da liquidação:</strong> Tabela progressiva acumulada (×N meses)</li>
+              <li><strong>Ano da liquidação:</strong> Tabela mensal acumulada (×M meses do ano corrente)</li>
+            </ul>
+          </div>
           <div className="flex items-center gap-2"><Checkbox checked={form.tributacao_exclusiva_13} onCheckedChange={v => setForm(p => ({ ...p, tributacao_exclusiva_13: !!v }))} /><Label className="text-xs">Tributação Exclusiva do 13º Salário</Label></div>
           <div className="flex items-center gap-2"><Checkbox checked={form.tributacao_separada_ferias} onCheckedChange={v => setForm(p => ({ ...p, tributacao_separada_ferias: !!v }))} /><Label className="text-xs">Tributação Separada de Férias</Label></div>
-          <p className="text-[10px] text-muted-foreground">O cálculo aplica a tabela progressiva mensal multiplicada pelo número de meses (Art. 12-A, Lei 7.713/88).</p>
         </CardContent>
       </Card>
       <Card>
