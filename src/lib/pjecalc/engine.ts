@@ -71,6 +71,12 @@ export interface PjeFalta {
   justificativa?: string;
 }
 
+export interface PjeFeriasGozoPeriodo {
+  inicio: string;
+  fim: string;
+  dias: number;
+}
+
 export interface PjeFerias {
   id: string;
   relativas: string;
@@ -82,7 +88,10 @@ export interface PjeFerias {
   situacao: 'gozadas' | 'indenizadas' | 'perdidas' | 'gozadas_parcialmente';
   dobra: boolean;
   abono: boolean;
-  periodos_gozo?: { inicio: string; fim: string }[];
+  /** Fracionamento em até 3 períodos (CLT Art. 134 §1º - Reforma Trabalhista) */
+  periodos_gozo?: PjeFeriasGozoPeriodo[];
+  /** Abono pecuniário (1/3 dos dias) */
+  abono_dias?: number;
 }
 
 export interface PjeExcecaoCargaHoraria {
@@ -220,6 +229,32 @@ export interface PjeFGTSConfig {
   lc110_05: boolean;
 }
 
+export interface PjeCNAEAliquotas {
+  cnae: string;
+  descricao: string;
+  sat_rat: number;
+  terceiros: number;
+  fap?: number;
+}
+
+export const CNAE_ALIQUOTAS_COMUNS: PjeCNAEAliquotas[] = [
+  { cnae: '4711-3', descricao: 'Comércio varejista', sat_rat: 2, terceiros: 5.8 },
+  { cnae: '4120-4', descricao: 'Construção de edifícios', sat_rat: 3, terceiros: 5.8 },
+  { cnae: '1011-2', descricao: 'Abate de bovinos', sat_rat: 3, terceiros: 5.8 },
+  { cnae: '4921-3', descricao: 'Transporte rodoviário coletivo', sat_rat: 3, terceiros: 5.8 },
+  { cnae: '8610-1', descricao: 'Atividades hospitalares', sat_rat: 3, terceiros: 5.8 },
+  { cnae: '6201-5', descricao: 'Desenvolvimento de software', sat_rat: 1, terceiros: 5.8 },
+  { cnae: '5611-2', descricao: 'Restaurantes e lanchonetes', sat_rat: 2, terceiros: 5.8 },
+  { cnae: '4930-2', descricao: 'Transporte rodoviário de carga', sat_rat: 3, terceiros: 5.8 },
+  { cnae: '8411-6', descricao: 'Administração pública', sat_rat: 2, terceiros: 5.8 },
+  { cnae: '8531-7', descricao: 'Ensino fundamental', sat_rat: 1, terceiros: 5.8 },
+  { cnae: '6422-1', descricao: 'Bancos comerciais', sat_rat: 1, terceiros: 5.8 },
+  { cnae: '4110-7', descricao: 'Incorporação de empreendimentos', sat_rat: 3, terceiros: 5.8 },
+  { cnae: '4511-1', descricao: 'Comércio de veículos', sat_rat: 2, terceiros: 5.8 },
+  { cnae: '4781-4', descricao: 'Comércio de artigos do vestuário', sat_rat: 1, terceiros: 5.8 },
+  { cnae: '4761-0', descricao: 'Papelarias e livrarias', sat_rat: 1, terceiros: 5.8 },
+];
+
 export interface PjeCSConfig {
   apurar_segurado: boolean;
   cobrar_reclamante: boolean;
@@ -235,6 +270,8 @@ export interface PjeCSConfig {
   aliquota_sat_fixa?: number;
   aliquota_terceiros_fixa?: number;
   periodos_simples: { inicio: string; fim: string }[];
+  /** CNAE da atividade econômica para lookup automático SAT/RAT */
+  cnae?: string;
 }
 
 export interface PjeIRConfig {
