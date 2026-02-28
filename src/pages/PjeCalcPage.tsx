@@ -20,7 +20,7 @@ import {
   ChevronRight, Check, AlertTriangle, Plus, Trash2, Loader2,
   Building2, Receipt, Scale, Percent, TrendingUp, FileBarChart,
   Eye, GitCompareArrows, ClipboardCheck, History, MessageSquare,
-  Lightbulb, XCircle, CheckCircle2, Info, Search,
+  Lightbulb, XCircle, CheckCircle2, Info, Search, MapPin,
 } from "lucide-react";
 
 // Module components
@@ -72,6 +72,7 @@ const MODULOS = [
   { id: 'honorarios', label: 'Honorários', icon: Scale, desc: 'Sucumbenciais e contratuais' },
   { id: 'custas', label: 'Custas', icon: Receipt, desc: 'Custas processuais' },
   { id: 'resumo', label: 'Resumo', icon: FileBarChart, desc: 'Resultado da liquidação' },
+  { id: 'tabelas_regionais', label: 'Tabelas Regionais', icon: MapPin, desc: 'Pisos, VT e Sal. Família' },
   // Phase 4 extra modules
   { id: 'memoria', label: 'Memória de Cálculo', icon: FileText, desc: 'Detalhamento linha a linha' },
   { id: 'comparacao', label: 'Comparar Cenários', icon: GitCompareArrows, desc: 'Lado a lado' },
