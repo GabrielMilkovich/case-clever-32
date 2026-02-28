@@ -4,7 +4,6 @@ import {
   Briefcase,
   ChevronDown,
   LogOut,
-  Scale,
   Table2,
   DollarSign,
   Building2,
@@ -24,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import logoMrd from "@/assets/logo-mrdcalc.png";
 
 const tabelasItems = [
   { icon: DollarSign, label: "Salário Mínimo", path: "/tabelas/salario-minimo" },
@@ -66,27 +66,22 @@ export function SidebarPremium() {
     <aside
       className="fixed left-0 top-0 z-50 flex h-screen w-60 flex-col overflow-hidden"
       style={{
-        backgroundColor: 'hsl(var(--sidebar-background))',
-        borderRight: '1px solid hsl(var(--sidebar-border))',
+        backgroundColor: 'hsl(215 45% 13%)',
+        borderRight: '1px solid hsl(215 35% 20%)',
       }}
     >
       {/* Logo */}
       <div
-        className="flex h-14 items-center gap-3 px-5"
-        style={{ borderBottom: '1px solid hsl(var(--sidebar-border))' }}
+        className="flex h-16 items-center gap-3 px-5"
+        style={{ borderBottom: '1px solid hsl(215 35% 20%)' }}
       >
-        <div
-          className="flex h-8 w-8 items-center justify-center rounded-md"
-          style={{ background: 'linear-gradient(135deg, hsl(40 76% 52%), hsl(36 80% 46%))' }}
-        >
-          <Scale className="h-4 w-4" style={{ color: 'hsl(222 47% 11%)' }} />
-        </div>
+        <img src={logoMrd} alt="MRDCalc" className="h-9 w-9 object-contain" />
         <div className="flex flex-col">
-          <span className="text-sm font-bold tracking-tight" style={{ color: 'hsl(var(--sidebar-foreground))' }}>
-            JurisCálculo
+          <span className="text-sm font-bold tracking-tight" style={{ color: 'hsl(210 25% 92%)' }}>
+            MRDCalc
           </span>
-          <span className="text-[10px] uppercase tracking-widest" style={{ color: 'hsl(var(--sidebar-foreground) / 0.4)' }}>
-            Trabalhista
+          <span className="text-[10px] uppercase tracking-widest" style={{ color: 'hsl(210 25% 92% / 0.35)' }}>
+            Liquidação
           </span>
         </div>
       </div>
@@ -117,12 +112,12 @@ export function SidebarPremium() {
                 </span>
                 <ChevronDown
                   className={cn("h-3.5 w-3.5 transition-transform duration-200", tabelasOpen && "rotate-180")}
-                  style={{ color: 'hsl(var(--sidebar-foreground) / 0.4)' }}
+                  style={{ color: 'hsl(210 25% 92% / 0.35)' }}
                 />
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent className="overflow-hidden data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up">
-              <div className="space-y-0.5 mt-1 ml-3 pl-3" style={{ borderLeft: '1px solid hsl(var(--sidebar-border) / 0.6)' }}>
+              <div className="space-y-0.5 mt-1 ml-3 pl-3" style={{ borderLeft: '1px solid hsl(215 35% 20% / 0.6)' }}>
                 {tabelasItems.map((item) => (
                   <Link
                     key={item.path}
@@ -140,11 +135,11 @@ export function SidebarPremium() {
       </nav>
 
       {/* Footer */}
-      <div className="px-3 py-3" style={{ borderTop: '1px solid hsl(var(--sidebar-border))' }}>
+      <div className="px-3 py-3" style={{ borderTop: '1px solid hsl(215 35% 20%)' }}>
         <button
           onClick={handleLogout}
           className="sidebar-nav-item w-full"
-          style={{ color: 'hsl(var(--sidebar-foreground) / 0.4)' }}
+          style={{ color: 'hsl(210 25% 92% / 0.35)' }}
         >
           <LogOut className="h-4 w-4 flex-shrink-0" />
           <span>Sair</span>
