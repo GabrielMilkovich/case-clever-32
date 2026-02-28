@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -325,4 +325,6 @@ const Auth = React.forwardRef<HTMLDivElement, {}>(function Auth(_props, _ref) {
       </div>
     </div>
   );
-}
+});
+Auth.displayName = "Auth";
+export default Auth;
