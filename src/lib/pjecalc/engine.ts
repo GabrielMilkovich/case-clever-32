@@ -272,6 +272,17 @@ export interface PjeHonorariosConfig {
   valor_fixo?: number;
 }
 
+export interface PjeCustaItem {
+  tipo: 'judiciais' | 'periciais' | 'emolumentos' | 'postais' | 'outras';
+  descricao: string;
+  apurar: boolean;
+  percentual: number;
+  valor_fixo?: number;
+  valor_minimo: number;
+  valor_maximo?: number;
+  isento: boolean;
+}
+
 export interface PjeCustasConfig {
   apurar: boolean;
   percentual: number;
@@ -279,6 +290,7 @@ export interface PjeCustasConfig {
   valor_maximo?: number;
   isento: boolean;
   assistencia_judiciaria: boolean;
+  itens: PjeCustaItem[];
 }
 
 export interface PjeSeguroConfig {
@@ -369,6 +381,13 @@ export interface PjeIRResult {
   imposto_devido: number;
   meses_rra: number;
   metodo: 'tabela_mensal' | 'art_12a_rra';
+  // Art. 12-A detalhamento
+  ir_anos_anteriores: number;
+  ir_ano_liquidacao: number;
+  ir_13_exclusivo: number;
+  ir_ferias_separado: number;
+  meses_anos_anteriores: number;
+  meses_ano_liquidacao: number;
 }
 
 export interface PjeSeguroResult {
@@ -376,6 +395,12 @@ export interface PjeSeguroResult {
   parcelas: number;
   valor_parcela: number;
   total: number;
+}
+
+export interface PjeCustaResult {
+  tipo: string;
+  descricao: string;
+  valor: number;
 }
 
 export interface PjeResumo {
@@ -392,6 +417,8 @@ export interface PjeResumo {
   honorarios_sucumbenciais: number;
   honorarios_contratuais: number;
   custas: number;
+  custas_detalhadas: PjeCustaResult[];
+  pensao_sobre_fgts: number;
   liquido_reclamante: number;
   total_reclamada: number;
 }
