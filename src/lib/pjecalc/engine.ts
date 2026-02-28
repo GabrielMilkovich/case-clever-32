@@ -440,6 +440,13 @@ export interface PjeCustaResult {
   valor: number;
 }
 
+export interface PjePensaoConfig {
+  apurar: boolean;
+  percentual: number;
+  valor_fixo?: number;
+  base: 'liquido' | 'bruto' | 'bruto_menos_inss';
+}
+
 export interface PjeResumo {
   principal_bruto: number;
   principal_corrigido: number;
@@ -456,6 +463,7 @@ export interface PjeResumo {
   custas: number;
   custas_detalhadas: PjeCustaResult[];
   pensao_sobre_fgts: number;
+  pensao_total: number;
   liquido_reclamante: number;
   total_reclamada: number;
 }
@@ -561,6 +569,7 @@ export class PjeCalcEngine {
   private excecoesCargas: PjeExcecaoCargaHoraria[];
   private feriadosDB: PjeFeriadoDB[];
   private prevPrivadaConfig: PjePrevidenciaPrivadaConfig;
+  private pensaoConfig: PjePensaoConfig;
   // Map of verba results by verba_id for reflexa resolution
   private verbaResultsMap: Map<string, PjeVerbaResult> = new Map();
 
@@ -584,6 +593,7 @@ export class PjeCalcEngine {
     excecoesCargas: PjeExcecaoCargaHoraria[] = [],
     feriadosDB: PjeFeriadoDB[] = [],
     prevPrivadaConfig: PjePrevidenciaPrivadaConfig = { apurar: false, percentual: 0, base_calculo: 'diferenca', deduzir_ir: false },
+    pensaoConfig: PjePensaoConfig = { apurar: false, percentual: 0, base: 'liquido' },
   ) {
     this.params = params;
     this.historicos = historicos;
@@ -604,6 +614,7 @@ export class PjeCalcEngine {
     this.excecoesCargas = excecoesCargas;
     this.feriadosDB = feriadosDB;
     this.prevPrivadaConfig = prevPrivadaConfig;
+    this.pensaoConfig = pensaoConfig;
   }
 
   // =====================================================
@@ -2063,19 +2074,37 @@ export class PjeCalcEngine {
     const custasResult = this.calcularCustas(valorCondenacao);
     const csDescontado = this.csConfig.cobrar_reclamante ? cs.total_segurado : 0;
 
-    // Pensão Alimentícia sobre FGTS+Multa (Fase 8)
+    // Pensão Alimentícia (config + sobre FGTS)
     let pensaoSobreFgts = 0;
-    // Check if any verba has pensao incidence — apply same % on FGTS total
-    const verbasPensao = this.verbas.filter(v => v.incidencias.pensao_alimenticia);
-    if (verbasPensao.length > 0 && fgts.total_fgts > 0) {
-      // Use the first pensao verba's multiplicador as the pension percentage
-      // This is a simplified approach; in practice, pension % comes from PensaoConfig
-      pensaoSobreFgts = 0; // Will be populated from pensao config if available
+    let pensaoTotal = 0;
+    if (this.pensaoConfig.apurar && this.pensaoConfig.percentual > 0) {
+      const pct = this.pensaoConfig.percentual / 100;
+      // Calcular pensão sobre verbas com incidência
+      let basePensaoVerbas = 0;
+      for (const vr of verbaResults) {
+        const verba = this.verbas.find(v => v.id === vr.verba_id);
+        if (!verba?.incidencias.pensao_alimenticia) continue;
+        basePensaoVerbas += vr.total_final;
+      }
+      const pensaoVerbas = Number(new Decimal(basePensaoVerbas).times(pct).toDP(2));
+      
+      // Pensão sobre FGTS+Multa
+      if (fgts.total_fgts > 0) {
+        pensaoSobreFgts = Number(new Decimal(fgts.total_fgts).times(pct).toDP(2));
+      }
+      
+      // Se valor fixo informado, usa o fixo ao invés do percentual
+      if (this.pensaoConfig.valor_fixo && this.pensaoConfig.valor_fixo > 0) {
+        pensaoTotal = this.pensaoConfig.valor_fixo;
+        pensaoSobreFgts = 0;
+      } else {
+        pensaoTotal = pensaoVerbas + pensaoSobreFgts;
+      }
     }
 
     const liquido = Number(new Decimal(
       principalCorrigido + jurosMora + fgts.total_fgts + seguro.total + multa523
-      - csDescontado - ir.imposto_devido - prevPrivada.valor - pensaoSobreFgts
+      - csDescontado - ir.imposto_devido - prevPrivada.valor - pensaoTotal
     ).toDP(2));
 
     const totalReclamada = Number(new Decimal(
@@ -2091,7 +2120,7 @@ export class PjeCalcEngine {
       ir_retido: ir.imposto_devido, seguro_desemprego: seguro.total, previdencia_privada: prevPrivada.valor,
       multa_523: multa523, honorarios_sucumbenciais: honorarios.sucumbenciais,
       honorarios_contratuais: honorarios.contratuais, custas: custasResult.total,
-      custas_detalhadas: custasResult.detalhadas, pensao_sobre_fgts: pensaoSobreFgts,
+      custas_detalhadas: custasResult.detalhadas, pensao_sobre_fgts: pensaoSobreFgts, pensao_total: pensaoTotal,
       liquido_reclamante: liquido, total_reclamada: totalReclamada,
     };
 
