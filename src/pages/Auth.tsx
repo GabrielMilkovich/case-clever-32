@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Scale, Mail, Lock, User, ArrowRight, Shield, BarChart3, FileCheck } from "lucide-react";
+import { Mail, Lock, User, ArrowRight, Shield, BarChart3, FileCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import logoMrd from "@/assets/logo-mrdcalc.png";
 
 function Auth() {
   const [loading, setLoading] = useState(false);
@@ -104,22 +105,17 @@ function Auth() {
       <div
         className="hidden lg:flex lg:w-[45%] flex-col justify-between p-12"
         style={{
-          background: 'linear-gradient(160deg, hsl(222 47% 14%) 0%, hsl(222 47% 20%) 50%, hsl(222 40% 26%) 100%)',
+          background: 'linear-gradient(160deg, hsl(215 45% 12%) 0%, hsl(215 45% 18%) 50%, hsl(215 40% 24%) 100%)',
         }}
       >
         <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div
-              className="flex h-11 w-11 items-center justify-center rounded-lg"
-              style={{ background: 'linear-gradient(135deg, hsl(40 76% 52%), hsl(36 80% 46%))' }}
-            >
-              <Scale className="h-6 w-6" style={{ color: 'hsl(222 47% 11%)' }} />
-            </div>
-            <span className="text-2xl font-bold" style={{ color: 'hsl(213 31% 91%)' }}>
-              JurisCálculo
+          <div className="flex items-center gap-4 mb-3">
+            <img src={logoMrd} alt="MRDCalc" className="h-12 w-12 object-contain" />
+            <span className="text-2xl font-bold" style={{ color: 'hsl(210 25% 92%)' }}>
+              MRDCalc
             </span>
           </div>
-          <p className="text-sm mt-1" style={{ color: 'hsl(213 31% 91% / 0.5)' }}>
+          <p className="text-sm mt-1" style={{ color: 'hsl(210 25% 92% / 0.45)' }}>
             Sistema de Liquidação Trabalhista
           </p>
         </div>
@@ -129,15 +125,15 @@ function Auth() {
             <div key={i} className="flex items-start gap-4">
               <div
                 className="flex h-10 w-10 items-center justify-center rounded-lg flex-shrink-0"
-                style={{ backgroundColor: 'hsl(222 47% 20%)' }}
+                style={{ backgroundColor: 'hsl(215 40% 20%)' }}
               >
-                <f.icon className="h-5 w-5" style={{ color: 'hsl(40 76% 52%)' }} />
+                <f.icon className="h-5 w-5" style={{ color: 'hsl(190 60% 50%)' }} />
               </div>
               <div>
-                <h3 className="font-semibold text-sm" style={{ color: 'hsl(213 31% 91%)' }}>
+                <h3 className="font-semibold text-sm" style={{ color: 'hsl(210 25% 92%)' }}>
                   {f.title}
                 </h3>
-                <p className="text-sm mt-0.5" style={{ color: 'hsl(213 31% 91% / 0.55)' }}>
+                <p className="text-sm mt-0.5" style={{ color: 'hsl(210 25% 92% / 0.5)' }}>
                   {f.desc}
                 </p>
               </div>
@@ -145,8 +141,8 @@ function Auth() {
           ))}
         </div>
 
-        <p className="text-xs" style={{ color: 'hsl(213 31% 91% / 0.3)' }}>
-          © {new Date().getFullYear()} JurisCálculo. Todos os direitos reservados.
+        <p className="text-xs" style={{ color: 'hsl(210 25% 92% / 0.25)' }}>
+          © {new Date().getFullYear()} MRDCalc. Todos os direitos reservados.
         </p>
       </div>
 
@@ -155,13 +151,8 @@ function Auth() {
         <div className="w-full max-w-[420px] animate-fade-in">
           {/* Mobile logo */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">
-            <div
-              className="flex h-10 w-10 items-center justify-center rounded-lg"
-              style={{ background: 'linear-gradient(135deg, hsl(40 76% 52%), hsl(36 80% 46%))' }}
-            >
-              <Scale className="h-5 w-5" style={{ color: 'hsl(222 47% 11%)' }} />
-            </div>
-            <span className="text-xl font-bold text-foreground">JurisCálculo</span>
+            <img src={logoMrd} alt="MRDCalc" className="h-10 w-10 object-contain" />
+            <span className="text-xl font-bold text-foreground">MRDCalc</span>
           </div>
 
           {forgotMode ? (
