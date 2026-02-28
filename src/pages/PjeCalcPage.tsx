@@ -36,7 +36,7 @@ import { ModuloCustas } from "@/components/cases/pjecalc/ModuloCustas";
 import { ModuloMultasCLT } from "@/components/cases/pjecalc/ModuloMultasCLT";
 import { ModuloSalarioFamilia } from "@/components/cases/pjecalc/ModuloSalarioFamilia";
 import { ModuloPensaoAlimenticia } from "@/components/cases/pjecalc/ModuloPensaoAlimenticia";
-import { ModuloOcorrencias } from "@/components/cases/pjecalc/ModuloOcorrencias";
+import { GradeOcorrencias } from "@/components/cases/pjecalc/GradeOcorrencias";
 import { ModuloDadosProcesso } from "@/components/cases/pjecalc/ModuloDadosProcesso";
 import { ModuloPrevidenciaPrivada } from "@/components/cases/pjecalc/ModuloPrevidenciaPrivada";
 
