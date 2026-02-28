@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 
-export const CreateCaseDialog = React.forwardRef<HTMLDivElement, {}>(function CreateCaseDialog(_props, _ref) {
+export function CreateCaseDialog() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [cliente, setCliente] = useState("");
@@ -119,5 +119,4 @@ export const CreateCaseDialog = React.forwardRef<HTMLDivElement, {}>(function Cr
       </DialogContent>
     </Dialog>
   );
-});
-CreateCaseDialog.displayName = "CreateCaseDialog";
+}
