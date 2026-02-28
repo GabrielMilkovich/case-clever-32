@@ -1348,59 +1348,54 @@ export class PjeCalcEngine {
   // =====================================================
 
   calcularCS(verbaResults: PjeVerbaResult[]): PjeCSResult {
-    const segurado: PjeCSResult['segurado'] = [];
+    const segurado_devidos: PjeCSResult['segurado_devidos'] = [];
+    const segurado_pagos: PjeCSResult['segurado_pagos'] = [];
     const empregador: PjeCSResult['empregador'] = [];
 
     if (!this.csConfig.apurar_segurado && !this.csConfig.apurar_empresa) {
-      return { segurado, empregador, total_segurado: 0, total_empregador: 0 };
+      return { segurado_devidos: [], segurado_pagos: [], empregador, total_segurado_devidos: 0, total_segurado_pagos: 0, total_segurado: 0, total_empregador: 0 };
     }
 
-    // Agrupar por competência
-    const basesPorComp: Record<string, number> = {};
+    // ═══ Track 1: CS sobre salários DEVIDOS (diferenças) ═══
+    const basesDevidos: Record<string, number> = {};
     for (const vr of verbaResults) {
       const verba = this.verbas.find(v => v.id === vr.verba_id);
       if (!verba?.incidencias.contribuicao_social) continue;
       if (verba.caracteristica === 'ferias') continue;
       for (const oc of vr.ocorrencias) {
         if (oc.diferenca <= 0) continue;
-        basesPorComp[oc.competencia] = (basesPorComp[oc.competencia] || 0) + oc.diferenca;
+        basesDevidos[oc.competencia] = (basesDevidos[oc.competencia] || 0) + oc.diferenca;
       }
     }
 
-    // CS sobre salários pagos (Fase 2): adicionar salários pagos à base
+    // ═══ Track 2: CS sobre salários PAGOS (histórico não recolhido) ═══
+    const basesPagos: Record<string, number> = {};
     if (this.csConfig.cs_sobre_salarios_pagos) {
       for (const hist of this.historicos) {
         if (!hist.incidencia_cs || hist.cs_recolhida) continue;
         for (const oc of hist.ocorrencias) {
-          basesPorComp[oc.competencia] = (basesPorComp[oc.competencia] || 0) + oc.valor;
+          basesPagos[oc.competencia] = (basesPagos[oc.competencia] || 0) + oc.valor;
         }
       }
     }
 
-    // Segurado progressivo (tabela versionada por competência)
+    // Apurar segurado sobre DEVIDOS
     if (this.csConfig.apurar_segurado) {
-      for (const [comp, base] of Object.entries(basesPorComp)) {
-        let imposto = 0;
-        if (this.csConfig.aliquota_segurado_tipo === 'fixa' && this.csConfig.aliquota_segurado_fixa) {
-          imposto = base * (this.csConfig.aliquota_segurado_fixa / 100);
-        } else {
-          // Buscar tabela vigente para a competência
-          const faixas = this.getFaixasINSSParaCompetencia(comp);
-          const teto = faixas[faixas.length - 1].ate;
-          let baseRestante = this.csConfig.limitar_teto ? Math.min(base, teto) : base;
-          let faixaAnterior = 0;
-          for (const faixa of faixas) {
-            const limiteNaFaixa = faixa.ate - faixaAnterior;
-            const baseNaFaixa = Math.min(baseRestante, limiteNaFaixa);
-            if (baseNaFaixa > 0) {
-              imposto += baseNaFaixa * faixa.aliquota;
-              baseRestante -= baseNaFaixa;
-            }
-            if (baseRestante <= 0) break;
-            faixaAnterior = faixa.ate;
-          }
-        }
-        segurado.push({
+      for (const [comp, base] of Object.entries(basesDevidos)) {
+        const imposto = this.calcularINSSProgressivo(comp, base);
+        segurado_devidos.push({
+          competencia: comp, base,
+          aliquota: base > 0 ? imposto / base : 0,
+          valor: Number(new Decimal(imposto).toDP(2)),
+          recolhido: 0,
+          diferenca: Number(new Decimal(imposto).toDP(2)),
+        });
+      }
+
+      // Apurar segurado sobre PAGOS (track separado)
+      for (const [comp, base] of Object.entries(basesPagos)) {
+        const imposto = this.calcularINSSProgressivo(comp, base);
+        segurado_pagos.push({
           competencia: comp, base,
           aliquota: base > 0 ? imposto / base : 0,
           valor: Number(new Decimal(imposto).toDP(2)),
@@ -1410,12 +1405,15 @@ export class PjeCalcEngine {
       }
     }
 
-    // Empregador (alíquotas fixas, com Simples Nacional)
+    // Empregador (sobre devidos + pagos combinados)
+    const basesEmpregador: Record<string, number> = { ...basesDevidos };
+    for (const [comp, val] of Object.entries(basesPagos)) {
+      basesEmpregador[comp] = (basesEmpregador[comp] || 0) + val;
+    }
+
     if (this.csConfig.apurar_empresa || this.csConfig.apurar_sat || this.csConfig.apurar_terceiros) {
-      for (const [comp, base] of Object.entries(basesPorComp)) {
+      for (const [comp, base] of Object.entries(basesEmpregador)) {
         if (base <= 0) continue;
-        
-        // Verificar se a competência está em período de Simples Nacional
         const compDate = new Date(comp + '-01');
         const isSimples = this.csConfig.periodos_simples?.some(p => {
           const pInicio = new Date(p.inicio);
@@ -1424,7 +1422,6 @@ export class PjeCalcEngine {
         }) || false;
         
         if (isSimples) {
-          // Simples Nacional: sem CS patronal separada (já incluída no DAS)
           empregador.push({ competencia: comp, empresa: 0, sat: 0, terceiros: 0 });
         } else {
           const aliqEmp = (this.csConfig.aliquota_empresa_fixa ?? 20) / 100;
@@ -1440,11 +1437,39 @@ export class PjeCalcEngine {
       }
     }
 
+    const totalDevidos = segurado_devidos.reduce((s, x) => s + x.diferenca, 0);
+    const totalPagos = segurado_pagos.reduce((s, x) => s + x.diferenca, 0);
+
     return {
-      segurado, empregador,
-      total_segurado: segurado.reduce((s, x) => s + x.diferenca, 0),
+      segurado_devidos, segurado_pagos, empregador,
+      total_segurado_devidos: totalDevidos,
+      total_segurado_pagos: totalPagos,
+      total_segurado: totalDevidos + totalPagos,
       total_empregador: empregador.reduce((s, x) => s + x.empresa + x.sat + x.terceiros, 0),
     };
+  }
+
+  // Helper: calcular INSS progressivo para uma competência
+  private calcularINSSProgressivo(comp: string, base: number): number {
+    if (this.csConfig.aliquota_segurado_tipo === 'fixa' && this.csConfig.aliquota_segurado_fixa) {
+      return base * (this.csConfig.aliquota_segurado_fixa / 100);
+    }
+    const faixas = this.getFaixasINSSParaCompetencia(comp);
+    const teto = faixas[faixas.length - 1].ate;
+    let baseRestante = this.csConfig.limitar_teto ? Math.min(base, teto) : base;
+    let imposto = 0;
+    let faixaAnterior = 0;
+    for (const faixa of faixas) {
+      const limiteNaFaixa = faixa.ate - faixaAnterior;
+      const baseNaFaixa = Math.min(baseRestante, limiteNaFaixa);
+      if (baseNaFaixa > 0) {
+        imposto += baseNaFaixa * faixa.aliquota;
+        baseRestante -= baseNaFaixa;
+      }
+      if (baseRestante <= 0) break;
+      faixaAnterior = faixa.ate;
+    }
+    return imposto;
   }
 
   // =====================================================
