@@ -270,7 +270,7 @@ export default function PjeCalcPage() {
   // =====================================================
   const renderModule = () => {
     if (selectedVerbaForGrid) {
-      return <ModuloOcorrencias
+      return <GradeOcorrencias
         caseId={caseId!} verbaId={selectedVerbaForGrid.id}
         verbaNome={selectedVerbaForGrid.nome}
         periodoInicio={selectedVerbaForGrid.periodo_inicio}
