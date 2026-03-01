@@ -50,6 +50,15 @@ export function ModuloResumo({ caseId }: Props) {
     },
   });
 
+  // Load verbas to get verba_principal_id linkage for hierarchical display
+  const { data: verbasDB = [] } = useQuery({
+    queryKey: ["pjecalc_verbas", caseId],
+    queryFn: async () => {
+      const { data } = await supabase.from("pjecalc_verbas").select("id, verba_principal_id, tipo").eq("case_id", caseId).order("ordem");
+      return data || [];
+    },
+  });
+
   const executarLiquidacao = async () => {
     setLiquidando(true);
     setValidacao(null);
