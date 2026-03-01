@@ -29,6 +29,10 @@ import { ModuloSeguroDesemprego } from "./pjecalc/ModuloSeguroDesemprego";
 import { ModuloHonorarios } from "./pjecalc/ModuloHonorarios";
 import { ModuloCustas } from "./pjecalc/ModuloCustas";
 import { ModuloResumo } from "./pjecalc/ModuloResumo";
+import { ModuloMultasCLT } from "./pjecalc/ModuloMultasCLT";
+import { ModuloPensaoAlimenticia } from "./pjecalc/ModuloPensaoAlimenticia";
+import { ModuloPrevidenciaPrivada } from "./pjecalc/ModuloPrevidenciaPrivada";
+import { ModuloSalarioFamilia } from "./pjecalc/ModuloSalarioFamilia";
 
 const MODULOS = [
   { id: 'dados_processo', label: 'Dados do Processo', icon: Gavel, desc: 'Identificação e partes' },
