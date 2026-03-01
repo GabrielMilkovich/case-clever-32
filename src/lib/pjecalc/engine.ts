@@ -122,7 +122,7 @@ export interface PjeVerba {
     integralizar: boolean;
   };
   
-  tipo_divisor: 'informado' | 'carga_horaria' | 'dias_uteis' | 'cartao_ponto';
+  tipo_divisor: 'informado' | 'carga_horaria' | 'dias_uteis' | 'cartao_ponto' | 'calendario';
   divisor_informado: number;
   divisor_cartao_colunas?: string[];
   multiplicador: number;
@@ -292,11 +292,13 @@ export interface PjeCorrecaoConfig {
   indice: string;
   epoca: 'mensal' | 'fixo';
   data_fixa?: string;
-  juros_tipo: 'simples_mensal' | 'selic' | 'nenhum';
+  juros_tipo: 'simples_mensal' | 'selic' | 'nenhum' | 'composto';
   juros_percentual: number;
   juros_inicio: 'ajuizamento' | 'citacao' | 'vencimento';
   multa_523: boolean;
   multa_523_percentual: number;
+  multa_467?: boolean;
+  multa_467_percentual?: number;
   data_liquidacao: string;
 }
 
@@ -458,6 +460,7 @@ export interface PjeResumo {
   seguro_desemprego: number;
   previdencia_privada: number;
   multa_523: number;
+  multa_467: number;
   honorarios_sucumbenciais: number;
   honorarios_contratuais: number;
   custas: number;
@@ -816,6 +819,22 @@ export class PjeCalcEngine {
   }
 
   // =====================================================
+  // QUANTIDADE MÉDIA APURADA (from cartão de ponto)
+  // =====================================================
+
+  calcularQuantidadeMediaApurada(verba: PjeVerba): number {
+    if (this.cartaoPonto.length === 0) return verba.quantidade_informada || 0;
+    const colunas = verba.quantidade_cartao_colunas;
+    let soma = 0;
+    let count = 0;
+    for (const reg of this.cartaoPonto) {
+      const val = this.getCartaoPontoQuantidade(reg.competencia, colunas);
+      if (val > 0) { soma += val; count++; }
+    }
+    return count > 0 ? soma / count : verba.quantidade_informada || 0;
+  }
+
+  // =====================================================
   // FÓRMULA OFICIAL DE CÁLCULO DE VERBA
   // Devido = (Base × Multiplicador / Divisor) × Quantidade × Dobra
   // =====================================================
@@ -836,19 +855,23 @@ export class PjeCalcEngine {
       div = new Decimal(this.getCargaHorariaParaCompetencia(competencia));
     } else if (verba.tipo_divisor === 'dias_uteis') {
       div = new Decimal(this.getDivisorComFeriados(competencia));
+    } else if (verba.tipo_divisor === 'calendario') {
+      div = new Decimal(this.calcularQuantidadeCalendario(competencia, 'dias_uteis') || 22);
     } else {
       div = new Decimal(verba.divisor_informado || 30);
     }
 
-    // Quantidade resolution (with calendario support)
+    // Quantidade resolution (with calendario + apurada support)
     let qtd: Decimal;
     if (verba.tipo_quantidade === 'cartao_ponto') {
       qtd = new Decimal(this.getCartaoPontoQuantidade(competencia, verba.quantidade_cartao_colunas) || 0);
     } else if (verba.tipo_quantidade === 'avos') {
       qtd = new Decimal(this.calcularAvos(competencia, verba.caracteristica));
     } else if (verba.tipo_quantidade === 'calendario') {
-      // Quantidade Calendário: usa dias úteis do período conforme feriados cadastrados
       qtd = new Decimal(this.calcularQuantidadeCalendario(competencia, 'dias_uteis'));
+    } else if (verba.tipo_quantidade === 'apurada') {
+      // Média apurada: usa a média da quantidade de todas as competências do cartão de ponto
+      qtd = new Decimal(this.calcularQuantidadeMediaApurada(verba));
     } else {
       qtd = new Decimal(verba.quantidade_informada || 1);
     }
@@ -1328,6 +1351,17 @@ export class PjeCalcEngine {
               const mesesJuros = this.mesesEntre(dataInicioJuros, dataLiq);
               const taxaMensal = (this.correcaoConfig.juros_percentual || 1) / 100;
               juros = Number(new Decimal(valorCorrigido).times(taxaMensal).times(mesesJuros).toDP(2));
+            } else if ((this.correcaoConfig.juros_tipo as string) === 'composto') {
+              // Juros compostos
+              let dataInicioJuros: Date;
+              if (this.correcaoConfig.juros_inicio === 'vencimento') dataInicioJuros = dataComp;
+              else if (this.correcaoConfig.juros_inicio === 'citacao' && dataCitacao) dataInicioJuros = dataCitacao;
+              else if (dataAjuiz) dataInicioJuros = dataAjuiz;
+              else dataInicioJuros = dataComp;
+              const mesesJuros = this.mesesEntre(dataInicioJuros, dataLiq);
+              const taxaMensal = (this.correcaoConfig.juros_percentual || 1) / 100;
+              const fatorComposto = Math.pow(1 + taxaMensal, mesesJuros);
+              juros = Number(new Decimal(valorCorrigido).times(fatorComposto - 1).toDP(2));
             } else if (this.correcaoConfig.juros_tipo === 'selic') {
               const mesesJuros = this.mesesEntre(dataAjuiz || dataComp, dataLiq);
               juros = Number(new Decimal(valorCorrigido).times(0.01).times(mesesJuros).toDP(2));
@@ -1836,6 +1870,12 @@ export class PjeCalcEngine {
     return Number(new Decimal(valorCondenacao).times(this.correcaoConfig.multa_523_percentual / 100).toDP(2));
   }
 
+  calcularMulta467(principalBruto: number): number {
+    if (!this.correcaoConfig.multa_467) return 0;
+    const pct = (this.correcaoConfig.multa_467_percentual || 50) / 100;
+    return Number(new Decimal(principalBruto).times(pct).toDP(2));
+  }
+
   // =====================================================
   // VALIDAÇÃO PRÉ-LIQUIDAÇÃO
   // Checklist automático de consistência
@@ -1993,38 +2033,51 @@ export class PjeCalcEngine {
     // ── 0. Validação pré-liquidação ──
     const validacao = this.validarPreLiquidacao();
 
-    // ── 1. Separar principais e reflexas ──
-    const verbasPrincipais = this.verbas
-      .filter(v => v.tipo === 'principal')
-      .sort((a, b) => a.ordem - b.ordem);
-
-    const verbasReflexas = this.verbas
-      .filter(v => v.tipo === 'reflexa')
-      .sort((a, b) => a.ordem - b.ordem);
-
+    // ── 1. Topological sort: principals first, then reflexas in dependency order ──
+    // This supports reflex-on-reflex (e.g., HE → DSR → 13º s/ DSR)
     const verbaResults: PjeVerbaResult[] = [];
+    const processed = new Set<string>();
     
-    // ── 2. Calcular principais ──
-    for (const verba of verbasPrincipais) {
+    const processVerba = (verba: PjeVerba) => {
+      if (processed.has(verba.id)) return;
+      
+      // Process dependencies first (reflex-on-reflex)
+      if (verba.verba_principal_id && !processed.has(verba.verba_principal_id)) {
+        const dep = this.verbas.find(v => v.id === verba.verba_principal_id);
+        if (dep) processVerba(dep);
+      }
+      for (const depId of (verba.base_calculo?.verbas || [])) {
+        if (!processed.has(depId)) {
+          const dep = this.verbas.find(v => v.id === depId);
+          if (dep) processVerba(dep);
+        }
+      }
+      
+      processed.add(verba.id);
+      
+      // Calculate
+      if (verba.tipo === 'reflexa' && verba.verba_principal_id) {
+        const principalResult = this.verbaResultsMap.get(verba.verba_principal_id);
+        if (principalResult) {
+          const refResult = this.calcularVerbaReflexa(verba, principalResult);
+          verbaResults.push(refResult);
+          this.verbaResultsMap.set(verba.id, refResult);
+          return;
+        }
+      }
       const result = this.calcularVerba(verba);
       verbaResults.push(result);
       this.verbaResultsMap.set(verba.id, result);
-    }
+    };
 
-    // ── 3. Calcular reflexas (vinculadas via verba_principal_id) ──
-    for (const reflexa of verbasReflexas) {
-      if (reflexa.verba_principal_id) {
-        const principalResult = this.verbaResultsMap.get(reflexa.verba_principal_id);
-        if (principalResult) {
-          const refResult = this.calcularVerbaReflexa(reflexa, principalResult);
-          verbaResults.push(refResult);
-          this.verbaResultsMap.set(reflexa.id, refResult);
-          continue;
-        }
-      }
-      const result = this.calcularVerba(reflexa);
-      verbaResults.push(result);
-      this.verbaResultsMap.set(reflexa.id, result);
+    // Process all verbas in dependency order
+    const sorted = [...this.verbas].sort((a, b) => {
+      if (a.tipo === 'principal' && b.tipo === 'reflexa') return -1;
+      if (a.tipo === 'reflexa' && b.tipo === 'principal') return 1;
+      return a.ordem - b.ordem;
+    });
+    for (const verba of sorted) {
+      processVerba(verba);
     }
 
     // ── 4. Correção Monetária + Juros ──
@@ -2071,6 +2124,7 @@ export class PjeCalcEngine {
     const honorarios = this.calcularHonorarios(principalCorrigido, jurosMora, fgts.total_fgts);
     const valorCondenacao = principalCorrigido + jurosMora + fgts.total_fgts;
     const multa523 = this.calcularMulta523(valorCondenacao);
+    const multa467 = this.calcularMulta467(principalBruto);
     const custasResult = this.calcularCustas(valorCondenacao);
     const csDescontado = this.csConfig.cobrar_reclamante ? cs.total_segurado : 0;
 
@@ -2079,7 +2133,6 @@ export class PjeCalcEngine {
     let pensaoTotal = 0;
     if (this.pensaoConfig.apurar && this.pensaoConfig.percentual > 0) {
       const pct = this.pensaoConfig.percentual / 100;
-      // Calcular pensão sobre verbas com incidência
       let basePensaoVerbas = 0;
       for (const vr of verbaResults) {
         const verba = this.verbas.find(v => v.id === vr.verba_id);
@@ -2087,13 +2140,9 @@ export class PjeCalcEngine {
         basePensaoVerbas += vr.total_final;
       }
       const pensaoVerbas = Number(new Decimal(basePensaoVerbas).times(pct).toDP(2));
-      
-      // Pensão sobre FGTS+Multa
       if (fgts.total_fgts > 0) {
         pensaoSobreFgts = Number(new Decimal(fgts.total_fgts).times(pct).toDP(2));
       }
-      
-      // Se valor fixo informado, usa o fixo ao invés do percentual
       if (this.pensaoConfig.valor_fixo && this.pensaoConfig.valor_fixo > 0) {
         pensaoTotal = this.pensaoConfig.valor_fixo;
         pensaoSobreFgts = 0;
@@ -2103,13 +2152,13 @@ export class PjeCalcEngine {
     }
 
     const liquido = Number(new Decimal(
-      principalCorrigido + jurosMora + fgts.total_fgts + seguro.total + multa523
+      principalCorrigido + jurosMora + fgts.total_fgts + seguro.total + multa523 + multa467
       - csDescontado - ir.imposto_devido - prevPrivada.valor - pensaoTotal
     ).toDP(2));
 
     const totalReclamada = Number(new Decimal(
       principalCorrigido + jurosMora + fgts.total_fgts + cs.total_empregador 
-      + seguro.total + honorarios.sucumbenciais + custasResult.total + multa523
+      + seguro.total + honorarios.sucumbenciais + custasResult.total + multa523 + multa467
     ).toDP(2));
 
     const resumo: PjeResumo = {
@@ -2118,7 +2167,7 @@ export class PjeCalcEngine {
       juros_mora: Number(new Decimal(jurosMora).toDP(2)),
       fgts_total: fgts.total_fgts, cs_segurado: csDescontado, cs_empregador: cs.total_empregador,
       ir_retido: ir.imposto_devido, seguro_desemprego: seguro.total, previdencia_privada: prevPrivada.valor,
-      multa_523: multa523, honorarios_sucumbenciais: honorarios.sucumbenciais,
+      multa_523: multa523, multa_467: multa467, honorarios_sucumbenciais: honorarios.sucumbenciais,
       honorarios_contratuais: honorarios.contratuais, custas: custasResult.total,
       custas_detalhadas: custasResult.detalhadas, pensao_sobre_fgts: pensaoSobreFgts, pensao_total: pensaoTotal,
       liquido_reclamante: liquido, total_reclamada: totalReclamada,
