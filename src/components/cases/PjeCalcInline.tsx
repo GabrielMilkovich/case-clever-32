@@ -29,6 +29,10 @@ import { ModuloSeguroDesemprego } from "./pjecalc/ModuloSeguroDesemprego";
 import { ModuloHonorarios } from "./pjecalc/ModuloHonorarios";
 import { ModuloCustas } from "./pjecalc/ModuloCustas";
 import { ModuloResumo } from "./pjecalc/ModuloResumo";
+import { ModuloMultasCLT } from "./pjecalc/ModuloMultasCLT";
+import { ModuloPensaoAlimenticia } from "./pjecalc/ModuloPensaoAlimenticia";
+import { ModuloPrevidenciaPrivada } from "./pjecalc/ModuloPrevidenciaPrivada";
+import { ModuloSalarioFamilia } from "./pjecalc/ModuloSalarioFamilia";
 
 const MODULOS = [
   { id: 'dados_processo', label: 'Dados do Processo', icon: Gavel, desc: 'Identificação e partes' },
@@ -38,11 +42,15 @@ const MODULOS = [
   { id: 'ferias', label: 'Férias', icon: Calendar, desc: 'Períodos aquisitivos' },
   { id: 'cartao_ponto', label: 'Cartão de Ponto', icon: Clock, desc: 'Horas extras e noturnas' },
   { id: 'verbas', label: 'Verbas', icon: FileText, desc: 'Parcelas do cálculo' },
+  { id: 'salario_familia', label: 'Salário-Família', icon: Users, desc: 'Cotas por dependente' },
+  { id: 'seguro_desemprego', label: 'Seguro-Desemprego', icon: Shield, desc: 'Indenização substitutiva' },
   { id: 'fgts', label: 'FGTS', icon: Building2, desc: 'Depósitos e multa' },
   { id: 'cs', label: 'Contrib. Social', icon: Receipt, desc: 'Segurado e empregador' },
+  { id: 'prev_privada', label: 'Previd. Privada', icon: Briefcase, desc: 'Complementar' },
+  { id: 'pensao', label: 'Pensão Alimentícia', icon: Users, desc: 'Percentual sobre crédito' },
   { id: 'ir', label: 'Imposto de Renda', icon: Percent, desc: 'IRRF / RRA' },
   { id: 'correcao', label: 'Correção/Juros', icon: TrendingUp, desc: 'Atualização monetária' },
-  { id: 'seguro_desemprego', label: 'Seguro-Desemprego', icon: Shield, desc: 'Indenização substitutiva' },
+  { id: 'multas', label: 'Multas e Inden.', icon: Gavel, desc: 'CLT 467, 477, etc.' },
   { id: 'honorarios', label: 'Honorários', icon: Scale, desc: 'Sucumbenciais e contratuais' },
   { id: 'custas', label: 'Custas', icon: Landmark, desc: 'Custas e assistência' },
   { id: 'resumo', label: 'Resumo', icon: FileBarChart, desc: 'Resultado da liquidação' },
@@ -400,11 +408,15 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
       case 'historico': return renderHistorico();
       case 'cartao_ponto': return <ModuloCartaoPonto caseId={caseId} dataAdmissao={formParams.data_admissao} dataDemissao={formParams.data_demissao} />;
       case 'verbas': return renderVerbas();
+      case 'salario_familia': return <ModuloSalarioFamilia caseId={caseId} />;
       case 'fgts': return <ModuloFGTS caseId={caseId} />;
       case 'cs': return <ModuloCS caseId={caseId} />;
+      case 'prev_privada': return <ModuloPrevidenciaPrivada caseId={caseId} />;
+      case 'pensao': return <ModuloPensaoAlimenticia caseId={caseId} />;
       case 'ir': return <ModuloIR caseId={caseId} />;
       case 'correcao': return <ModuloCorrecao caseId={caseId} />;
       case 'seguro_desemprego': return <ModuloSeguroDesemprego caseId={caseId} />;
+      case 'multas': return <ModuloMultasCLT caseId={caseId} />;
       case 'honorarios': return <ModuloHonorarios caseId={caseId} />;
       case 'custas': return <ModuloCustas caseId={caseId} />;
       case 'resumo': return <ModuloResumo caseId={caseId} />;
@@ -555,13 +567,50 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
             const aqFim = new Date(aqInicio); aqFim.setFullYear(aqFim.getFullYear() + 1); aqFim.setDate(aqFim.getDate() - 1);
             const concInicio = new Date(aqFim); concInicio.setDate(concInicio.getDate() + 1);
             const concFim = new Date(concInicio); concFim.setFullYear(concFim.getFullYear() + 1); concFim.setDate(concFim.getDate() - 1);
-            const situacao = concFim <= dem ? 'gozadas' : 'indenizadas';
-            periodos.push({ case_id: caseId, relativas: `${aqInicio.getFullYear()}/${aqFim.getFullYear()}`, periodo_aquisitivo_inicio: aqInicio.toISOString().slice(0, 10), periodo_aquisitivo_fim: aqFim > dem ? dem.toISOString().slice(0, 10) : aqFim.toISOString().slice(0, 10), periodo_concessivo_inicio: concInicio.toISOString().slice(0, 10), periodo_concessivo_fim: concFim.toISOString().slice(0, 10), prazo_dias: formParams.regime_trabalho === 'tempo_integral' ? 30 : 18, situacao, dobra: situacao === 'indenizadas' ? false : (concFim > dem) });
+            
+            // Art. 130 CLT: Calcular prazo com base em faltas não justificadas no período aquisitivo
+            let faltasNaoJustificadas = 0;
+            for (const f of faltas) {
+              if ((f as any).justificada) continue;
+              const fInicio = new Date((f as any).data_inicial);
+              const fFim = new Date((f as any).data_final);
+              const overlapInicio = fInicio > aqInicio ? fInicio : aqInicio;
+              const overlapFim = fFim < (aqFim > dem ? dem : aqFim) ? fFim : (aqFim > dem ? dem : aqFim);
+              if (overlapInicio <= overlapFim) {
+                faltasNaoJustificadas += Math.floor((overlapFim.getTime() - overlapInicio.getTime()) / 86400000) + 1;
+              }
+            }
+            let prazoDias: number;
+            if (formParams.regime_trabalho === 'tempo_parcial') {
+              prazoDias = faltasNaoJustificadas > 7 ? 9 : 18;
+            } else {
+              if (faltasNaoJustificadas > 32) prazoDias = 0;
+              else if (faltasNaoJustificadas > 23) prazoDias = 12;
+              else if (faltasNaoJustificadas > 14) prazoDias = 18;
+              else if (faltasNaoJustificadas > 5) prazoDias = 24;
+              else prazoDias = 30;
+            }
+            
+            const periodoAqFimEfetivo = aqFim > dem ? dem : aqFim;
+            const situacao = prazoDias === 0 ? 'perdidas' : (concFim <= dem ? 'gozadas' : 'indenizadas');
+            const dobra = situacao === 'gozadas' ? false : (situacao === 'indenizadas' && concFim > dem);
+            
+            periodos.push({
+              case_id: caseId,
+              relativas: `${aqInicio.getFullYear()}/${periodoAqFimEfetivo.getFullYear()}`,
+              periodo_aquisitivo_inicio: aqInicio.toISOString().slice(0, 10),
+              periodo_aquisitivo_fim: periodoAqFimEfetivo.toISOString().slice(0, 10),
+              periodo_concessivo_inicio: concInicio.toISOString().slice(0, 10),
+              periodo_concessivo_fim: concFim.toISOString().slice(0, 10),
+              prazo_dias: prazoDias,
+              situacao,
+              dobra: !!dobra,
+            });
             aqInicio = new Date(aqFim); aqInicio.setDate(aqInicio.getDate() + 1);
           }
           if (periodos.length > 0) await supabase.from("pjecalc_ferias").insert(periodos);
           queryClient.invalidateQueries({ queryKey: ["pjecalc_ferias", caseId] });
-          toast.success(`${periodos.length} período(s) gerado(s)`);
+          toast.success(`${periodos.length} período(s) gerado(s) com prazo Art. 130 CLT`);
         }}><Calculator className="h-4 w-4 mr-1" /> Gerar Automaticamente</Button>
       </div>
       {ferias.length === 0 ? (

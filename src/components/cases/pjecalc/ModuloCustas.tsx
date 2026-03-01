@@ -11,24 +11,19 @@ import { toast } from "sonner";
 import { Save, Loader2, Plus, Trash2 } from "lucide-react";
 
 interface CustaItem {
-  tipo: 'judiciais' | 'periciais' | 'emolumentos' | 'postais' | 'outras';
+  tipo: string;
   descricao: string;
   apurar: boolean;
+  valor_tipo: 'calculado' | 'informado' | 'nao_aplica';
   percentual: number;
   valor_fixo: string;
   valor_minimo: number;
   valor_maximo: string;
   isento: boolean;
+  vencimento: string;
 }
 
 interface Props { caseId: string; }
-
-const TIPOS_CUSTAS = [
-  { value: 'periciais', label: 'Custas Periciais' },
-  { value: 'emolumentos', label: 'Emolumentos' },
-  { value: 'postais', label: 'Custas Postais' },
-  { value: 'outras', label: 'Outras Custas' },
-];
 
 export function ModuloCustas({ caseId }: Props) {
   const qc = useQueryClient();
@@ -43,50 +38,78 @@ export function ModuloCustas({ caseId }: Props) {
   });
 
   const [form, setForm] = useState({
-    apurar: true, percentual: 2, valor_minimo: 10.64, valor_maximo: '',
-    isento: false, assistencia_judiciaria: false,
+    base_custas: 'bruto_reclamante' as 'bruto_reclamante' | 'bruto_mais_debitos',
+    // Reclamante
+    rec_conhecimento: 'nao_aplica' as string,
+    rec_conhecimento_valor: '',
+    rec_conhecimento_vencimento: '',
+    // Reclamado
+    rdo_conhecimento: 'calculado_2' as string,
+    rdo_conhecimento_valor: '',
+    rdo_conhecimento_vencimento: '',
+    rdo_liquidacao: 'nao_aplica' as string,
+    rdo_liquidacao_valor: '',
+    rdo_liquidacao_vencimento: '',
+    rdo_fixas: false,
+    rdo_fixas_valor: '',
+    rdo_fixas_vencimento: '',
+    rdo_autos: false,
+    rdo_autos_valor: '',
+    rdo_armazenamento: false,
+    rdo_armazenamento_valor: '',
+    // Recolhidas
+    valor_minimo: 10.64,
+    isento: false,
+    assistencia_judiciaria: false,
   });
 
   const [itens, setItens] = useState<CustaItem[]>([]);
+  const [recolhidas, setRecolhidas] = useState<{ descricao: string; valor: string; data: string }[]>([]);
 
   useEffect(() => {
     if (data) {
-      setForm({
-        apurar: data.apurar ?? true, percentual: data.percentual ?? 2,
-        valor_minimo: data.valor_minimo ?? 10.64, valor_maximo: data.valor_maximo?.toString() || '',
-        isento: data.isento ?? false, assistencia_judiciaria: data.assistencia_judiciaria ?? false,
-      });
-      if (data.itens && Array.isArray(data.itens)) {
-        setItens(data.itens.map((i: any) => ({
-          ...i, valor_fixo: i.valor_fixo?.toString() || '', valor_maximo: i.valor_maximo?.toString() || '',
-        })));
-      }
+      setForm(prev => ({
+        ...prev,
+        base_custas: data.base_custas || 'bruto_reclamante',
+        rec_conhecimento: data.rec_conhecimento || 'nao_aplica',
+        rec_conhecimento_valor: data.rec_conhecimento_valor?.toString() || '',
+        rec_conhecimento_vencimento: data.rec_conhecimento_vencimento || '',
+        rdo_conhecimento: data.rdo_conhecimento || 'calculado_2',
+        rdo_conhecimento_valor: data.rdo_conhecimento_valor?.toString() || '',
+        rdo_conhecimento_vencimento: data.rdo_conhecimento_vencimento || '',
+        rdo_liquidacao: data.rdo_liquidacao || 'nao_aplica',
+        rdo_liquidacao_valor: data.rdo_liquidacao_valor?.toString() || '',
+        rdo_liquidacao_vencimento: data.rdo_liquidacao_vencimento || '',
+        rdo_fixas: data.rdo_fixas ?? false,
+        rdo_fixas_valor: data.rdo_fixas_valor?.toString() || '',
+        rdo_fixas_vencimento: data.rdo_fixas_vencimento || '',
+        rdo_autos: data.rdo_autos ?? false,
+        rdo_autos_valor: data.rdo_autos_valor?.toString() || '',
+        rdo_armazenamento: data.rdo_armazenamento ?? false,
+        rdo_armazenamento_valor: data.rdo_armazenamento_valor?.toString() || '',
+        valor_minimo: data.valor_minimo ?? 10.64,
+        isento: data.isento ?? false,
+        assistencia_judiciaria: data.assistencia_judiciaria ?? false,
+      }));
+      if (data.itens && Array.isArray(data.itens)) setItens(data.itens);
+      if (data.recolhidas && Array.isArray(data.recolhidas)) setRecolhidas(data.recolhidas);
     }
   }, [data]);
-
-  const addItem = () => {
-    setItens(prev => [...prev, {
-      tipo: 'periciais', descricao: 'Custas Periciais', apurar: true,
-      percentual: 0, valor_fixo: '', valor_minimo: 0, valor_maximo: '', isento: false,
-    }]);
-  };
-
-  const removeItem = (idx: number) => setItens(prev => prev.filter((_, i) => i !== idx));
-  const updateItem = (idx: number, changes: Partial<CustaItem>) => {
-    setItens(prev => prev.map((item, i) => i === idx ? { ...item, ...changes } : item));
-  };
 
   const save = async () => {
     setSaving(true);
     try {
-      const payload = {
+      const payload: any = {
         case_id: caseId, ...form,
-        percentual: Number(form.percentual), valor_minimo: Number(form.valor_minimo),
-        valor_maximo: form.valor_maximo ? parseFloat(form.valor_maximo) : null,
-        itens: itens.map(i => ({
-          ...i, valor_fixo: i.valor_fixo ? parseFloat(i.valor_fixo) : null,
-          valor_maximo: i.valor_maximo ? parseFloat(i.valor_maximo) : null,
-        })),
+        rec_conhecimento_valor: form.rec_conhecimento_valor ? parseFloat(form.rec_conhecimento_valor) : null,
+        rdo_conhecimento_valor: form.rdo_conhecimento_valor ? parseFloat(form.rdo_conhecimento_valor) : null,
+        rdo_liquidacao_valor: form.rdo_liquidacao_valor ? parseFloat(form.rdo_liquidacao_valor) : null,
+        rdo_fixas_valor: form.rdo_fixas_valor ? parseFloat(form.rdo_fixas_valor) : null,
+        rdo_autos_valor: form.rdo_autos_valor ? parseFloat(form.rdo_autos_valor) : null,
+        rdo_armazenamento_valor: form.rdo_armazenamento_valor ? parseFloat(form.rdo_armazenamento_valor) : null,
+        // Keep legacy compatibility
+        apurar: true, percentual: 2,
+        itens, recolhidas,
       };
       if (data?.id) {
         const { error } = await supabase.from("pjecalc_custas_config" as any).update(payload).eq("id", data.id);
@@ -101,81 +124,127 @@ export function ModuloCustas({ caseId }: Props) {
     finally { setSaving(false); }
   };
 
+  const CustaSelect = ({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) => (
+    <div>
+      <Label className="text-xs">{label}</Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="nao_aplica">Não se aplica</SelectItem>
+          <SelectItem value="calculado_2">Calculada 2%</SelectItem>
+          <SelectItem value="informado">Informada</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Custas e Assistência Judiciária</h2>
+        <h2 className="text-lg font-semibold">Custas Judiciais</h2>
         <Button onClick={save} disabled={saving} size="sm">
           {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />} Salvar
         </Button>
       </div>
 
-      {/* Custas Judiciais (Art. 789 CLT) */}
+      {/* Base das Custas */}
       <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-sm">Custas Judiciais (Art. 789 CLT)</CardTitle></CardHeader>
+        <CardHeader className="pb-3"><CardTitle className="text-sm">Base das Custas de Conhecimento e Liquidação</CardTitle></CardHeader>
+        <CardContent>
+          <Select value={form.base_custas} onValueChange={v => setForm(p => ({ ...p, base_custas: v as any }))}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="bruto_reclamante">Bruto Devido ao Reclamante</SelectItem>
+              <SelectItem value="bruto_mais_debitos">Bruto Devido ao Reclamante + Outros Débitos da Reclamada</SelectItem>
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
+      {/* Custas do Reclamante */}
+      <Card>
+        <CardHeader className="pb-3"><CardTitle className="text-sm">Custas do Reclamante</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          <div className="flex items-center gap-2"><Checkbox checked={form.apurar} onCheckedChange={v => setForm(p => ({ ...p, apurar: !!v }))} /><Label className="text-xs">Apurar Custas Judiciais (2% sobre valor da condenação)</Label></div>
-          <div className="flex items-center gap-2"><Checkbox checked={form.isento} onCheckedChange={v => setForm(p => ({ ...p, isento: !!v }))} /><Label className="text-xs">Isento de Custas (beneficiário da justiça gratuita)</Label></div>
-          <div className="grid grid-cols-3 gap-3">
-            <div><Label className="text-xs">Percentual (%)</Label><Input type="number" step="0.1" value={form.percentual} onChange={e => setForm(p => ({ ...p, percentual: parseFloat(e.target.value) || 2 }))} className="mt-1 h-8 text-xs" /></div>
-            <div><Label className="text-xs">Valor Mínimo (R$)</Label><Input type="number" step="0.01" value={form.valor_minimo} onChange={e => setForm(p => ({ ...p, valor_minimo: parseFloat(e.target.value) || 10.64 }))} className="mt-1 h-8 text-xs" /></div>
-            <div><Label className="text-xs">Valor Máximo (R$)</Label><Input type="number" step="0.01" value={form.valor_maximo} onChange={e => setForm(p => ({ ...p, valor_maximo: e.target.value }))} className="mt-1 h-8 text-xs" placeholder="Sem limite" /></div>
+          <CustaSelect value={form.rec_conhecimento} onChange={v => setForm(p => ({ ...p, rec_conhecimento: v }))} label="Conhecimento" />
+          {form.rec_conhecimento === 'informado' && (
+            <div className="grid grid-cols-2 gap-2">
+              <div><Label className="text-[10px]">Vencimento</Label><Input type="date" value={form.rec_conhecimento_vencimento} onChange={e => setForm(p => ({ ...p, rec_conhecimento_vencimento: e.target.value }))} className="mt-0.5 h-7 text-xs" /></div>
+              <div><Label className="text-[10px]">Valor (R$)</Label><Input type="number" step="0.01" value={form.rec_conhecimento_valor} onChange={e => setForm(p => ({ ...p, rec_conhecimento_valor: e.target.value }))} className="mt-0.5 h-7 text-xs" /></div>
+            </div>
+          )}
+          <p className="text-[10px] text-muted-foreground">Mínimo de R$ {form.valor_minimo.toFixed(2)} (Art. 789 CLT).</p>
+        </CardContent>
+      </Card>
+
+      {/* Custas do Reclamado */}
+      <Card>
+        <CardHeader className="pb-3"><CardTitle className="text-sm">Custas do Reclamado</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <CustaSelect value={form.rdo_conhecimento} onChange={v => setForm(p => ({ ...p, rdo_conhecimento: v }))} label="Conhecimento" />
+          {form.rdo_conhecimento === 'informado' && (
+            <div className="grid grid-cols-2 gap-2">
+              <div><Label className="text-[10px]">Vencimento</Label><Input type="date" value={form.rdo_conhecimento_vencimento} onChange={e => setForm(p => ({ ...p, rdo_conhecimento_vencimento: e.target.value }))} className="mt-0.5 h-7 text-xs" /></div>
+              <div><Label className="text-[10px]">Valor (R$)</Label><Input type="number" step="0.01" value={form.rdo_conhecimento_valor} onChange={e => setForm(p => ({ ...p, rdo_conhecimento_valor: e.target.value }))} className="mt-0.5 h-7 text-xs" /></div>
+            </div>
+          )}
+
+          <CustaSelect value={form.rdo_liquidacao} onChange={v => setForm(p => ({ ...p, rdo_liquidacao: v }))} label="Liquidação" />
+          {form.rdo_liquidacao === 'informado' && (
+            <div className="grid grid-cols-2 gap-2">
+              <div><Label className="text-[10px]">Vencimento</Label><Input type="date" value={form.rdo_liquidacao_vencimento} onChange={e => setForm(p => ({ ...p, rdo_liquidacao_vencimento: e.target.value }))} className="mt-0.5 h-7 text-xs" /></div>
+              <div><Label className="text-[10px]">Valor (R$)</Label><Input type="number" step="0.01" value={form.rdo_liquidacao_valor} onChange={e => setForm(p => ({ ...p, rdo_liquidacao_valor: e.target.value }))} className="mt-0.5 h-7 text-xs" /></div>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Checkbox checked={form.rdo_fixas} onCheckedChange={v => setForm(p => ({ ...p, rdo_fixas: !!v }))} />
+              <Label className="text-xs">Custas Fixas</Label>
+              {form.rdo_fixas && <Input type="number" step="0.01" value={form.rdo_fixas_valor} onChange={e => setForm(p => ({ ...p, rdo_fixas_valor: e.target.value }))} className="h-7 text-xs w-24" placeholder="R$" />}
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox checked={form.rdo_autos} onCheckedChange={v => setForm(p => ({ ...p, rdo_autos: !!v }))} />
+              <Label className="text-xs">Custas de Autos</Label>
+              {form.rdo_autos && <Input type="number" step="0.01" value={form.rdo_autos_valor} onChange={e => setForm(p => ({ ...p, rdo_autos_valor: e.target.value }))} className="h-7 text-xs w-24" placeholder="R$" />}
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox checked={form.rdo_armazenamento} onCheckedChange={v => setForm(p => ({ ...p, rdo_armazenamento: !!v }))} />
+              <Label className="text-xs">Custas de Armazenamento</Label>
+              {form.rdo_armazenamento && <Input type="number" step="0.01" value={form.rdo_armazenamento_valor} onChange={e => setForm(p => ({ ...p, rdo_armazenamento_valor: e.target.value }))} className="h-7 text-xs w-24" placeholder="R$" />}
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Custas Adicionais (Periciais, Emolumentos, Postais, Outras) */}
+      {/* Custas Recolhidas */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm">Custas Adicionais</CardTitle>
-            <Button variant="outline" size="sm" onClick={addItem} className="h-7 text-xs">
+            <CardTitle className="text-sm">Custas Recolhidas (Dedução)</CardTitle>
+            <Button variant="outline" size="sm" onClick={() => setRecolhidas(p => [...p, { descricao: '', valor: '', data: '' }])} className="h-7 text-xs">
               <Plus className="h-3 w-3 mr-1" /> Adicionar
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {itens.length === 0 && (
-            <p className="text-[10px] text-muted-foreground text-center py-2">
-              Nenhuma custa adicional configurada. Clique em "Adicionar" para incluir custas periciais, emolumentos, etc.
-            </p>
-          )}
-          {itens.map((item, idx) => (
-            <div key={idx} className="border border-border/50 rounded p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Checkbox checked={item.apurar} onCheckedChange={v => updateItem(idx, { apurar: !!v })} />
-                  <Select value={item.tipo} onValueChange={v => updateItem(idx, { tipo: v as any, descricao: TIPOS_CUSTAS.find(t => t.value === v)?.label || v })}>
-                    <SelectTrigger className="h-7 text-xs w-40"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {TIPOS_CUSTAS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button variant="ghost" size="sm" onClick={() => removeItem(idx)} className="h-7 w-7 p-0">
-                  <Trash2 className="h-3 w-3 text-destructive" />
-                </Button>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <div><Label className="text-[10px]">Valor Fixo (R$)</Label><Input type="number" step="0.01" value={item.valor_fixo} onChange={e => updateItem(idx, { valor_fixo: e.target.value })} className="mt-0.5 h-7 text-xs" placeholder="Calculado" /></div>
-                <div><Label className="text-[10px]">% Condenação</Label><Input type="number" step="0.1" value={item.percentual} onChange={e => updateItem(idx, { percentual: parseFloat(e.target.value) || 0 })} className="mt-0.5 h-7 text-xs" disabled={!!item.valor_fixo} /></div>
-                <div><Label className="text-[10px]">Mínimo (R$)</Label><Input type="number" step="0.01" value={item.valor_minimo} onChange={e => updateItem(idx, { valor_minimo: parseFloat(e.target.value) || 0 })} className="mt-0.5 h-7 text-xs" /></div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox checked={item.isento} onCheckedChange={v => updateItem(idx, { isento: !!v })} />
-                <Label className="text-[10px]">Isento</Label>
-              </div>
+        <CardContent className="space-y-2">
+          {recolhidas.length === 0 && <p className="text-[10px] text-muted-foreground text-center py-2">Nenhuma custa recolhida.</p>}
+          {recolhidas.map((r, idx) => (
+            <div key={idx} className="flex items-center gap-2">
+              <Input value={r.descricao} onChange={e => { const n = [...recolhidas]; n[idx] = { ...n[idx], descricao: e.target.value }; setRecolhidas(n); }} className="h-7 text-xs flex-1" placeholder="Descrição" />
+              <Input type="number" step="0.01" value={r.valor} onChange={e => { const n = [...recolhidas]; n[idx] = { ...n[idx], valor: e.target.value }; setRecolhidas(n); }} className="h-7 text-xs w-24" placeholder="R$" />
+              <Input type="date" value={r.data} onChange={e => { const n = [...recolhidas]; n[idx] = { ...n[idx], data: e.target.value }; setRecolhidas(n); }} className="h-7 text-xs w-32" />
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setRecolhidas(p => p.filter((_, i) => i !== idx))}><Trash2 className="h-3 w-3" /></Button>
             </div>
           ))}
         </CardContent>
       </Card>
 
-      {/* Assistência Judiciária */}
+      {/* Isenção */}
       <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-sm">Assistência Judiciária</CardTitle></CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2"><Checkbox checked={form.assistencia_judiciaria} onCheckedChange={v => setForm(p => ({ ...p, assistencia_judiciaria: !!v }))} /><Label className="text-xs">Deferir Assistência Judiciária Gratuita</Label></div>
-          <p className="text-[10px] text-muted-foreground mt-2">Art. 790, §3º CLT — presunção de insuficiência econômica para salário ≤ 40% do teto RGPS.</p>
+        <CardHeader className="pb-3"><CardTitle className="text-sm">Isenção e Assistência</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          <div className="flex items-center gap-2"><Checkbox checked={form.isento} onCheckedChange={v => setForm(p => ({ ...p, isento: !!v }))} /><Label className="text-xs">Isento de Custas (beneficiário da justiça gratuita)</Label></div>
+          <div className="flex items-center gap-2"><Checkbox checked={form.assistencia_judiciaria} onCheckedChange={v => setForm(p => ({ ...p, assistencia_judiciaria: !!v }))} /><Label className="text-xs">Deferir Assistência Judiciária Gratuita (Art. 790, §3º CLT)</Label></div>
         </CardContent>
       </Card>
     </div>
