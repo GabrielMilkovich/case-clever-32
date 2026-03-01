@@ -50,6 +50,15 @@ export function ModuloResumo({ caseId }: Props) {
     },
   });
 
+  // Load verbas to get verba_principal_id linkage for hierarchical display
+  const { data: verbasDB = [] } = useQuery({
+    queryKey: ["pjecalc_verbas", caseId],
+    queryFn: async () => {
+      const { data } = await supabase.from("pjecalc_verbas").select("id, verba_principal_id, tipo").eq("case_id", caseId).order("ordem");
+      return data || [];
+    },
+  });
+
   const executarLiquidacao = async () => {
     setLiquidando(true);
     setValidacao(null);
@@ -512,7 +521,7 @@ export function ModuloResumo({ caseId }: Props) {
             </CardContent>
           </Card>
 
-          {/* Verbas Detail */}
+          {/* Verbas Detail — Hierarchical Tree */}
           <Card>
             <CardHeader className="pb-3"><CardTitle className="text-sm">Verbas ({res.verbas.length})</CardTitle></CardHeader>
             <CardContent>
@@ -528,18 +537,65 @@ export function ModuloResumo({ caseId }: Props) {
                   <th className="p-2 text-right font-bold">Final</th>
                 </tr></thead>
                 <tbody>
-                  {res.verbas.map(v => (
-                    <tr key={v.verba_id} className="border-b border-border/30">
-                      <td className="p-2 font-medium">{v.nome}</td>
-                      <td className="p-2 text-center"><Badge variant={v.tipo === 'principal' ? 'default' : 'secondary'} className="text-[10px]">{v.tipo === 'principal' ? 'P' : 'R'}</Badge></td>
-                      <td className="p-2 text-right font-mono">{fmt(v.total_devido)}</td>
-                      <td className="p-2 text-right font-mono">{fmt(v.total_pago)}</td>
-                      <td className="p-2 text-right font-mono">{fmt(v.total_diferenca)}</td>
-                      <td className="p-2 text-right font-mono">{fmt(v.total_corrigido)}</td>
-                      <td className="p-2 text-right font-mono">{fmt(v.total_juros)}</td>
-                      <td className="p-2 text-right font-mono font-bold">{fmt(v.total_final)}</td>
-                    </tr>
-                  ))}
+                  {(() => {
+                    const principals = res.verbas.filter(v => v.tipo === 'principal');
+                    const reflexas = res.verbas.filter(v => v.tipo === 'reflexa');
+                    const rows: JSX.Element[] = [];
+                    for (const p of principals) {
+                      // Principal row
+                      rows.push(
+                        <tr key={p.verba_id} className="border-b border-border/30 bg-muted/20">
+                          <td className="p-2 font-semibold">{p.nome}</td>
+                          <td className="p-2 text-center"><Badge variant="default" className="text-[10px]">P</Badge></td>
+                          <td className="p-2 text-right font-mono">{fmt(p.total_devido)}</td>
+                          <td className="p-2 text-right font-mono">{fmt(p.total_pago)}</td>
+                          <td className="p-2 text-right font-mono">{fmt(p.total_diferenca)}</td>
+                          <td className="p-2 text-right font-mono">{fmt(p.total_corrigido)}</td>
+                          <td className="p-2 text-right font-mono">{fmt(p.total_juros)}</td>
+                          <td className="p-2 text-right font-mono font-bold">{fmt(p.total_final)}</td>
+                        </tr>
+                      );
+                      // Find reflexas linked to this principal via verba_principal_id from DB
+                      const linkedReflexas = reflexas.filter(r => {
+                        const dbVerba = verbasDB.find((vdb: any) => vdb.id === r.verba_id);
+                        return dbVerba?.verba_principal_id === p.verba_id;
+                      });
+                      for (const ref of linkedReflexas) {
+                        rows.push(
+                          <tr key={ref.verba_id} className="border-b border-border/20">
+                            <td className="p-2 pl-6 text-muted-foreground"><span className="text-primary/50 mr-1">└</span> {ref.nome}</td>
+                            <td className="p-2 text-center"><Badge variant="secondary" className="text-[10px]">R</Badge></td>
+                            <td className="p-2 text-right font-mono">{fmt(ref.total_devido)}</td>
+                            <td className="p-2 text-right font-mono">{fmt(ref.total_pago)}</td>
+                            <td className="p-2 text-right font-mono">{fmt(ref.total_diferenca)}</td>
+                            <td className="p-2 text-right font-mono">{fmt(ref.total_corrigido)}</td>
+                            <td className="p-2 text-right font-mono">{fmt(ref.total_juros)}</td>
+                            <td className="p-2 text-right font-mono font-bold">{fmt(ref.total_final)}</td>
+                          </tr>
+                        );
+                      }
+                    }
+                    // Orphan reflexas (no verba_principal_id in DB)
+                    const linkedIds = new Set(
+                      verbasDB.filter((vdb: any) => vdb.verba_principal_id).map((vdb: any) => vdb.id)
+                    );
+                    for (const ref of reflexas) {
+                      if (linkedIds.has(ref.verba_id)) continue;
+                      rows.push(
+                        <tr key={ref.verba_id} className="border-b border-border/30">
+                          <td className="p-2 font-medium text-destructive">⚠ {ref.nome}</td>
+                          <td className="p-2 text-center"><Badge variant="destructive" className="text-[10px]">R</Badge></td>
+                          <td className="p-2 text-right font-mono">{fmt(ref.total_devido)}</td>
+                          <td className="p-2 text-right font-mono">{fmt(ref.total_pago)}</td>
+                          <td className="p-2 text-right font-mono">{fmt(ref.total_diferenca)}</td>
+                          <td className="p-2 text-right font-mono">{fmt(ref.total_corrigido)}</td>
+                          <td className="p-2 text-right font-mono">{fmt(ref.total_juros)}</td>
+                          <td className="p-2 text-right font-mono font-bold">{fmt(ref.total_final)}</td>
+                        </tr>
+                      );
+                    }
+                    return rows;
+                  })()}
                 </tbody>
               </table>
             </CardContent>
