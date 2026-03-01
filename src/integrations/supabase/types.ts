@@ -3677,11 +3677,14 @@ export type Database = {
           multiplicador_valor: number
           origem: string
           pago: number
+          parametros_json: Json | null
           quantidade_valor: number
+          tipo_fracao: string | null
           total: number
           updated_at: string
           updated_by: string | null
           verba_id: string
+          verba_principal_id: string | null
         }
         Insert: {
           ativa?: boolean
@@ -3699,11 +3702,14 @@ export type Database = {
           multiplicador_valor?: number
           origem?: string
           pago?: number
+          parametros_json?: Json | null
           quantidade_valor?: number
+          tipo_fracao?: string | null
           total?: number
           updated_at?: string
           updated_by?: string | null
           verba_id: string
+          verba_principal_id?: string | null
         }
         Update: {
           ativa?: boolean
@@ -3721,11 +3727,14 @@ export type Database = {
           multiplicador_valor?: number
           origem?: string
           pago?: number
+          parametros_json?: Json | null
           quantidade_valor?: number
+          tipo_fracao?: string | null
           total?: number
           updated_at?: string
           updated_by?: string | null
           verba_id?: string
+          verba_principal_id?: string | null
         }
         Relationships: []
       }
@@ -4399,6 +4408,7 @@ export type Database = {
           divisor_informado: number | null
           dobrar_valor_devido: boolean | null
           exclusoes: Json
+          fracao_mes_modo: string | null
           gerar_verba_principal: string
           gerar_verba_reflexa: string
           id: string
@@ -4442,6 +4452,7 @@ export type Database = {
           divisor_informado?: number | null
           dobrar_valor_devido?: boolean | null
           exclusoes?: Json
+          fracao_mes_modo?: string | null
           gerar_verba_principal?: string
           gerar_verba_reflexa?: string
           id?: string
@@ -4485,6 +4496,7 @@ export type Database = {
           divisor_informado?: number | null
           dobrar_valor_devido?: boolean | null
           exclusoes?: Json
+          fracao_mes_modo?: string | null
           gerar_verba_principal?: string
           gerar_verba_reflexa?: string
           id?: string
