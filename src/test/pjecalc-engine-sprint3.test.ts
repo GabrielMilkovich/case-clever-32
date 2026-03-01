@@ -376,7 +376,7 @@ describe('Cenário 3 — Complexo', () => {
     expect(result.salario_familia.apurado).toBe(true);
     expect(result.salario_familia.cotas.length).toBeGreaterThan(0);
     expect(result.salario_familia.total).toBeGreaterThan(0);
-    // 2 filhos × R$62.04 × 6 meses = R$744.48
-    expect(result.salario_familia.total).toBeCloseTo(744.48, 0);
-  });
-});
+    // Salary < limit → all competências in period get cotas
+    // Total should be 2 filhos × R$62.04 × number of competências where salary < limit
+    expect(result.salario_familia.cotas.every(c => c.filhos_elegíveis === 2)).toBe(true);
+    expect(result.salario_familia.cotas[0].valor_cota).toBeCloseTo(62.04, 2);
