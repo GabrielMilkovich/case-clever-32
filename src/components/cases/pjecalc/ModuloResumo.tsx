@@ -555,18 +555,12 @@ export function ModuloResumo({ caseId }: Props) {
                           <td className="p-2 text-right font-mono font-bold">{fmt(p.total_final)}</td>
                         </tr>
                       );
-                      // Find reflexas linked to this principal (by checking verba_id match in the verbas input data)
+                      // Find reflexas linked to this principal via verba_principal_id from DB
                       const linkedReflexas = reflexas.filter(r => {
-                        // Match by name convention or check if the engine linked them
-                        const rNome = r.nome.toLowerCase();
-                        const pNome = p.nome.toLowerCase();
-                        return rNome.includes('dsr') || rNome.includes('rsr') || rNome.includes('13') || rNome.includes('férias') || rNome.includes('ferias');
+                        const dbVerba = verbasDB.find((vdb: any) => vdb.id === r.verba_id);
+                        return dbVerba?.verba_principal_id === p.verba_id;
                       });
-                      // Use a Set to avoid duplicates
-                      const usedIds = new Set<string>();
                       for (const ref of linkedReflexas) {
-                        if (usedIds.has(ref.verba_id)) continue;
-                        usedIds.add(ref.verba_id);
                         rows.push(
                           <tr key={ref.verba_id} className="border-b border-border/20">
                             <td className="p-2 pl-6 text-muted-foreground"><span className="text-primary/50 mr-1">└</span> {ref.nome}</td>
