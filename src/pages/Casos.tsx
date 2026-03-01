@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { seedAdvancedTestCase } from "@/lib/test-case-seed";
+import { seedCasoMarcelo } from "@/lib/test-case-seed-marcelo";
 import { toast } from "sonner";
 
 interface CaseWithMetrics {
@@ -46,6 +47,8 @@ export default function Casos() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [seedingTest, setSeedingTest] = useState(false);
 
+  const [seedingMarcelo, setSeedingMarcelo] = useState(false);
+
   const handleSeedTestCase = async () => {
     setSeedingTest(true);
     try {
@@ -59,6 +62,20 @@ export default function Casos() {
       toast.error("Erro ao criar caso teste: " + err.message);
     } finally {
       setSeedingTest(false);
+    }
+  };
+
+  const handleSeedMarcelo = async () => {
+    setSeedingMarcelo(true);
+    try {
+      const caseId = await seedCasoMarcelo();
+      toast.success("Caso Marcelo Henrique Pires criado com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["cases-with-metrics"] });
+      navigate(`/casos/${caseId}`);
+    } catch (err: any) {
+      toast.error("Erro ao criar caso: " + err.message);
+    } finally {
+      setSeedingMarcelo(false);
     }
   };
 
@@ -215,7 +232,16 @@ export default function Casos() {
               className="gap-1.5 h-9 text-sm"
             >
               <FlaskConical className="h-4 w-4" />
-              {seedingTest ? "Criando..." : "Caso Teste"}
+              {seedingTest ? "Criando..." : "Caso Teste 1"}
+            </Button>
+            <Button 
+              variant="outline" size="sm" 
+              onClick={handleSeedMarcelo}
+              disabled={seedingMarcelo}
+              className="gap-1.5 h-9 text-sm"
+            >
+              <FlaskConical className="h-4 w-4" />
+              {seedingMarcelo ? "Criando..." : "Caso Teste 2"}
             </Button>
             <Button 
               variant="outline" size="sm" 
