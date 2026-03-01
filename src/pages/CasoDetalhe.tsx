@@ -179,7 +179,7 @@ export default function CasoDetalhe() {
     queryKey: ["pjecalc_liquidacao", id],
     queryFn: async () => {
       const { data } = await supabase.from("pjecalc_liquidacao_resultado" as any).select("total_bruto, created_at").eq("case_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle();
-      return data as { total_bruto: number; created_at: string } | null;
+      return data as any;
     },
   });
 
