@@ -16,6 +16,8 @@ import {
   type PjeCustasConfig, type PjeSeguroConfig, type PjeLiquidacaoResult,
   type PjeIndiceRow, type PjeINSSFaixaRow, type PjeIRFaixaRow,
   type PjeValidationResult,
+  type PjeExcecaoCargaHoraria, type PjeFeriadoDB,
+  type PjePrevidenciaPrivadaConfig, type PjePensaoConfig, type PjeSalarioFamiliaConfig,
 } from "@/lib/pjecalc/engine";
 import { gerarRelatorioPDF } from "@/lib/pjecalc/pdf-report";
 import { gerarRelatorioMemoriaCalculo } from "@/lib/pjecalc/pdf-report-memoria";
