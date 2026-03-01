@@ -270,8 +270,8 @@ export default function CasoDetalhe() {
 
   // Progress calculation
   const progressSteps = [
-    documents.length > 0,
-    facts.length > 0,
+    isTestCase || documents.length > 0,
+    isTestCase || facts.length > 0,
     canCalculate,
     snapshotsCount > 0,
     caseData.status === "revisado",
