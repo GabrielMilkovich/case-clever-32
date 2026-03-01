@@ -494,11 +494,14 @@ export function ModuloResumo({ caseId }: Props) {
                     ['(-) CS Segurado', -res.resumo.cs_segurado],
                     ['(-) IRRF (Art. 12-A RRA)', -res.resumo.ir_retido],
                     ...(res.resumo.seguro_desemprego > 0 ? [['(+) Seguro-Desemprego (indenização)', res.resumo.seguro_desemprego]] : []),
+                    ...((res.resumo.salario_familia || 0) > 0 ? [['(+) Salário-Família (Art. 65, Lei 8.213/91)', res.resumo.salario_familia]] : []),
                     ...(res.resumo.multa_523 > 0 ? [['(+) Multa Art. 523, §1º CPC', res.resumo.multa_523]] : []),
                     ...((res.resumo.multa_467 || 0) > 0 ? [['(+) Multa Art. 467 CLT', res.resumo.multa_467]] : []),
                     ...(res.resumo.honorarios_sucumbenciais > 0 ? [['(+) Honorários Sucumbenciais', res.resumo.honorarios_sucumbenciais]] : []),
                     ...(res.resumo.honorarios_contratuais > 0 ? [['(+) Honorários Contratuais', res.resumo.honorarios_contratuais]] : []),
                     ...(res.resumo.custas > 0 ? [['(+) Custas Processuais', res.resumo.custas]] : []),
+                    ...((res.resumo.previdencia_privada || 0) > 0 ? [['(-) Previdência Privada', -res.resumo.previdencia_privada]] : []),
+                    ...((res.resumo.pensao_total || 0) > 0 ? [['(-) Pensão Alimentícia', -res.resumo.pensao_total]] : []),
                   ].map(([label, value]) => (
                     <tr key={label as string} className="border-b border-border/30">
                       <td className="py-2 text-muted-foreground">{label}</td>

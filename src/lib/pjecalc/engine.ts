@@ -29,6 +29,7 @@ export interface PjeParametros {
   data_prescricao_quinquenal?: string;
   maior_remuneracao?: number;
   ultima_remuneracao?: number;
+  salario_minimo?: number;
   prazo_aviso_previo: 'nao_apurar' | 'calculado' | 'informado';
   prazo_aviso_dias?: number;
   projetar_aviso_indenizado: boolean;
@@ -214,6 +215,24 @@ export interface PjePrevidenciaPrivadaConfig {
   deduzir_ir: boolean;
 }
 
+export interface PjeSalarioFamiliaConfig {
+  apurar: boolean;
+  numero_filhos: number;
+  filhos_detalhes?: { nome: string; nascimento: string; ate_14: boolean }[];
+}
+
+export interface PjeSalarioFamiliaResult {
+  apurado: boolean;
+  cotas: { competencia: string; filhos_elegíveis: number; valor_cota: number; total: number }[];
+  total: number;
+}
+
+// Tabela Salário-Família 2025 (Portaria MPS/MF nº 6/2025)
+const SALARIO_FAMILIA_2025 = {
+  limite_remuneracao: 1819.26,
+  valor_cota: 62.04,
+};
+
 export interface PjeFGTSConfig {
   apurar: boolean;
   destino: 'pagar_reclamante' | 'recolher_conta';
@@ -358,6 +377,7 @@ export interface PjeLiquidacaoResult {
   imposto_renda: PjeIRResult;
   seguro_desemprego: PjeSeguroResult;
   previdencia_privada: PjePrevidenciaPrivadaResult;
+  salario_familia: PjeSalarioFamiliaResult;
   resumo: PjeResumo;
   validacao?: PjeValidationResult;
 }
@@ -459,6 +479,7 @@ export interface PjeResumo {
   ir_retido: number;
   seguro_desemprego: number;
   previdencia_privada: number;
+  salario_familia: number;
   multa_523: number;
   multa_467: number;
   honorarios_sucumbenciais: number;
@@ -573,6 +594,7 @@ export class PjeCalcEngine {
   private feriadosDB: PjeFeriadoDB[];
   private prevPrivadaConfig: PjePrevidenciaPrivadaConfig;
   private pensaoConfig: PjePensaoConfig;
+  private salarioFamiliaConfig: PjeSalarioFamiliaConfig;
   // Map of verba results by verba_id for reflexa resolution
   private verbaResultsMap: Map<string, PjeVerbaResult> = new Map();
 
@@ -597,6 +619,7 @@ export class PjeCalcEngine {
     feriadosDB: PjeFeriadoDB[] = [],
     prevPrivadaConfig: PjePrevidenciaPrivadaConfig = { apurar: false, percentual: 0, base_calculo: 'diferenca', deduzir_ir: false },
     pensaoConfig: PjePensaoConfig = { apurar: false, percentual: 0, base: 'liquido' },
+    salarioFamiliaConfig: PjeSalarioFamiliaConfig = { apurar: false, numero_filhos: 0 },
   ) {
     this.params = params;
     this.historicos = historicos;
@@ -618,6 +641,7 @@ export class PjeCalcEngine {
     this.feriadosDB = feriadosDB;
     this.prevPrivadaConfig = prevPrivadaConfig;
     this.pensaoConfig = pensaoConfig;
+    this.salarioFamiliaConfig = salarioFamiliaConfig;
   }
 
   // =====================================================
@@ -2110,6 +2134,9 @@ export class PjeCalcEngine {
       prevPrivada = { apurado: true, base: basePP, percentual: this.prevPrivadaConfig.percentual, valor: valorPP };
     }
 
+    // ── 8c. Salário-Família (Art. 65, Lei 8.213/91) ──
+    const salarioFamilia = this.calcularSalarioFamilia(verbaResults);
+
     // ── 9. Composição do Resumo ──
     const principalBruto = verbaResults
       .filter(v => { const verba = this.verbas.find(vb => vb.id === v.verba_id); return verba?.compor_principal !== false; })
@@ -2153,6 +2180,7 @@ export class PjeCalcEngine {
 
     const liquido = Number(new Decimal(
       principalCorrigido + jurosMora + fgts.total_fgts + seguro.total + multa523 + multa467
+      + salarioFamilia.total
       - csDescontado - ir.imposto_devido - prevPrivada.valor - pensaoTotal
     ).toDP(2));
 
@@ -2167,6 +2195,7 @@ export class PjeCalcEngine {
       juros_mora: Number(new Decimal(jurosMora).toDP(2)),
       fgts_total: fgts.total_fgts, cs_segurado: csDescontado, cs_empregador: cs.total_empregador,
       ir_retido: ir.imposto_devido, seguro_desemprego: seguro.total, previdencia_privada: prevPrivada.valor,
+      salario_familia: salarioFamilia.total,
       multa_523: multa523, multa_467: multa467, honorarios_sucumbenciais: honorarios.sucumbenciais,
       honorarios_contratuais: honorarios.contratuais, custas: custasResult.total,
       custas_detalhadas: custasResult.detalhadas, pensao_sobre_fgts: pensaoSobreFgts, pensao_total: pensaoTotal,
@@ -2176,13 +2205,68 @@ export class PjeCalcEngine {
     return {
       data_liquidacao: this.correcaoConfig.data_liquidacao,
       verbas: verbaResults, fgts, contribuicao_social: cs, imposto_renda: ir,
-      seguro_desemprego: seguro, previdencia_privada: prevPrivada, resumo, validacao,
+      seguro_desemprego: seguro, previdencia_privada: prevPrivada, salario_familia: salarioFamilia, resumo, validacao,
     };
   }
 
   // =====================================================
   // CALCULAR VERBA REFLEXA
   // =====================================================
+
+  // =====================================================
+  // SALÁRIO-FAMÍLIA (Art. 65, Lei 8.213/91)
+  // Cota por filho ≤14 anos para empregados de baixa renda
+  // =====================================================
+
+  calcularSalarioFamilia(verbaResults: PjeVerbaResult[]): PjeSalarioFamiliaResult {
+    if (!this.salarioFamiliaConfig.apurar || this.salarioFamiliaConfig.numero_filhos <= 0) {
+      return { apurado: false, cotas: [], total: 0 };
+    }
+
+    const filhos = this.salarioFamiliaConfig.filhos_detalhes || [];
+    const periodo = this.getPeriodoCalculo();
+    const competencias = this.getCompetencias(periodo.inicio, periodo.fim);
+    const cotas: PjeSalarioFamiliaResult['cotas'] = [];
+    let totalSF = 0;
+
+    for (const comp of competencias) {
+      // Determinar remuneração da competência (usar histórico ou última remuneração)
+      let remuneracao = 0;
+      for (const hist of this.historicos) {
+        const oc = hist.ocorrencias.find(o => o.competencia === comp);
+        if (oc) remuneracao += oc.valor;
+      }
+      if (remuneracao === 0) remuneracao = this.params.ultima_remuneracao || 0;
+
+      // Verificar se remuneração está dentro do limite
+      if (remuneracao > SALARIO_FAMILIA_2025.limite_remuneracao) continue;
+
+      // Contar filhos elegíveis na competência
+      const [anoComp, mesComp] = comp.split('-').map(Number);
+      const dataComp = new Date(anoComp, mesComp - 1, 1);
+      let filhosElegiveis = 0;
+
+      if (filhos.length > 0) {
+        for (const f of filhos) {
+          if (!f.nascimento) { filhosElegiveis++; continue; }
+          const nasc = new Date(f.nascimento);
+          const idadeAnos = (dataComp.getTime() - nasc.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+          if (idadeAnos <= 14 || f.ate_14) filhosElegiveis++;
+        }
+      } else {
+        filhosElegiveis = this.salarioFamiliaConfig.numero_filhos;
+      }
+
+      if (filhosElegiveis <= 0) continue;
+
+      const valorCota = SALARIO_FAMILIA_2025.valor_cota;
+      const totalComp = Number(new Decimal(valorCota).times(filhosElegiveis).toDP(2));
+      cotas.push({ competencia: comp, filhos_elegíveis: filhosElegiveis, valor_cota: valorCota, total: totalComp });
+      totalSF += totalComp;
+    }
+
+    return { apurado: true, cotas, total: Number(new Decimal(totalSF).toDP(2)) };
+  }
 
   private calcularVerbaReflexa(reflexa: PjeVerba, principalResult: PjeVerbaResult): PjeVerbaResult {
     const comportamento = reflexa.comportamento_reflexo || 'valor_mensal';
