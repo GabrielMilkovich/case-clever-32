@@ -112,7 +112,20 @@ export function ModuloResumo({ caseId }: Props) {
         params.data_citacao = dadosProcesso.data_citacao;
       }
 
-      const historicos: PjeHistoricoSalarial[] = (histRes.data || []).map((h: any) => ({ ...h, ocorrencias: [] }));
+      // Load historico ocorrencias per historico
+      const histIds = (histRes.data || []).map((h: any) => h.id);
+      let histOcorrencias: any[] = [];
+      if (histIds.length > 0) {
+        const { data: ho } = await supabase.from("pjecalc_historico_ocorrencias" as any)
+          .select("*").in("historico_id", histIds).order("competencia");
+        histOcorrencias = ho || [];
+      }
+      const historicos: PjeHistoricoSalarial[] = (histRes.data || []).map((h: any) => ({
+        ...h,
+        ocorrencias: histOcorrencias
+          .filter((o: any) => o.historico_id === h.id)
+          .map((o: any) => ({ id: o.id, historico_id: o.historico_id, competencia: o.competencia, valor: Number(o.valor), tipo: o.tipo || 'calculado' })),
+      }));
       const faltas: PjeFalta[] = (faltasRes.data || []).map((f: any) => ({ ...f }));
       const ferias: PjeFerias[] = (feriasRes.data || []).map((f: any) => ({ ...f }));
 
@@ -317,7 +330,7 @@ export function ModuloResumo({ caseId }: Props) {
 
       const result = engine.liquidar();
 
-      // Persist
+      // Persist resultado
       await supabase.from("pjecalc_liquidacao_resultado" as any).insert({
         case_id: caseId,
         resultado: result as any,
@@ -328,6 +341,88 @@ export function ModuloResumo({ caseId }: Props) {
         total_reclamante: result.resumo.liquido_reclamante,
         total_reclamada: result.resumo.total_reclamada,
       });
+
+      // ── Persistir ocorrências calculadas nas tabelas de persistência ──
+      // 1. Ocorrências de verbas → pjecalc_ocorrencias
+      const ocRows: any[] = [];
+      for (const vr of result.verbas) {
+        for (const oc of vr.ocorrencias) {
+          ocRows.push({
+            calculo_id: caseId,
+            verba_id: vr.verba_id,
+            competencia: oc.competencia,
+            ativa: true,
+            origem: 'CALCULADA',
+            base_valor: oc.base,
+            divisor_valor: oc.divisor,
+            multiplicador_valor: oc.multiplicador,
+            quantidade_valor: oc.quantidade,
+            dobra: oc.dobra,
+            devido: oc.devido,
+            pago: oc.pago,
+            diferenca: oc.diferenca,
+            correcao: oc.valor_corrigido - oc.diferenca,
+            juros: oc.juros,
+            total: oc.valor_final,
+          });
+        }
+      }
+      if (ocRows.length > 0) {
+        // Delete existing CALCULADA rows, preserve INFORMADA
+        await supabase.from("pjecalc_ocorrencias")
+          .delete()
+          .eq("calculo_id", caseId)
+          .eq("origem", "CALCULADA");
+        // Insert in batches of 500
+        for (let i = 0; i < ocRows.length; i += 500) {
+          await supabase.from("pjecalc_ocorrencias").insert(ocRows.slice(i, i + 500));
+        }
+      }
+
+      // 2. FGTS ocorrências → pjecalc_fgts_ocorrencias
+      if (result.fgts.depositos.length > 0) {
+        await supabase.from("pjecalc_fgts_ocorrencias" as any)
+          .delete().eq("calculo_id", caseId);
+        const fgtsRows = result.fgts.depositos.map(d => ({
+          calculo_id: caseId,
+          competencia: d.competencia,
+          base: d.base,
+          aliquota: d.aliquota,
+          valor_devido: d.valor,
+          valor_recolhido: 0,
+        }));
+        await supabase.from("pjecalc_fgts_ocorrencias" as any).insert(fgtsRows);
+      }
+
+      // 3. CS ocorrências → pjecalc_cs_ocorrencias
+      if (result.contribuicao_social.segurado_devidos.length > 0) {
+        await supabase.from("pjecalc_cs_ocorrencias" as any)
+          .delete().eq("calculo_id", caseId);
+        const csRows = result.contribuicao_social.segurado_devidos.map(s => ({
+          calculo_id: caseId,
+          competencia: s.competencia,
+          tipo: 'segurado_devido',
+          base: s.base,
+          aliquota: s.aliquota,
+          valor: s.valor,
+          recolhido: s.recolhido,
+          diferenca: s.diferenca,
+        }));
+        // Add empregador rows
+        for (const e of result.contribuicao_social.empregador) {
+          csRows.push({
+            calculo_id: caseId,
+            competencia: e.competencia,
+            tipo: 'empregador',
+            base: 0,
+            aliquota: 0,
+            valor: e.empresa + e.sat + e.terceiros,
+            recolhido: 0,
+            diferenca: e.empresa + e.sat + e.terceiros,
+          });
+        }
+        await supabase.from("pjecalc_cs_ocorrencias" as any).insert(csRows);
+      }
 
       qc.invalidateQueries({ queryKey: ["pjecalc_liquidacao", caseId] });
       toast.success("Liquidação executada com sucesso!");
