@@ -2167,7 +2167,7 @@ export class PjeCalcEngine {
       juros_mora: Number(new Decimal(jurosMora).toDP(2)),
       fgts_total: fgts.total_fgts, cs_segurado: csDescontado, cs_empregador: cs.total_empregador,
       ir_retido: ir.imposto_devido, seguro_desemprego: seguro.total, previdencia_privada: prevPrivada.valor,
-      multa_523: multa523, honorarios_sucumbenciais: honorarios.sucumbenciais,
+      multa_523: multa523, multa_467: multa467, honorarios_sucumbenciais: honorarios.sucumbenciais,
       honorarios_contratuais: honorarios.contratuais, custas: custasResult.total,
       custas_detalhadas: custasResult.detalhadas, pensao_sobre_fgts: pensaoSobreFgts, pensao_total: pensaoTotal,
       liquido_reclamante: liquido, total_reclamada: totalReclamada,
