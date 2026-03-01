@@ -275,19 +275,32 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
         }
       }
 
-      // ── Auto-generate verbas if empty ──
+      // ── Auto-generate verbas if empty (with verba_principal_id linkage) ──
       const existingVerbas = await supabase.from("pjecalc_verbas").select("id").eq("case_id", caseId);
       if (!existingVerbas.data?.length && autoParams.data_admissao) {
         const periodo = { inicio: autoParams.data_admissao, fim: autoParams.data_demissao || new Date().toISOString().slice(0, 10) };
-        const verbasExpresso = [
-          { nome: 'Horas Extras 50%', caracteristica: 'comum', ocorrencia_pagamento: 'mensal', tipo: 'principal', multiplicador: 1.5, divisor_informado: autoParams.carga_horaria_padrao || 220 },
-          { nome: 'RSR s/ Horas Extras', caracteristica: 'comum', ocorrencia_pagamento: 'mensal', tipo: 'reflexa', multiplicador: 1, divisor_informado: 30 },
-          { nome: '13º Salário', caracteristica: '13_salario', ocorrencia_pagamento: 'dezembro', tipo: 'reflexa', multiplicador: 1, divisor_informado: 12 },
-          { nome: 'Férias + 1/3', caracteristica: 'ferias', ocorrencia_pagamento: 'periodo_aquisitivo', tipo: 'reflexa', multiplicador: 1.3333, divisor_informado: 12 },
+        // 1. Insert principal first to get its ID
+        const { data: principalData, error: principalError } = await supabase.from("pjecalc_verbas").insert({
+          case_id: caseId, nome: 'Horas Extras 50%', caracteristica: 'comum', ocorrencia_pagamento: 'mensal',
+          tipo: 'principal', multiplicador: 1.5, divisor_informado: autoParams.carga_horaria_padrao || 220,
+          periodo_inicio: periodo.inicio, periodo_fim: periodo.fim, ordem: 0,
+        }).select("id").single();
+        if (principalError) errors.push(`Verba HE: ${principalError.message}`);
+
+        const principalId = principalData?.id || null;
+        // 2. Insert reflexas linked to principal
+        const reflexas = [
+          { nome: 'RSR s/ Horas Extras', caracteristica: 'comum', ocorrencia_pagamento: 'mensal', tipo: 'reflexa', multiplicador: 1, divisor_informado: 30, ordem: 1 },
+          { nome: '13º Salário', caracteristica: '13_salario', ocorrencia_pagamento: 'dezembro', tipo: 'reflexa', multiplicador: 1, divisor_informado: 12, ordem: 2 },
+          { nome: 'Férias + 1/3', caracteristica: 'ferias', ocorrencia_pagamento: 'periodo_aquisitivo', tipo: 'reflexa', multiplicador: 1.3333, divisor_informado: 12, ordem: 3 },
         ];
-        for (let i = 0; i < verbasExpresso.length; i++) {
-          const { error } = await supabase.from("pjecalc_verbas").insert({ case_id: caseId, ...verbasExpresso[i], periodo_inicio: periodo.inicio, periodo_fim: periodo.fim, ordem: i });
-          if (error) errors.push(`Verba ${verbasExpresso[i].nome}: ${error.message}`);
+        for (const ref of reflexas) {
+          const { error } = await supabase.from("pjecalc_verbas").insert({
+            case_id: caseId, ...ref, periodo_inicio: periodo.inicio, periodo_fim: periodo.fim,
+            verba_principal_id: principalId,
+            base_calculo: { historicos: [], verbas: principalId ? [principalId] : [], tabelas: [], proporcionalizar: false, integralizar: false },
+          });
+          if (error) errors.push(`Verba ${ref.nome}: ${error.message}`);
         }
       }
 
@@ -628,20 +641,34 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={async () => {
             const periodo = formParams.data_admissao && formParams.data_demissao ? { inicio: formParams.data_admissao, fim: formParams.data_demissao } : { inicio: new Date().toISOString().slice(0, 10), fim: new Date().toISOString().slice(0, 10) };
-            const verbasExpresso = [
-              { nome: 'Horas Extras 50%', caracteristica: 'comum', ocorrencia_pagamento: 'mensal', tipo: 'principal', multiplicador: 1.5, divisor_informado: formParams.carga_horaria_padrao },
-              { nome: 'RSR s/ Horas Extras', caracteristica: 'comum', ocorrencia_pagamento: 'mensal', tipo: 'reflexa', multiplicador: 1 },
-              { nome: '13º Salário', caracteristica: '13_salario', ocorrencia_pagamento: 'dezembro', tipo: 'reflexa', multiplicador: 1 },
-              { nome: 'Férias + 1/3', caracteristica: 'ferias', ocorrencia_pagamento: 'periodo_aquisitivo', tipo: 'reflexa', multiplicador: 1.3333 },
+            // 1. Insert principal first
+            const { data: principalData } = await supabase.from("pjecalc_verbas").insert({
+              case_id: caseId, nome: 'Horas Extras 50%', caracteristica: 'comum', ocorrencia_pagamento: 'mensal',
+              tipo: 'principal', multiplicador: 1.5, divisor_informado: formParams.carga_horaria_padrao || 220,
+              periodo_inicio: periodo.inicio, periodo_fim: periodo.fim, ordem: verbas.length,
+            }).select("id").single();
+            const principalId = principalData?.id || null;
+            // 2. Insert reflexas linked to principal
+            const reflexas = [
+              { nome: 'RSR s/ Horas Extras', caracteristica: 'comum', ocorrencia_pagamento: 'mensal', multiplicador: 1, divisor_informado: 30 },
+              { nome: '13º Salário', caracteristica: '13_salario', ocorrencia_pagamento: 'dezembro', multiplicador: 1, divisor_informado: 12 },
+              { nome: 'Férias + 1/3', caracteristica: 'ferias', ocorrencia_pagamento: 'periodo_aquisitivo', multiplicador: 1.3333, divisor_informado: 12 },
             ];
-            for (const ve of verbasExpresso) {
-              await supabase.from("pjecalc_verbas").insert({ case_id: caseId, nome: ve.nome, tipo: ve.tipo, caracteristica: ve.caracteristica, ocorrencia_pagamento: ve.ocorrencia_pagamento, multiplicador: ve.multiplicador, divisor_informado: ve.divisor_informado || 30, periodo_inicio: periodo.inicio, periodo_fim: periodo.fim, ordem: verbas.length });
+            for (let i = 0; i < reflexas.length; i++) {
+              await supabase.from("pjecalc_verbas").insert({
+                case_id: caseId, ...reflexas[i], tipo: 'reflexa',
+                periodo_inicio: periodo.inicio, periodo_fim: periodo.fim,
+                ordem: verbas.length + 1 + i,
+                verba_principal_id: principalId,
+                base_calculo: { historicos: [], verbas: principalId ? [principalId] : [], tabelas: [], proporcionalizar: false, integralizar: false },
+              });
             }
             queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] });
-            toast.success("Verbas expressas adicionadas!");
+            toast.success("Verbas expressas adicionadas com vinculação!");
           }}><Briefcase className="h-4 w-4 mr-1" /> Expresso</Button>
           <Button size="sm" onClick={async () => {
             const periodo = formParams.data_admissao && formParams.data_demissao ? { inicio: formParams.data_admissao, fim: formParams.data_demissao } : { inicio: new Date().toISOString().slice(0, 10), fim: new Date().toISOString().slice(0, 10) };
+            // Only allow creating reflexa if there's at least one principal
             await supabase.from("pjecalc_verbas").insert({ case_id: caseId, nome: `Verba ${verbas.length + 1}`, tipo: 'principal', periodo_inicio: periodo.inicio, periodo_fim: periodo.fim, ordem: verbas.length });
             queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] });
           }}><Plus className="h-4 w-4 mr-1" /> Manual</Button>
@@ -651,15 +678,63 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
         <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Use "Expresso" para incluir verbas comuns ou "Manual" para criar uma verba personalizada.</CardContent></Card>
       ) : (
         <div className="space-y-2">
-          {verbas.map((v: any) => (
-            <Card key={v.id} className="hover:border-primary/30 transition-colors">
+          {/* Render verbas hierarchically: principals first, then their reflexas indented */}
+          {verbas.filter((v: any) => v.tipo === 'principal').map((principal: any) => {
+            const reflexas = verbas.filter((v: any) => v.tipo === 'reflexa' && v.verba_principal_id === principal.id);
+            const orphanCount = reflexas.length;
+            return (
+              <div key={principal.id} className="space-y-1">
+                <Card className="hover:border-primary/30 transition-colors">
+                  <CardContent className="p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Badge variant="default" className="text-[10px]">P</Badge>
+                        <div>
+                          <div className="text-sm font-medium">{principal.nome}</div>
+                          <div className="text-[10px] text-muted-foreground flex gap-2"><span>{principal.caracteristica}</span><span>•</span><span>{principal.ocorrencia_pagamento}</span><span>•</span><span>×{principal.multiplicador} ÷{principal.divisor_informado || 30}</span>{orphanCount > 0 && <span className="text-primary">• {orphanCount} reflexo(s)</span>}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px] font-mono">{principal.periodo_inicio?.slice(0, 7)} → {principal.periodo_fim?.slice(0, 7)}</Badge>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={async () => { await supabase.from("pjecalc_verbas").delete().eq("id", principal.id); queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] }); }}><Trash2 className="h-3 w-3" /></Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                {/* Reflexas indented under principal */}
+                {reflexas.map((ref: any) => (
+                  <Card key={ref.id} className="ml-6 border-l-2 border-primary/20 hover:border-primary/40 transition-colors">
+                    <CardContent className="p-2.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className="text-muted-foreground text-[10px]">└</span>
+                          <Badge variant="secondary" className="text-[10px]">R</Badge>
+                          <div>
+                            <div className="text-sm font-medium">{ref.nome}</div>
+                            <div className="text-[10px] text-muted-foreground flex gap-2"><span>{ref.caracteristica}</span><span>•</span><span>×{ref.multiplicador} ÷{ref.divisor_informado || 30}</span></div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-[10px] font-mono">{ref.periodo_inicio?.slice(0, 7)} → {ref.periodo_fim?.slice(0, 7)}</Badge>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={async () => { await supabase.from("pjecalc_verbas").delete().eq("id", ref.id); queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] }); }}><Trash2 className="h-3 w-3" /></Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            );
+          })}
+          {/* Orphan reflexas (no verba_principal_id) */}
+          {verbas.filter((v: any) => v.tipo === 'reflexa' && !v.verba_principal_id).map((v: any) => (
+            <Card key={v.id} className="hover:border-destructive/30 transition-colors border-destructive/20">
               <CardContent className="p-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Badge variant={v.tipo === 'principal' ? 'default' : 'secondary'} className="text-[10px]">{v.tipo === 'principal' ? 'P' : 'R'}</Badge>
+                    <Badge variant="destructive" className="text-[10px]">R⚠</Badge>
                     <div>
                       <div className="text-sm font-medium">{v.nome}</div>
-                      <div className="text-[10px] text-muted-foreground flex gap-2"><span>{v.caracteristica}</span><span>•</span><span>{v.ocorrencia_pagamento}</span><span>•</span><span>×{v.multiplicador} ÷{v.divisor_informado || 30}</span></div>
+                      <div className="text-[10px] text-destructive">Sem verba principal vinculada</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
