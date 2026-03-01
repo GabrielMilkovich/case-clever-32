@@ -68,6 +68,7 @@ interface CaseData {
   numero_processo: string | null;
   status: "rascunho" | "em_analise" | "calculado" | "revisado";
   criado_em: string;
+  tags?: string[] | null;
 }
 
 interface Fact {
