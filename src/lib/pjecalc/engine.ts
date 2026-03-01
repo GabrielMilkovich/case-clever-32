@@ -1875,8 +1875,6 @@ export class PjeCalcEngine {
     const pct = (this.correcaoConfig.multa_467_percentual || 50) / 100;
     return Number(new Decimal(principalBruto).times(pct).toDP(2));
   }
-    return Number(new Decimal(valorCondenacao).times(this.correcaoConfig.multa_523_percentual / 100).toDP(2));
-  }
 
   // =====================================================
   // VALIDAÇÃO PRÉ-LIQUIDAÇÃO
