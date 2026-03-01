@@ -460,6 +460,7 @@ export interface PjeResumo {
   seguro_desemprego: number;
   previdencia_privada: number;
   multa_523: number;
+  multa_467: number;
   honorarios_sucumbenciais: number;
   honorarios_contratuais: number;
   custas: number;
