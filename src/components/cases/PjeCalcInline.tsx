@@ -42,11 +42,15 @@ const MODULOS = [
   { id: 'ferias', label: 'Férias', icon: Calendar, desc: 'Períodos aquisitivos' },
   { id: 'cartao_ponto', label: 'Cartão de Ponto', icon: Clock, desc: 'Horas extras e noturnas' },
   { id: 'verbas', label: 'Verbas', icon: FileText, desc: 'Parcelas do cálculo' },
+  { id: 'salario_familia', label: 'Salário-Família', icon: Users, desc: 'Cotas por dependente' },
+  { id: 'seguro_desemprego', label: 'Seguro-Desemprego', icon: Shield, desc: 'Indenização substitutiva' },
   { id: 'fgts', label: 'FGTS', icon: Building2, desc: 'Depósitos e multa' },
   { id: 'cs', label: 'Contrib. Social', icon: Receipt, desc: 'Segurado e empregador' },
+  { id: 'prev_privada', label: 'Previd. Privada', icon: Briefcase, desc: 'Complementar' },
+  { id: 'pensao', label: 'Pensão Alimentícia', icon: Users, desc: 'Percentual sobre crédito' },
   { id: 'ir', label: 'Imposto de Renda', icon: Percent, desc: 'IRRF / RRA' },
   { id: 'correcao', label: 'Correção/Juros', icon: TrendingUp, desc: 'Atualização monetária' },
-  { id: 'seguro_desemprego', label: 'Seguro-Desemprego', icon: Shield, desc: 'Indenização substitutiva' },
+  { id: 'multas', label: 'Multas e Inden.', icon: Gavel, desc: 'CLT 467, 477, etc.' },
   { id: 'honorarios', label: 'Honorários', icon: Scale, desc: 'Sucumbenciais e contratuais' },
   { id: 'custas', label: 'Custas', icon: Landmark, desc: 'Custas e assistência' },
   { id: 'resumo', label: 'Resumo', icon: FileBarChart, desc: 'Resultado da liquidação' },
@@ -404,11 +408,15 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
       case 'historico': return renderHistorico();
       case 'cartao_ponto': return <ModuloCartaoPonto caseId={caseId} dataAdmissao={formParams.data_admissao} dataDemissao={formParams.data_demissao} />;
       case 'verbas': return renderVerbas();
+      case 'salario_familia': return <ModuloSalarioFamilia caseId={caseId} />;
       case 'fgts': return <ModuloFGTS caseId={caseId} />;
       case 'cs': return <ModuloCS caseId={caseId} />;
+      case 'prev_privada': return <ModuloPrevidenciaPrivada caseId={caseId} />;
+      case 'pensao': return <ModuloPensaoAlimenticia caseId={caseId} />;
       case 'ir': return <ModuloIR caseId={caseId} />;
       case 'correcao': return <ModuloCorrecao caseId={caseId} />;
       case 'seguro_desemprego': return <ModuloSeguroDesemprego caseId={caseId} />;
+      case 'multas': return <ModuloMultasCLT caseId={caseId} />;
       case 'honorarios': return <ModuloHonorarios caseId={caseId} />;
       case 'custas': return <ModuloCustas caseId={caseId} />;
       case 'resumo': return <ModuloResumo caseId={caseId} />;
