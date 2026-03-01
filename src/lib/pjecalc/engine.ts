@@ -594,6 +594,7 @@ export class PjeCalcEngine {
   private feriadosDB: PjeFeriadoDB[];
   private prevPrivadaConfig: PjePrevidenciaPrivadaConfig;
   private pensaoConfig: PjePensaoConfig;
+  private salarioFamiliaConfig: PjeSalarioFamiliaConfig;
   // Map of verba results by verba_id for reflexa resolution
   private verbaResultsMap: Map<string, PjeVerbaResult> = new Map();
 
@@ -618,6 +619,7 @@ export class PjeCalcEngine {
     feriadosDB: PjeFeriadoDB[] = [],
     prevPrivadaConfig: PjePrevidenciaPrivadaConfig = { apurar: false, percentual: 0, base_calculo: 'diferenca', deduzir_ir: false },
     pensaoConfig: PjePensaoConfig = { apurar: false, percentual: 0, base: 'liquido' },
+    salarioFamiliaConfig: PjeSalarioFamiliaConfig = { apurar: false, numero_filhos: 0 },
   ) {
     this.params = params;
     this.historicos = historicos;
@@ -639,6 +641,7 @@ export class PjeCalcEngine {
     this.feriadosDB = feriadosDB;
     this.prevPrivadaConfig = prevPrivadaConfig;
     this.pensaoConfig = pensaoConfig;
+    this.salarioFamiliaConfig = salarioFamiliaConfig;
   }
 
   // =====================================================
@@ -2131,6 +2134,9 @@ export class PjeCalcEngine {
       prevPrivada = { apurado: true, base: basePP, percentual: this.prevPrivadaConfig.percentual, valor: valorPP };
     }
 
+    // ── 8c. Salário-Família (Art. 65, Lei 8.213/91) ──
+    const salarioFamilia = this.calcularSalarioFamilia(verbaResults);
+
     // ── 9. Composição do Resumo ──
     const principalBruto = verbaResults
       .filter(v => { const verba = this.verbas.find(vb => vb.id === v.verba_id); return verba?.compor_principal !== false; })
@@ -2174,6 +2180,7 @@ export class PjeCalcEngine {
 
     const liquido = Number(new Decimal(
       principalCorrigido + jurosMora + fgts.total_fgts + seguro.total + multa523 + multa467
+      + salarioFamilia.total
       - csDescontado - ir.imposto_devido - prevPrivada.valor - pensaoTotal
     ).toDP(2));
 
@@ -2188,6 +2195,7 @@ export class PjeCalcEngine {
       juros_mora: Number(new Decimal(jurosMora).toDP(2)),
       fgts_total: fgts.total_fgts, cs_segurado: csDescontado, cs_empregador: cs.total_empregador,
       ir_retido: ir.imposto_devido, seguro_desemprego: seguro.total, previdencia_privada: prevPrivada.valor,
+      salario_familia: salarioFamilia.total,
       multa_523: multa523, multa_467: multa467, honorarios_sucumbenciais: honorarios.sucumbenciais,
       honorarios_contratuais: honorarios.contratuais, custas: custasResult.total,
       custas_detalhadas: custasResult.detalhadas, pensao_sobre_fgts: pensaoSobreFgts, pensao_total: pensaoTotal,
@@ -2197,7 +2205,7 @@ export class PjeCalcEngine {
     return {
       data_liquidacao: this.correcaoConfig.data_liquidacao,
       verbas: verbaResults, fgts, contribuicao_social: cs, imposto_renda: ir,
-      seguro_desemprego: seguro, previdencia_privada: prevPrivada, resumo, validacao,
+      seguro_desemprego: seguro, previdencia_privada: prevPrivada, salario_familia: salarioFamilia, resumo, validacao,
     };
   }
 
