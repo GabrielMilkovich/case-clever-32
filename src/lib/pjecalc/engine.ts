@@ -1870,6 +1870,14 @@ export class PjeCalcEngine {
     return Number(new Decimal(valorCondenacao).times(this.correcaoConfig.multa_523_percentual / 100).toDP(2));
   }
 
+  calcularMulta467(principalBruto: number): number {
+    if (!this.correcaoConfig.multa_467) return 0;
+    const pct = (this.correcaoConfig.multa_467_percentual || 50) / 100;
+    return Number(new Decimal(principalBruto).times(pct).toDP(2));
+  }
+    return Number(new Decimal(valorCondenacao).times(this.correcaoConfig.multa_523_percentual / 100).toDP(2));
+  }
+
   // =====================================================
   // VALIDAÇÃO PRÉ-LIQUIDAÇÃO
   // Checklist automático de consistência
