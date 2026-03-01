@@ -575,10 +575,12 @@ export function ModuloResumo({ caseId }: Props) {
                         );
                       }
                     }
-                    // Orphan reflexas (not matched to any principal)
-                    const allUsed = new Set(rows.map(r => r.key));
+                    // Orphan reflexas (no verba_principal_id in DB)
+                    const linkedIds = new Set(
+                      verbasDB.filter((vdb: any) => vdb.verba_principal_id).map((vdb: any) => vdb.id)
+                    );
                     for (const ref of reflexas) {
-                      if (allUsed.has(ref.verba_id)) continue;
+                      if (linkedIds.has(ref.verba_id)) continue;
                       rows.push(
                         <tr key={ref.verba_id} className="border-b border-border/30">
                           <td className="p-2 font-medium text-destructive">⚠ {ref.nome}</td>
