@@ -122,7 +122,7 @@ export interface PjeVerba {
     integralizar: boolean;
   };
   
-  tipo_divisor: 'informado' | 'carga_horaria' | 'dias_uteis' | 'cartao_ponto';
+  tipo_divisor: 'informado' | 'carga_horaria' | 'dias_uteis' | 'cartao_ponto' | 'calendario';
   divisor_informado: number;
   divisor_cartao_colunas?: string[];
   multiplicador: number;
@@ -808,6 +808,28 @@ export class PjeCalcEngine {
     const reg = this.cartaoPonto.find(r => r.competencia === competencia);
     if (!reg) return 30;
     if (!colunas || colunas.length === 0) return reg.dias_uteis || 22;
+    let total = 0;
+    for (const col of colunas) {
+      total += (reg as any)[col] || 0;
+    }
+    return total || 30;
+  }
+
+  // =====================================================
+  // QUANTIDADE MÉDIA APURADA (from cartão de ponto)
+  // =====================================================
+
+  calcularQuantidadeMediaApurada(verba: PjeVerba): number {
+    if (this.cartaoPonto.length === 0) return verba.quantidade_informada || 0;
+    const colunas = verba.quantidade_cartao_colunas;
+    let soma = 0;
+    let count = 0;
+    for (const reg of this.cartaoPonto) {
+      const val = this.getCartaoPontoQuantidade(reg.competencia, colunas);
+      if (val > 0) { soma += val; count++; }
+    }
+    return count > 0 ? soma / count : verba.quantidade_informada || 0;
+  }
     let total = 0;
     for (const col of colunas) {
       total += (reg as any)[col] || 0;
