@@ -87,7 +87,7 @@ function makeEngine(
     honorarios?: Partial<PjeHonorariosConfig>;
     custas?: Partial<PjeCustasConfig>;
   },
-): PjeLiquidacaoResult {
+) {
   const fullParams: PjeParametros = {
     case_id: 'test', data_admissao: '2022-01-01', data_ajuizamento: '2024-06-01',
     estado: 'SP', municipio: 'São Paulo', regime_trabalho: 'tempo_integral',
