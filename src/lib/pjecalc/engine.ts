@@ -1348,6 +1348,17 @@ export class PjeCalcEngine {
               const mesesJuros = this.mesesEntre(dataInicioJuros, dataLiq);
               const taxaMensal = (this.correcaoConfig.juros_percentual || 1) / 100;
               juros = Number(new Decimal(valorCorrigido).times(taxaMensal).times(mesesJuros).toDP(2));
+            } else if ((this.correcaoConfig.juros_tipo as string) === 'composto') {
+              // Juros compostos
+              let dataInicioJuros: Date;
+              if (this.correcaoConfig.juros_inicio === 'vencimento') dataInicioJuros = dataComp;
+              else if (this.correcaoConfig.juros_inicio === 'citacao' && dataCitacao) dataInicioJuros = dataCitacao;
+              else if (dataAjuiz) dataInicioJuros = dataAjuiz;
+              else dataInicioJuros = dataComp;
+              const mesesJuros = this.mesesEntre(dataInicioJuros, dataLiq);
+              const taxaMensal = (this.correcaoConfig.juros_percentual || 1) / 100;
+              const fatorComposto = Math.pow(1 + taxaMensal, mesesJuros);
+              juros = Number(new Decimal(valorCorrigido).times(fatorComposto - 1).toDP(2));
             } else if (this.correcaoConfig.juros_tipo === 'selic') {
               const mesesJuros = this.mesesEntre(dataAjuiz || dataComp, dataLiq);
               juros = Number(new Decimal(valorCorrigido).times(0.01).times(mesesJuros).toDP(2));
