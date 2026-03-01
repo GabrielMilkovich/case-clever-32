@@ -174,6 +174,15 @@ export default function CasoDetalhe() {
     },
   });
 
+  // Also fetch PJe-Calc liquidação total for the header display
+  const { data: pjecalcLiquidacao } = useQuery({
+    queryKey: ["pjecalc_liquidacao", id],
+    queryFn: async () => {
+      const { data } = await supabase.from("pjecalc_liquidacao_resultado" as any).select("total_bruto, created_at").eq("case_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      return data as any;
+    },
+  });
+
   const { data: extractionsCount = 0 } = useQuery({
     queryKey: ["extractions_count", id],
     queryFn: async () => {
@@ -252,7 +261,10 @@ export default function CasoDetalhe() {
   const missingCriticalKeys = CRITICAL_FACTS.filter(k => !facts.some(f => f.chave === k));
   const chunksCount = Math.max(processingStats?.total_chunks ?? 0, chunksCountDirect ?? 0);
   const snapshotsCount = snapshotsData.length;
-  const latestTotal = snapshotsData[0]?.total_bruto ?? null;
+  // Use most recent total from either calc_snapshots or pjecalc_liquidacao_resultado
+  const snapshotTotal = snapshotsData[0]?.total_bruto ?? null;
+  const pjecalcTotal = (pjecalcLiquidacao as any)?.total_bruto ?? null;
+  const latestTotal = pjecalcTotal ?? snapshotTotal;
 
   // Progress calculation
   const progressSteps = [
