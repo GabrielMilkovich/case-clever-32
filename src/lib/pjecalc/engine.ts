@@ -836,19 +836,23 @@ export class PjeCalcEngine {
       div = new Decimal(this.getCargaHorariaParaCompetencia(competencia));
     } else if (verba.tipo_divisor === 'dias_uteis') {
       div = new Decimal(this.getDivisorComFeriados(competencia));
+    } else if (verba.tipo_divisor === 'calendario') {
+      div = new Decimal(this.calcularQuantidadeCalendario(competencia, 'dias_uteis') || 22);
     } else {
       div = new Decimal(verba.divisor_informado || 30);
     }
 
-    // Quantidade resolution (with calendario support)
+    // Quantidade resolution (with calendario + apurada support)
     let qtd: Decimal;
     if (verba.tipo_quantidade === 'cartao_ponto') {
       qtd = new Decimal(this.getCartaoPontoQuantidade(competencia, verba.quantidade_cartao_colunas) || 0);
     } else if (verba.tipo_quantidade === 'avos') {
       qtd = new Decimal(this.calcularAvos(competencia, verba.caracteristica));
     } else if (verba.tipo_quantidade === 'calendario') {
-      // Quantidade Calendário: usa dias úteis do período conforme feriados cadastrados
       qtd = new Decimal(this.calcularQuantidadeCalendario(competencia, 'dias_uteis'));
+    } else if (verba.tipo_quantidade === 'apurada') {
+      // Média apurada: usa a média da quantidade de todas as competências do cartão de ponto
+      qtd = new Decimal(this.calcularQuantidadeMediaApurada(verba));
     } else {
       qtd = new Decimal(verba.quantidade_informada || 1);
     }
