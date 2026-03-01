@@ -2013,38 +2013,51 @@ export class PjeCalcEngine {
     // ── 0. Validação pré-liquidação ──
     const validacao = this.validarPreLiquidacao();
 
-    // ── 1. Separar principais e reflexas ──
-    const verbasPrincipais = this.verbas
-      .filter(v => v.tipo === 'principal')
-      .sort((a, b) => a.ordem - b.ordem);
-
-    const verbasReflexas = this.verbas
-      .filter(v => v.tipo === 'reflexa')
-      .sort((a, b) => a.ordem - b.ordem);
-
+    // ── 1. Topological sort: principals first, then reflexas in dependency order ──
+    // This supports reflex-on-reflex (e.g., HE → DSR → 13º s/ DSR)
     const verbaResults: PjeVerbaResult[] = [];
+    const processed = new Set<string>();
     
-    // ── 2. Calcular principais ──
-    for (const verba of verbasPrincipais) {
+    const processVerba = (verba: PjeVerba) => {
+      if (processed.has(verba.id)) return;
+      
+      // Process dependencies first (reflex-on-reflex)
+      if (verba.verba_principal_id && !processed.has(verba.verba_principal_id)) {
+        const dep = this.verbas.find(v => v.id === verba.verba_principal_id);
+        if (dep) processVerba(dep);
+      }
+      for (const depId of (verba.base_calculo?.verbas || [])) {
+        if (!processed.has(depId)) {
+          const dep = this.verbas.find(v => v.id === depId);
+          if (dep) processVerba(dep);
+        }
+      }
+      
+      processed.add(verba.id);
+      
+      // Calculate
+      if (verba.tipo === 'reflexa' && verba.verba_principal_id) {
+        const principalResult = this.verbaResultsMap.get(verba.verba_principal_id);
+        if (principalResult) {
+          const refResult = this.calcularVerbaReflexa(verba, principalResult);
+          verbaResults.push(refResult);
+          this.verbaResultsMap.set(verba.id, refResult);
+          return;
+        }
+      }
       const result = this.calcularVerba(verba);
       verbaResults.push(result);
       this.verbaResultsMap.set(verba.id, result);
-    }
+    };
 
-    // ── 3. Calcular reflexas (vinculadas via verba_principal_id) ──
-    for (const reflexa of verbasReflexas) {
-      if (reflexa.verba_principal_id) {
-        const principalResult = this.verbaResultsMap.get(reflexa.verba_principal_id);
-        if (principalResult) {
-          const refResult = this.calcularVerbaReflexa(reflexa, principalResult);
-          verbaResults.push(refResult);
-          this.verbaResultsMap.set(reflexa.id, refResult);
-          continue;
-        }
-      }
-      const result = this.calcularVerba(reflexa);
-      verbaResults.push(result);
-      this.verbaResultsMap.set(reflexa.id, result);
+    // Process all verbas in dependency order
+    const sorted = [...this.verbas].sort((a, b) => {
+      if (a.tipo === 'principal' && b.tipo === 'reflexa') return -1;
+      if (a.tipo === 'reflexa' && b.tipo === 'principal') return 1;
+      return a.ordem - b.ordem;
+    });
+    for (const verba of sorted) {
+      processVerba(verba);
     }
 
     // ── 4. Correção Monetária + Juros ──
