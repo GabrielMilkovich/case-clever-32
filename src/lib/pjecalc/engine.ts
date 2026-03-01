@@ -292,11 +292,13 @@ export interface PjeCorrecaoConfig {
   indice: string;
   epoca: 'mensal' | 'fixo';
   data_fixa?: string;
-  juros_tipo: 'simples_mensal' | 'selic' | 'nenhum';
+  juros_tipo: 'simples_mensal' | 'selic' | 'nenhum' | 'composto';
   juros_percentual: number;
   juros_inicio: 'ajuizamento' | 'citacao' | 'vencimento';
   multa_523: boolean;
   multa_523_percentual: number;
+  multa_467?: boolean;
+  multa_467_percentual?: number;
   data_liquidacao: string;
 }
 
