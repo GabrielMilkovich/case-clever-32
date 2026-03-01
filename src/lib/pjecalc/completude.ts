@@ -11,6 +11,7 @@ interface CompletionInput {
   ferias: any[];
   historicos: any[];
   verbas: any[];
+  cartaoPonto?: any[];
   resultado: any;
   fgtsConfig?: any;
   csConfig?: any;
