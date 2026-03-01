@@ -112,7 +112,20 @@ export function ModuloResumo({ caseId }: Props) {
         params.data_citacao = dadosProcesso.data_citacao;
       }
 
-      const historicos: PjeHistoricoSalarial[] = (histRes.data || []).map((h: any) => ({ ...h, ocorrencias: [] }));
+      // Load historico ocorrencias per historico
+      const histIds = (histRes.data || []).map((h: any) => h.id);
+      let histOcorrencias: any[] = [];
+      if (histIds.length > 0) {
+        const { data: ho } = await supabase.from("pjecalc_historico_ocorrencias" as any)
+          .select("*").in("historico_id", histIds).order("competencia");
+        histOcorrencias = ho || [];
+      }
+      const historicos: PjeHistoricoSalarial[] = (histRes.data || []).map((h: any) => ({
+        ...h,
+        ocorrencias: histOcorrencias
+          .filter((o: any) => o.historico_id === h.id)
+          .map((o: any) => ({ id: o.id, historico_id: o.historico_id, competencia: o.competencia, valor: Number(o.valor), tipo: o.tipo || 'calculado' })),
+      }));
       const faltas: PjeFalta[] = (faltasRes.data || []).map((f: any) => ({ ...f }));
       const ferias: PjeFerias[] = (feriasRes.data || []).map((f: any) => ({ ...f }));
 
