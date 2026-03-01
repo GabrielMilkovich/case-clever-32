@@ -232,7 +232,16 @@ export default function Casos() {
               className="gap-1.5 h-9 text-sm"
             >
               <FlaskConical className="h-4 w-4" />
-              {seedingTest ? "Criando..." : "Caso Teste"}
+              {seedingTest ? "Criando..." : "Caso Teste 1"}
+            </Button>
+            <Button 
+              variant="outline" size="sm" 
+              onClick={handleSeedMarcelo}
+              disabled={seedingMarcelo}
+              className="gap-1.5 h-9 text-sm"
+            >
+              <FlaskConical className="h-4 w-4" />
+              {seedingMarcelo ? "Criando..." : "Caso Teste 2"}
             </Button>
             <Button 
               variant="outline" size="sm" 
