@@ -9,11 +9,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
   Search, Loader2, Briefcase, Plus, TrendingUp, FileStack, 
-  CheckCircle2, Clock, Calculator, Scale 
+  CheckCircle2, Clock, Calculator, Scale, FlaskConical
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { seedAdvancedTestCase } from "@/lib/test-case-seed";
+import { toast } from "sonner";
 
 interface CaseWithMetrics {
   id: string;
@@ -39,8 +41,26 @@ const STATUS_TABS = [
 
 export default function Casos() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [seedingTest, setSeedingTest] = useState(false);
+
+  const handleSeedTestCase = async () => {
+    setSeedingTest(true);
+    try {
+      const caseId = await seedAdvancedTestCase();
+      if (caseId) {
+        toast.success("Caso teste avançado criado com sucesso!");
+        queryClient.invalidateQueries({ queryKey: ["cases-with-metrics"] });
+        navigate(`/casos/${caseId}`);
+      }
+    } catch (err: any) {
+      toast.error("Erro ao criar caso teste: " + err.message);
+    } finally {
+      setSeedingTest(false);
+    }
+  };
 
   // Fetch cases with counts
   const { data: cases = [], isLoading } = useQuery({
@@ -188,6 +208,15 @@ export default function Casos() {
             />
           </div>
           <div className="flex gap-2">
+            <Button 
+              variant="outline" size="sm" 
+              onClick={handleSeedTestCase}
+              disabled={seedingTest}
+              className="gap-1.5 h-9 text-sm"
+            >
+              <FlaskConical className="h-4 w-4" />
+              {seedingTest ? "Criando..." : "Caso Teste"}
+            </Button>
             <Button 
               variant="outline" size="sm" 
               onClick={() => navigate("/novo-calculo")}
