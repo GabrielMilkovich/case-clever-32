@@ -87,11 +87,17 @@ export function ModuloResumo({ caseId }: Props) {
       ]);
 
       // ── Fase 1: Carregar dados do banco (séries históricas e tabelas versionadas) ──
-      const [indicesRes, inssFaixasRes, irFaixasRes, dadosProcessoRes] = await Promise.all([
+      const [indicesRes, inssFaixasRes, irFaixasRes, dadosProcessoRes,
+             prevPrivadaData, pensaoData, sfData, feriadosRes, multasData] = await Promise.all([
         supabase.from("pjecalc_correcao_monetaria").select("*").order("competencia"),
         supabase.from("pjecalc_inss_faixas" as any).select("*").order("competencia_inicio,faixa"),
         supabase.from("pjecalc_ir_faixas" as any).select("*").order("competencia_inicio,faixa"),
         supabase.from("pjecalc_dados_processo" as any).select("*").eq("case_id", caseId).maybeSingle(),
+        supabase.from("pjecalc_previdencia_privada_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
+        supabase.from("pjecalc_pensao_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
+        supabase.from("pjecalc_salario_familia_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
+        supabase.from("pjecalc_feriados").select("*"),
+        supabase.from("pjecalc_multas_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
       ]);
 
       if (!paramsRes.data) throw new Error("Configure os Parâmetros primeiro.");
