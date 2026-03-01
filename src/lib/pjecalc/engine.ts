@@ -29,6 +29,7 @@ export interface PjeParametros {
   data_prescricao_quinquenal?: string;
   maior_remuneracao?: number;
   ultima_remuneracao?: number;
+  salario_minimo?: number;
   prazo_aviso_previo: 'nao_apurar' | 'calculado' | 'informado';
   prazo_aviso_dias?: number;
   projetar_aviso_indenizado: boolean;
@@ -214,6 +215,24 @@ export interface PjePrevidenciaPrivadaConfig {
   deduzir_ir: boolean;
 }
 
+export interface PjeSalarioFamiliaConfig {
+  apurar: boolean;
+  numero_filhos: number;
+  filhos_detalhes?: { nome: string; nascimento: string; ate_14: boolean }[];
+}
+
+export interface PjeSalarioFamiliaResult {
+  apurado: boolean;
+  cotas: { competencia: string; filhos_elegíveis: number; valor_cota: number; total: number }[];
+  total: number;
+}
+
+// Tabela Salário-Família 2025 (Portaria MPS/MF nº 6/2025)
+const SALARIO_FAMILIA_2025 = {
+  limite_remuneracao: 1819.26,
+  valor_cota: 62.04,
+};
+
 export interface PjeFGTSConfig {
   apurar: boolean;
   destino: 'pagar_reclamante' | 'recolher_conta';
@@ -358,6 +377,7 @@ export interface PjeLiquidacaoResult {
   imposto_renda: PjeIRResult;
   seguro_desemprego: PjeSeguroResult;
   previdencia_privada: PjePrevidenciaPrivadaResult;
+  salario_familia: PjeSalarioFamiliaResult;
   resumo: PjeResumo;
   validacao?: PjeValidationResult;
 }
@@ -459,6 +479,7 @@ export interface PjeResumo {
   ir_retido: number;
   seguro_desemprego: number;
   previdencia_privada: number;
+  salario_familia: number;
   multa_523: number;
   multa_467: number;
   honorarios_sucumbenciais: number;
