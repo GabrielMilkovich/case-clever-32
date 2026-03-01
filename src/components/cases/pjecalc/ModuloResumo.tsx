@@ -16,6 +16,8 @@ import {
   type PjeCustasConfig, type PjeSeguroConfig, type PjeLiquidacaoResult,
   type PjeIndiceRow, type PjeINSSFaixaRow, type PjeIRFaixaRow,
   type PjeValidationResult,
+  type PjeExcecaoCargaHoraria, type PjeFeriadoDB,
+  type PjePrevidenciaPrivadaConfig, type PjePensaoConfig, type PjeSalarioFamiliaConfig,
 } from "@/lib/pjecalc/engine";
 import { gerarRelatorioPDF } from "@/lib/pjecalc/pdf-report";
 import { gerarRelatorioMemoriaCalculo } from "@/lib/pjecalc/pdf-report-memoria";
@@ -85,11 +87,17 @@ export function ModuloResumo({ caseId }: Props) {
       ]);
 
       // ── Fase 1: Carregar dados do banco (séries históricas e tabelas versionadas) ──
-      const [indicesRes, inssFaixasRes, irFaixasRes, dadosProcessoRes] = await Promise.all([
+      const [indicesRes, inssFaixasRes, irFaixasRes, dadosProcessoRes,
+             prevPrivadaData, pensaoData, sfData, feriadosRes, multasData] = await Promise.all([
         supabase.from("pjecalc_correcao_monetaria").select("*").order("competencia"),
         supabase.from("pjecalc_inss_faixas" as any).select("*").order("competencia_inicio,faixa"),
         supabase.from("pjecalc_ir_faixas" as any).select("*").order("competencia_inicio,faixa"),
         supabase.from("pjecalc_dados_processo" as any).select("*").eq("case_id", caseId).maybeSingle(),
+        supabase.from("pjecalc_previdencia_privada_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
+        supabase.from("pjecalc_pensao_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
+        supabase.from("pjecalc_salario_familia_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
+        supabase.from("pjecalc_feriados").select("*"),
+        supabase.from("pjecalc_multas_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
       ]);
 
       if (!paramsRes.data) throw new Error("Configure os Parâmetros primeiro.");
@@ -195,6 +203,8 @@ export function ModuloResumo({ caseId }: Props) {
         juros_inicio: correcaoData?.juros_inicio || 'ajuizamento',
         multa_523: correcaoData?.multa_523 ?? false,
         multa_523_percentual: correcaoData?.multa_523_percentual ?? 10,
+        multa_467: multasData?.apurar_467 ?? false,
+        multa_467_percentual: multasData?.percentual_467 ?? 50,
         data_liquidacao: correcaoData?.data_liquidacao || new Date().toISOString().slice(0, 10),
       };
 
@@ -224,6 +234,35 @@ export function ModuloResumo({ caseId }: Props) {
         recebeu: seguroData?.recebeu ?? false,
       };
 
+      // ── Configs extras (antes faltavam na integração) ──
+      const prevPrivadaConfig: PjePrevidenciaPrivadaConfig = {
+        apurar: prevPrivadaData?.apurar ?? false,
+        percentual: prevPrivadaData?.percentual ?? 0,
+        base_calculo: prevPrivadaData?.base_calculo || 'diferenca',
+        deduzir_ir: prevPrivadaData?.deduzir_ir ?? false,
+      };
+
+      const pensaoConfig: PjePensaoConfig = {
+        apurar: pensaoData?.apurar ?? false,
+        percentual: pensaoData?.percentual ?? 0,
+        valor_fixo: pensaoData?.valor_fixo,
+        base: pensaoData?.base || 'liquido',
+      };
+
+      const salarioFamiliaConfig: PjeSalarioFamiliaConfig = {
+        apurar: sfData?.apurar ?? false,
+        numero_filhos: sfData?.numero_filhos ?? 0,
+        filhos_detalhes: sfData?.filhos_detalhes,
+      };
+
+      const feriadosDB: PjeFeriadoDB[] = (feriadosRes.data || []).map((f: any) => ({
+        data: f.data,
+        nome: f.nome,
+        tipo: f.tipo || 'nacional',
+        uf: f.uf,
+        municipio: f.municipio,
+      }));
+
       // ── Preparar dados do banco para o engine ──
       const indicesDB: PjeIndiceRow[] = (indicesRes.data || []).map((i: any) => ({
         indice: i.indice,
@@ -250,12 +289,17 @@ export function ModuloResumo({ caseId }: Props) {
         deducao_dependente: Number(f.deducao_dependente),
       }));
 
-      // Execute engine com dados versionados do banco
+      // Execute engine com TODOS os dados
       const engine = new PjeCalcEngine(
         params, historicos, faltas, ferias, verbas, cartaoPonto,
         fgtsConfig, csConfig, irConfig, correcaoConfig,
         honorariosConfig, custasConfig, seguroConfig,
         indicesDB, faixasINSSDB, faixasIRDB,
+        [], // excecoesCargas (TODO: load if table exists)
+        feriadosDB,
+        prevPrivadaConfig,
+        pensaoConfig,
+        salarioFamiliaConfig,
       );
 
       // ── Validação pré-liquidação ──
