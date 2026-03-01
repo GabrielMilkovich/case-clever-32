@@ -57,7 +57,14 @@ export function calcularCompletude(input: CompletionInput): Record<string, Modul
   }
 
   // Cartão de Ponto
-  status.cartao_ponto = 'nao_iniciado';
+  const verbasCartao = (input.verbas || []).filter((v: any) => v.tipo_quantidade === 'cartao_ponto' || v.tipo_divisor === 'cartao_ponto');
+  if (verbasCartao.length > 0 && (!input.cartaoPonto || input.cartaoPonto.length === 0)) {
+    status.cartao_ponto = 'alerta';
+  } else if (input.cartaoPonto && input.cartaoPonto.length > 0) {
+    status.cartao_ponto = 'preenchido';
+  } else {
+    status.cartao_ponto = 'nao_iniciado';
+  }
 
   // Verbas
   if (verbas.length === 0) {
