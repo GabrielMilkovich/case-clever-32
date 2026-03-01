@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { seedAdvancedTestCase } from "@/lib/test-case-seed";
+import { seedCasoMarcelo } from "@/lib/test-case-seed-marcelo";
 import { toast } from "sonner";
 
 interface CaseWithMetrics {
