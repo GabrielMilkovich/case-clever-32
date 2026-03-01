@@ -2213,6 +2213,61 @@ export class PjeCalcEngine {
   // CALCULAR VERBA REFLEXA
   // =====================================================
 
+  // =====================================================
+  // SALÁRIO-FAMÍLIA (Art. 65, Lei 8.213/91)
+  // Cota por filho ≤14 anos para empregados de baixa renda
+  // =====================================================
+
+  calcularSalarioFamilia(verbaResults: PjeVerbaResult[]): PjeSalarioFamiliaResult {
+    if (!this.salarioFamiliaConfig.apurar || this.salarioFamiliaConfig.numero_filhos <= 0) {
+      return { apurado: false, cotas: [], total: 0 };
+    }
+
+    const filhos = this.salarioFamiliaConfig.filhos_detalhes || [];
+    const periodo = this.getPeriodoCalculo();
+    const competencias = this.getCompetencias(periodo.inicio, periodo.fim);
+    const cotas: PjeSalarioFamiliaResult['cotas'] = [];
+    let totalSF = 0;
+
+    for (const comp of competencias) {
+      // Determinar remuneração da competência (usar histórico ou última remuneração)
+      let remuneracao = 0;
+      for (const hist of this.historicos) {
+        const oc = hist.ocorrencias.find(o => o.competencia === comp);
+        if (oc) remuneracao += oc.valor;
+      }
+      if (remuneracao === 0) remuneracao = this.params.ultima_remuneracao || 0;
+
+      // Verificar se remuneração está dentro do limite
+      if (remuneracao > SALARIO_FAMILIA_2025.limite_remuneracao) continue;
+
+      // Contar filhos elegíveis na competência
+      const [anoComp, mesComp] = comp.split('-').map(Number);
+      const dataComp = new Date(anoComp, mesComp - 1, 1);
+      let filhosElegiveis = 0;
+
+      if (filhos.length > 0) {
+        for (const f of filhos) {
+          if (!f.nascimento) { filhosElegiveis++; continue; }
+          const nasc = new Date(f.nascimento);
+          const idadeAnos = (dataComp.getTime() - nasc.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+          if (idadeAnos <= 14 || f.ate_14) filhosElegiveis++;
+        }
+      } else {
+        filhosElegiveis = this.salarioFamiliaConfig.numero_filhos;
+      }
+
+      if (filhosElegiveis <= 0) continue;
+
+      const valorCota = SALARIO_FAMILIA_2025.valor_cota;
+      const totalComp = Number(new Decimal(valorCota).times(filhosElegiveis).toDP(2));
+      cotas.push({ competencia: comp, filhos_elegíveis: filhosElegiveis, valor_cota: valorCota, total: totalComp });
+      totalSF += totalComp;
+    }
+
+    return { apurado: true, cotas, total: Number(new Decimal(totalSF).toDP(2)) };
+  }
+
   private calcularVerbaReflexa(reflexa: PjeVerba, principalResult: PjeVerbaResult): PjeVerbaResult {
     const comportamento = reflexa.comportamento_reflexo || 'valor_mensal';
     const ocorrencias: PjeOcorrenciaResult[] = [];
