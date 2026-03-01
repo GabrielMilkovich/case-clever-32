@@ -830,12 +830,6 @@ export class PjeCalcEngine {
     }
     return count > 0 ? soma / count : verba.quantidade_informada || 0;
   }
-    let total = 0;
-    for (const col of colunas) {
-      total += (reg as any)[col] || 0;
-    }
-    return total || 30;
-  }
 
   // =====================================================
   // FÓRMULA OFICIAL DE CÁLCULO DE VERBA
