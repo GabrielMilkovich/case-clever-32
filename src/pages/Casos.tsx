@@ -47,6 +47,8 @@ export default function Casos() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [seedingTest, setSeedingTest] = useState(false);
 
+  const [seedingMarcelo, setSeedingMarcelo] = useState(false);
+
   const handleSeedTestCase = async () => {
     setSeedingTest(true);
     try {
@@ -60,6 +62,20 @@ export default function Casos() {
       toast.error("Erro ao criar caso teste: " + err.message);
     } finally {
       setSeedingTest(false);
+    }
+  };
+
+  const handleSeedMarcelo = async () => {
+    setSeedingMarcelo(true);
+    try {
+      const caseId = await seedCasoMarcelo();
+      toast.success("Caso Marcelo Henrique Pires criado com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["cases-with-metrics"] });
+      navigate(`/casos/${caseId}`);
+    } catch (err: any) {
+      toast.error("Erro ao criar caso: " + err.message);
+    } finally {
+      setSeedingMarcelo(false);
     }
   };
 
