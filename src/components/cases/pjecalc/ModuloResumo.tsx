@@ -495,6 +495,7 @@ export function ModuloResumo({ caseId }: Props) {
                     ['(-) IRRF (Art. 12-A RRA)', -res.resumo.ir_retido],
                     ...(res.resumo.seguro_desemprego > 0 ? [['(+) Seguro-Desemprego (indenização)', res.resumo.seguro_desemprego]] : []),
                     ...(res.resumo.multa_523 > 0 ? [['(+) Multa Art. 523, §1º CPC', res.resumo.multa_523]] : []),
+                    ...((res.resumo.multa_467 || 0) > 0 ? [['(+) Multa Art. 467 CLT', res.resumo.multa_467]] : []),
                     ...(res.resumo.honorarios_sucumbenciais > 0 ? [['(+) Honorários Sucumbenciais', res.resumo.honorarios_sucumbenciais]] : []),
                     ...(res.resumo.honorarios_contratuais > 0 ? [['(+) Honorários Contratuais', res.resumo.honorarios_contratuais]] : []),
                     ...(res.resumo.custas > 0 ? [['(+) Custas Processuais', res.resumo.custas]] : []),
