@@ -2124,6 +2124,7 @@ export class PjeCalcEngine {
     const honorarios = this.calcularHonorarios(principalCorrigido, jurosMora, fgts.total_fgts);
     const valorCondenacao = principalCorrigido + jurosMora + fgts.total_fgts;
     const multa523 = this.calcularMulta523(valorCondenacao);
+    const multa467 = this.calcularMulta467(principalBruto);
     const custasResult = this.calcularCustas(valorCondenacao);
     const csDescontado = this.csConfig.cobrar_reclamante ? cs.total_segurado : 0;
 
@@ -2132,7 +2133,6 @@ export class PjeCalcEngine {
     let pensaoTotal = 0;
     if (this.pensaoConfig.apurar && this.pensaoConfig.percentual > 0) {
       const pct = this.pensaoConfig.percentual / 100;
-      // Calcular pensão sobre verbas com incidência
       let basePensaoVerbas = 0;
       for (const vr of verbaResults) {
         const verba = this.verbas.find(v => v.id === vr.verba_id);
@@ -2140,13 +2140,9 @@ export class PjeCalcEngine {
         basePensaoVerbas += vr.total_final;
       }
       const pensaoVerbas = Number(new Decimal(basePensaoVerbas).times(pct).toDP(2));
-      
-      // Pensão sobre FGTS+Multa
       if (fgts.total_fgts > 0) {
         pensaoSobreFgts = Number(new Decimal(fgts.total_fgts).times(pct).toDP(2));
       }
-      
-      // Se valor fixo informado, usa o fixo ao invés do percentual
       if (this.pensaoConfig.valor_fixo && this.pensaoConfig.valor_fixo > 0) {
         pensaoTotal = this.pensaoConfig.valor_fixo;
         pensaoSobreFgts = 0;
@@ -2156,13 +2152,13 @@ export class PjeCalcEngine {
     }
 
     const liquido = Number(new Decimal(
-      principalCorrigido + jurosMora + fgts.total_fgts + seguro.total + multa523
+      principalCorrigido + jurosMora + fgts.total_fgts + seguro.total + multa523 + multa467
       - csDescontado - ir.imposto_devido - prevPrivada.valor - pensaoTotal
     ).toDP(2));
 
     const totalReclamada = Number(new Decimal(
       principalCorrigido + jurosMora + fgts.total_fgts + cs.total_empregador 
-      + seguro.total + honorarios.sucumbenciais + custasResult.total + multa523
+      + seguro.total + honorarios.sucumbenciais + custasResult.total + multa523 + multa467
     ).toDP(2));
 
     const resumo: PjeResumo = {
