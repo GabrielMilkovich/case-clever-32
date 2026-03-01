@@ -134,6 +134,9 @@ export interface PjeVerba {
   proporcionalizar_devido?: boolean;
   proporcionalizar_pago?: boolean;
   
+  /** Modo de fração de mês: manter_fracao | integralizar | desprezar | desprezar_menor_15 */
+  fracao_mes_modo?: 'manter_fracao' | 'integralizar' | 'desprezar' | 'desprezar_menor_15';
+  
   exclusoes: {
     faltas_justificadas: boolean;
     faltas_nao_justificadas: boolean;
@@ -907,7 +910,7 @@ export class PjeCalcEngine {
       qtd = new Decimal(this.calcularPrazoAviso());
     }
 
-    // Proporcionalizar QUANTIDADE em meses incompletos
+    // Proporcionalizar QUANTIDADE em meses incompletos com modo de fração
     if (verba.quantidade_proporcionalizar) {
       const [ano, mes] = competencia.split('-').map(Number);
       const diasNoMes = new Date(ano, mes, 0).getDate();
@@ -918,7 +921,28 @@ export class PjeCalcEngine {
       if (demDate && demDate.getFullYear() === ano && demDate.getMonth() + 1 === mes) diaFim = demDate.getDate();
       const diasTrabalhados = diaFim - diaInicio + 1;
       if (diasTrabalhados < diasNoMes) {
-        qtd = qtd.times(diasTrabalhados).div(diasNoMes);
+        const fracaoModo = verba.fracao_mes_modo || 'manter_fracao';
+        switch (fracaoModo) {
+          case 'integralizar':
+            // Integraliza: mês incompleto conta como mês completo (qtd não muda)
+            break;
+          case 'desprezar':
+            // Desprezar: mês incompleto = 0
+            qtd = new Decimal(0);
+            break;
+          case 'desprezar_menor_15':
+            // Desprezar se < 15 dias, integralizar se >= 15
+            if (diasTrabalhados < 15) {
+              qtd = new Decimal(0);
+            }
+            // else: keep full qtd (integraliza)
+            break;
+          case 'manter_fracao':
+          default:
+            // Manter fração proporcional
+            qtd = qtd.times(diasTrabalhados).div(diasNoMes);
+            break;
+        }
       }
     }
 
