@@ -567,13 +567,50 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
             const aqFim = new Date(aqInicio); aqFim.setFullYear(aqFim.getFullYear() + 1); aqFim.setDate(aqFim.getDate() - 1);
             const concInicio = new Date(aqFim); concInicio.setDate(concInicio.getDate() + 1);
             const concFim = new Date(concInicio); concFim.setFullYear(concFim.getFullYear() + 1); concFim.setDate(concFim.getDate() - 1);
-            const situacao = concFim <= dem ? 'gozadas' : 'indenizadas';
-            periodos.push({ case_id: caseId, relativas: `${aqInicio.getFullYear()}/${aqFim.getFullYear()}`, periodo_aquisitivo_inicio: aqInicio.toISOString().slice(0, 10), periodo_aquisitivo_fim: aqFim > dem ? dem.toISOString().slice(0, 10) : aqFim.toISOString().slice(0, 10), periodo_concessivo_inicio: concInicio.toISOString().slice(0, 10), periodo_concessivo_fim: concFim.toISOString().slice(0, 10), prazo_dias: formParams.regime_trabalho === 'tempo_integral' ? 30 : 18, situacao, dobra: situacao === 'indenizadas' ? false : (concFim > dem) });
+            
+            // Art. 130 CLT: Calcular prazo com base em faltas não justificadas no período aquisitivo
+            let faltasNaoJustificadas = 0;
+            for (const f of faltas) {
+              if ((f as any).justificada) continue;
+              const fInicio = new Date((f as any).data_inicial);
+              const fFim = new Date((f as any).data_final);
+              const overlapInicio = fInicio > aqInicio ? fInicio : aqInicio;
+              const overlapFim = fFim < (aqFim > dem ? dem : aqFim) ? fFim : (aqFim > dem ? dem : aqFim);
+              if (overlapInicio <= overlapFim) {
+                faltasNaoJustificadas += Math.floor((overlapFim.getTime() - overlapInicio.getTime()) / 86400000) + 1;
+              }
+            }
+            let prazoDias: number;
+            if (formParams.regime_trabalho === 'tempo_parcial') {
+              prazoDias = faltasNaoJustificadas > 7 ? 9 : 18;
+            } else {
+              if (faltasNaoJustificadas > 32) prazoDias = 0;
+              else if (faltasNaoJustificadas > 23) prazoDias = 12;
+              else if (faltasNaoJustificadas > 14) prazoDias = 18;
+              else if (faltasNaoJustificadas > 5) prazoDias = 24;
+              else prazoDias = 30;
+            }
+            
+            const periodoAqFimEfetivo = aqFim > dem ? dem : aqFim;
+            const situacao = prazoDias === 0 ? 'perdidas' : (concFim <= dem ? 'gozadas' : 'indenizadas');
+            const dobra = situacao === 'gozadas' ? false : (situacao === 'indenizadas' && concFim > dem);
+            
+            periodos.push({
+              case_id: caseId,
+              relativas: `${aqInicio.getFullYear()}/${periodoAqFimEfetivo.getFullYear()}`,
+              periodo_aquisitivo_inicio: aqInicio.toISOString().slice(0, 10),
+              periodo_aquisitivo_fim: periodoAqFimEfetivo.toISOString().slice(0, 10),
+              periodo_concessivo_inicio: concInicio.toISOString().slice(0, 10),
+              periodo_concessivo_fim: concFim.toISOString().slice(0, 10),
+              prazo_dias: prazoDias,
+              situacao,
+              dobra: !!dobra,
+            });
             aqInicio = new Date(aqFim); aqInicio.setDate(aqInicio.getDate() + 1);
           }
           if (periodos.length > 0) await supabase.from("pjecalc_ferias").insert(periodos);
           queryClient.invalidateQueries({ queryKey: ["pjecalc_ferias", caseId] });
-          toast.success(`${periodos.length} período(s) gerado(s)`);
+          toast.success(`${periodos.length} período(s) gerado(s) com prazo Art. 130 CLT`);
         }}><Calculator className="h-4 w-4 mr-1" /> Gerar Automaticamente</Button>
       </div>
       {ferias.length === 0 ? (
