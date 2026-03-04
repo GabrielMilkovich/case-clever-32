@@ -11,7 +11,7 @@
  */
 
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -69,6 +69,7 @@ const STATUS_ICON: Record<string, { icon: any; color: string }> = {
 };
 
 export function WizardCalculo({ caseId, onComplete, onExit }: WizardProps) {
+  const qc = useQueryClient();
   const [currentStep, setCurrentStep] = useState(0);
 
   // Load data for completude check
