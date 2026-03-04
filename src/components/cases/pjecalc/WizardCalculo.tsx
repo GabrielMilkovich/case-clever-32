@@ -33,6 +33,8 @@ import { ExtractionReviewPanel } from "./ExtractionReviewPanel";
 import { ValidationPanel } from "./ValidationPanel";
 import { CTPSUploader } from "./CTPSUploader";
 import { DocumentPipelineStatus } from "./DocumentPipelineStatus";
+import { GeradorReflexos } from "./GeradorReflexos";
+import { MRDStatePanel } from "./MRDStatePanel";
 import { calcularCompletude, type ModuleStatus } from "@/lib/pjecalc/completude";
 import type { ValidationInput } from "@/lib/pjecalc/validation-engine";
 
