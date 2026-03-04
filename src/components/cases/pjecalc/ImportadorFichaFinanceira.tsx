@@ -176,9 +176,9 @@ export function ImportadorFichaFinanceira({ caseId, onImported }: Props) {
           }
 
           // Create monthly occurrences
-          if (inserted?.id) {
+          if ((inserted as any)?.id) {
             const ocorrencias = sorted.map((v) => ({
-              historico_id: inserted.id,
+              historico_id: (inserted as any).id,
               case_id: caseId,
               competencia: v.competencia,
               valor: v.valor,

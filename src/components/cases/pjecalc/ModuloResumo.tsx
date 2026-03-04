@@ -56,8 +56,8 @@ export function ModuloResumo({ caseId }: Props) {
   const { data: verbasDB = [] } = useQuery({
     queryKey: ["pjecalc_verbas", caseId],
     queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_verbas").select("id, verba_principal_id, tipo").eq("case_id", caseId).order("ordem");
-      return data || [];
+      const { data } = await supabase.from("pjecalc_verbas" as any).select("id, verba_principal_id, tipo").eq("case_id", caseId).order("ordem");
+      return (data || []) as any[];
     },
   });
 
@@ -375,7 +375,7 @@ export function ModuloResumo({ caseId }: Props) {
           .eq("origem", "CALCULADA");
         // Insert in batches of 500
         for (let i = 0; i < ocRows.length; i += 500) {
-          await supabase.from("pjecalc_ocorrencias").insert(ocRows.slice(i, i + 500));
+          await supabase.from("pjecalc_ocorrencias" as any).insert(ocRows.slice(i, i + 500));
         }
       }
 

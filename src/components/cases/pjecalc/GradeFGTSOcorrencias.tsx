@@ -40,10 +40,10 @@ export function GradeFGTSOcorrencias({ caseId }: Props) {
 
       // Get params for period
       const { data: params } = await supabase.from("pjecalc_parametros" as any).select("*").eq("case_id", caseId).maybeSingle();
-      if (!params?.data_admissao) { toast.error("Preencha parâmetros primeiro."); setGenerating(false); return; }
+      if (!(params as any)?.data_admissao) { toast.error("Preencha parâmetros primeiro."); setGenerating(false); return; }
 
-      const start = new Date(params.data_admissao + "T00:00:00");
-      const end = new Date((params.data_demissao || new Date().toISOString().slice(0, 10)) + "T00:00:00");
+      const start = new Date((params as any).data_admissao + "T00:00:00");
+      const end = new Date(((params as any).data_demissao || new Date().toISOString().slice(0, 10)) + "T00:00:00");
       const rows: any[] = [];
       const cur = new Date(start.getFullYear(), start.getMonth(), 1);
 
