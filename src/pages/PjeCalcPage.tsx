@@ -127,7 +127,7 @@ export default function PjeCalcPage() {
     queryFn: async () => {
       const { data, error } = await supabase.from("pjecalc_parametros" as any).select("*").eq("case_id", caseId).maybeSingle();
       if (error) throw error;
-      return data;
+      return data as any;
     },
   });
 
@@ -143,7 +143,7 @@ export default function PjeCalcPage() {
     queryKey: ["pjecalc_faltas", caseId],
     queryFn: async () => {
       const { data } = await supabase.from("pjecalc_faltas" as any).select("*").eq("case_id", caseId).order("data_inicial");
-      return data || [];
+      return (data || []) as any[];
     },
   });
 
@@ -151,7 +151,7 @@ export default function PjeCalcPage() {
     queryKey: ["pjecalc_ferias", caseId],
     queryFn: async () => {
       const { data } = await supabase.from("pjecalc_ferias" as any).select("*").eq("case_id", caseId).order("periodo_aquisitivo_inicio");
-      return data || [];
+      return (data || []) as any[];
     },
   });
 
@@ -159,7 +159,7 @@ export default function PjeCalcPage() {
     queryKey: ["pjecalc_historico", caseId],
     queryFn: async () => {
       const { data } = await supabase.from("pjecalc_historico_salarial" as any).select("*").eq("case_id", caseId).order("periodo_inicio");
-      return data || [];
+      return (data || []) as any[];
     },
   });
 
@@ -167,7 +167,7 @@ export default function PjeCalcPage() {
     queryKey: ["pjecalc_verbas", caseId],
     queryFn: async () => {
       const { data } = await supabase.from("pjecalc_verbas" as any).select("*").eq("case_id", caseId).order("ordem");
-      return data || [];
+      return (data || []) as any[];
     },
   });
 

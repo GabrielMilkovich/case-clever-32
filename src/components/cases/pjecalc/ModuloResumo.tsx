@@ -57,7 +57,7 @@ export function ModuloResumo({ caseId }: Props) {
     queryKey: ["pjecalc_verbas", caseId],
     queryFn: async () => {
       const { data } = await supabase.from("pjecalc_verbas" as any).select("id, verba_principal_id, tipo").eq("case_id", caseId).order("ordem");
-      return data || [];
+      return (data || []) as any[];
     },
   });
 
