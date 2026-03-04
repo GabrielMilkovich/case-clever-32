@@ -44,6 +44,7 @@ import { ModuloPrevidenciaPrivada } from "@/components/cases/pjecalc/ModuloPrevi
 import { ModuloTabelasRegionais } from "@/components/cases/pjecalc/ModuloTabelasRegionais";
 import { ExcecoesSabado } from "@/components/cases/pjecalc/ExcecoesSabado";
 import { PerfilAcesso, isModuloVisivel, type PerfilTipo } from "@/components/cases/pjecalc/PerfilAcesso";
+import { WizardCalculo } from "@/components/cases/pjecalc/WizardCalculo";
 
 // Phase 4 components
 import { VerbaPreview } from "@/components/cases/pjecalc/VerbaPreview";
@@ -111,6 +112,7 @@ export default function PjeCalcPage() {
   const [verbaFilterCarac, setVerbaFilterCarac] = useState<string>('all');
   const [expandedFeriasId, setExpandedFeriasId] = useState<string | null>(null);
   const [perfilAcesso, setPerfilAcesso] = useState<PerfilTipo>('perito');
+  const [showWizard, setShowWizard] = useState(false);
   // DATA
   // =====================================================
   const { data: caseData } = useQuery({
@@ -290,6 +292,9 @@ export default function PjeCalcPage() {
     }
 
     const moduleContent = (() => {
+      if (showWizard) {
+        return <WizardCalculo caseId={caseId!} onComplete={() => setShowWizard(false)} onExit={() => setShowWizard(false)} />;
+      }
       switch (activeModule) {
         case 'dados_processo': return <ModuloDadosProcesso caseId={caseId!} />;
         case 'parametros': return renderParametros();
