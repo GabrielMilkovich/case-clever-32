@@ -119,6 +119,46 @@ export function ImportadorFichaFinanceira({ caseId, onImported }: Props) {
       if (parseErr) throw new Error("Erro na análise: " + parseErr.message);
       if (parsed?.error) throw new Error(parsed.error);
 
+      // Persist to document_pipeline + extracao_item for audit
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const userId = auth?.user?.id || 'anonymous';
+        
+        // Create pipeline record
+        const { data: pipeline } = await supabase.from("document_pipeline").insert({
+          case_id: caseId,
+          document_id: doc?.id || crypto.randomUUID(),
+          user_id: userId,
+          pipeline_type: tipoDoc === "contracheque" ? "CONTRACHEQUE" : "FICHA_FINANCEIRA",
+          template_detectado: tipoDoc,
+          empresa_detectada: parsed.empresa || null,
+          status: "extraido",
+        } as any).select("id").single();
+
+        // Create extracao_items for each rubrica
+        if (pipeline?.id && parsed.rubricas) {
+          const items = parsed.rubricas.flatMap((rub: any, ri: number) =>
+            (rub.valores_mensais || []).map((vm: any) => ({
+              case_id: caseId,
+              pipeline_id: pipeline.id,
+              field_key: `rubrica_${rub.codigo}_${vm.competencia}`,
+              valor: String(vm.valor),
+              confidence: 0.85,
+              competencia: vm.competencia,
+              target_table: "pjecalc_hist_salarial",
+              target_field: rub.categoria || "outros",
+              evidence_text: `${rub.codigo} ${rub.denominacao} [${rub.classificacao || 'PGTO'}]`,
+              status: "AUTO",
+            }))
+          );
+          if (items.length > 0) {
+            await supabase.from("extracao_item").insert(items);
+          }
+        }
+      } catch (pipeErr) {
+        console.warn("Pipeline audit persistence failed (non-blocking):", pipeErr);
+      }
+
       setDados(parsed);
       // Select all rubricas by default
       setSelectedRubricas(new Set(parsed.rubricas.map((_: any, i: number) => String(i))));
