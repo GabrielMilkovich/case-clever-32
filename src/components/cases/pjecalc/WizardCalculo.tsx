@@ -221,26 +221,30 @@ export function WizardCalculo({ caseId, onComplete, onExit }: WizardProps) {
         );
       case 'pedidos':
         return (
-          <Card>
-            <CardHeader><CardTitle className="text-sm">Pedidos e Parâmetros</CardTitle></CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground mb-3">
-                Configure verbas, reflexos e parâmetros de cálculo no módulo completo.
-                Este passo requer configuração detalhada via a sidebar principal.
-              </p>
-              <div className="flex gap-2">
-                <Badge variant="outline">{verbas.length} verbas configuradas</Badge>
-              </div>
-              {verbas.length === 0 && (
-                <div className="mt-4 p-4 rounded-lg border border-dashed border-muted-foreground/30 text-center">
-                  <FileText className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
-                  <p className="text-xs text-muted-foreground">
-                    Nenhuma verba configurada. Use o módulo "Verbas" na sidebar do cálculo completo.
-                  </p>
+          <div className="space-y-4">
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Pedidos e Parâmetros</CardTitle></CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Configure verbas base e gere reflexos automaticamente.
+                  Para configuração avançada, use o módulo "Verbas" na sidebar.
+                </p>
+                <div className="flex gap-2">
+                  <Badge variant="outline">{verbas.filter((v: any) => !v.verba_principal_id).length} verbas principais</Badge>
+                  <Badge variant="outline">{verbas.filter((v: any) => v.verba_principal_id).length} reflexos</Badge>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+                {verbas.length === 0 && (
+                  <div className="mt-4 p-4 rounded-lg border border-dashed border-muted-foreground/30 text-center">
+                    <FileText className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
+                    <p className="text-xs text-muted-foreground">
+                      Nenhuma verba configurada. Use o módulo "Verbas" na sidebar ou o Catálogo de Verbas.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            <GeradorReflexos caseId={caseId} />
+          </div>
         );
       case 'revisao': {
         const valInput: ValidationInput = {
@@ -259,29 +263,32 @@ export function WizardCalculo({ caseId, onComplete, onExit }: WizardProps) {
       }
       case 'calcular':
         return (
-          <Card>
-            <CardHeader><CardTitle className="text-sm">Calcular e Exportar</CardTitle></CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground mb-4">
-                Execute a liquidação completa e gere os relatórios para conferência.
-              </p>
-              {resultado ? (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm text-[hsl(var(--success))]">
-                    <CheckCircle2 className="h-4 w-4" />
-                    Liquidação calculada com sucesso
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Use o módulo "Resumo" na sidebar para ver os resultados, gerar PDF e exportar PJC.
-                  </p>
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Use o botão "Calcular" no módulo Resumo da sidebar principal para executar a liquidação.
+          <div className="space-y-4">
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Calcular e Exportar</CardTitle></CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Execute a liquidação completa e gere os relatórios para conferência.
                 </p>
-              )}
-            </CardContent>
-          </Card>
+                {resultado ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm text-[hsl(var(--success))]">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Liquidação calculada com sucesso
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Use o módulo "Resumo" na sidebar para ver os resultados detalhados.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Use o botão "Calcular" no módulo Resumo da sidebar principal para executar a liquidação.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+            <MRDStatePanel caseId={caseId} />
+          </div>
         );
       default:
         return null;
