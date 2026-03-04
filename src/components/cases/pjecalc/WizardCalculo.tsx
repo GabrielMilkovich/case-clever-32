@@ -29,7 +29,10 @@ import {
 import { ModuloDadosProcesso } from "./ModuloDadosProcesso";
 import { ModuloCartaoPontoDiario } from "./ModuloCartaoPontoDiario";
 import { ImportadorFichaFinanceira } from "./ImportadorFichaFinanceira";
+import { ExtractionReviewPanel } from "./ExtractionReviewPanel";
+import { ValidationPanel } from "./ValidationPanel";
 import { calcularCompletude, type ModuleStatus } from "@/lib/pjecalc/completude";
+import type { ValidationInput } from "@/lib/pjecalc/validation-engine";
 
 interface WizardProps {
   caseId: string;
@@ -207,7 +210,12 @@ export function WizardCalculo({ caseId, onComplete, onExit }: WizardProps) {
           />
         );
       case 'remuneracao':
-        return <ImportadorFichaFinanceira caseId={caseId} />;
+        return (
+          <div className="space-y-4">
+            <ImportadorFichaFinanceira caseId={caseId} />
+            <ExtractionReviewPanel caseId={caseId} />
+          </div>
+        );
       case 'pedidos':
         return (
           <Card>
@@ -231,8 +239,21 @@ export function WizardCalculo({ caseId, onComplete, onExit }: WizardProps) {
             </CardContent>
           </Card>
         );
-      case 'revisao':
-        return renderRevisao();
+      case 'revisao': {
+        const valInput: ValidationInput = {
+          admissao: params?.data_admissao,
+          demissao: params?.data_demissao,
+          ajuizamento: params?.data_ajuizamento,
+          inicio_calculo: params?.data_inicial,
+          fim_calculo: params?.data_final,
+        };
+        return (
+          <div className="space-y-4">
+            {renderRevisao()}
+            <ValidationPanel input={valInput} />
+          </div>
+        );
+      }
       case 'calcular':
         return (
           <Card>
