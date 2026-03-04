@@ -72,7 +72,7 @@ export async function seedAdvancedTestCase(): Promise<string | null> {
     );
 
     // 5. PJe-Calc Parâmetros
-    await supabase.from("pjecalc_parametros").insert({
+    await supabase.from("pjecalc_parametros" as any).insert({
       case_id: caseId,
       data_admissao: "2018-03-05",
       data_demissao: "2022-08-12",
@@ -101,19 +101,19 @@ export async function seedAdvancedTestCase(): Promise<string | null> {
       { nome: "Salário", periodo_inicio: "2021-01-01", periodo_fim: "2021-12-31", valor_informado: 2200, tipo_valor: "mensal" },
       { nome: "Salário", periodo_inicio: "2022-01-01", periodo_fim: "2022-08-12", valor_informado: 2600, tipo_valor: "mensal" },
     ];
-    await supabase.from("pjecalc_historico_salarial").insert(
+    await supabase.from("pjecalc_historico_salarial" as any).insert(
       historicoData.map(h => ({ case_id: caseId, ...h, incidencia_fgts: true, incidencia_cs: true }))
     );
 
     // 7. Faltas
-    await supabase.from("pjecalc_faltas").insert([
+    await supabase.from("pjecalc_faltas" as any).insert([
       { case_id: caseId, data_inicial: "2019-09-05", data_final: "2019-09-05", justificada: false },
       { case_id: caseId, data_inicial: "2020-03-18", data_final: "2020-03-19", justificada: false },
       { case_id: caseId, data_inicial: "2021-11-07", data_final: "2021-11-07", justificada: true, justificativa: "Atestado médico" },
     ]);
 
     // 8. Férias
-    await supabase.from("pjecalc_ferias").insert([
+    await supabase.from("pjecalc_ferias" as any).insert([
       {
         case_id: caseId,
         periodo_aquisitivo_inicio: "2018-03-05", periodo_aquisitivo_fim: "2019-03-04",
@@ -147,7 +147,7 @@ export async function seedAdvancedTestCase(): Promise<string | null> {
     const periodo = { inicio: "2018-03-05", fim: "2022-08-12" };
 
     // HE 50%
-    const { data: he50 } = await supabase.from("pjecalc_verbas").insert({
+    const { data: he50 } = await supabase.from("pjecalc_verbas" as any).insert({
       case_id: caseId, nome: "Horas Extras 50%", tipo: "principal", caracteristica: "comum",
       ocorrencia_pagamento: "mensal", multiplicador: 1.5, divisor_informado: 220,
       quantidade_informada: 25, tipo_quantidade: "informada",
@@ -156,7 +156,7 @@ export async function seedAdvancedTestCase(): Promise<string | null> {
     }).select("id").single();
 
     // HE 100%
-    const { data: he100 } = await supabase.from("pjecalc_verbas").insert({
+    const { data: he100 } = await supabase.from("pjecalc_verbas" as any).insert({
       case_id: caseId, nome: "Horas Extras 100%", tipo: "principal", caracteristica: "comum",
       ocorrencia_pagamento: "mensal", multiplicador: 2.0, divisor_informado: 220,
       quantidade_informada: 10, tipo_quantidade: "informada",
@@ -165,7 +165,7 @@ export async function seedAdvancedTestCase(): Promise<string | null> {
     }).select("id").single();
 
     // Adicional Noturno
-    const { data: adicNot } = await supabase.from("pjecalc_verbas").insert({
+    const { data: adicNot } = await supabase.from("pjecalc_verbas" as any).insert({
       case_id: caseId, nome: "Adicional Noturno", tipo: "principal", caracteristica: "comum",
       ocorrencia_pagamento: "mensal", multiplicador: 0.2, divisor_informado: 220,
       quantidade_informada: 60, tipo_quantidade: "informada",
@@ -174,7 +174,7 @@ export async function seedAdvancedTestCase(): Promise<string | null> {
     }).select("id").single();
 
     // Intervalo intrajornada
-    const { data: intervalo } = await supabase.from("pjecalc_verbas").insert({
+    const { data: intervalo } = await supabase.from("pjecalc_verbas" as any).insert({
       case_id: caseId, nome: "Intervalo Intrajornada Suprimido", tipo: "principal", caracteristica: "comum",
       ocorrencia_pagamento: "mensal", multiplicador: 1.5, divisor_informado: 220,
       quantidade_informada: 22, tipo_quantidade: "informada", // ~1h/dia × 22 dias úteis
@@ -183,7 +183,7 @@ export async function seedAdvancedTestCase(): Promise<string | null> {
     }).select("id").single();
 
     // Reflexas linked to all principals
-    const principalIds = [he50?.id, he100?.id, adicNot?.id, intervalo?.id].filter(Boolean);
+    const principalIds = [(he50 as any)?.id, (he100 as any)?.id, (adicNot as any)?.id, (intervalo as any)?.id].filter(Boolean);
     
     // For each principal, create reflexas
     let ordem = 4;
@@ -194,7 +194,7 @@ export async function seedAdvancedTestCase(): Promise<string | null> {
         { nome: "Férias + 1/3", caracteristica: "ferias", ocorrencia_pagamento: "periodo_aquisitivo", multiplicador: 1.3333, divisor_informado: 12 },
       ];
       for (const ref of reflexas) {
-        await supabase.from("pjecalc_verbas").insert({
+        await supabase.from("pjecalc_verbas" as any).insert({
           case_id: caseId, ...ref, tipo: "reflexa",
           periodo_inicio: periodo.inicio, periodo_fim: periodo.fim,
           ordem: ordem++,
