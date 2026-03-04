@@ -295,7 +295,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
         }).select("id").single();
         if (principalError) errors.push(`Verba HE: ${principalError.message}`);
 
-        const principalId = principalData?.id || null;
+        const principalId = (principalData as any)?.id || null;
         // 2. Insert reflexas linked to principal
         const reflexas = [
           { nome: 'RSR s/ Horas Extras', caracteristica: 'comum', ocorrencia_pagamento: 'mensal', tipo: 'reflexa', multiplicador: 1, divisor_informado: 30, ordem: 1 },
@@ -696,7 +696,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
               tipo: 'principal', multiplicador: 1.5, divisor_informado: formParams.carga_horaria_padrao || 220,
               periodo_inicio: periodo.inicio, periodo_fim: periodo.fim, ordem: verbas.length,
             }).select("id").single();
-            const principalId = principalData?.id || null;
+            const principalId = (principalData as any)?.id || null;
             // 2. Insert reflexas linked to principal
             const reflexas = [
               { nome: 'RSR s/ Horas Extras', caracteristica: 'comum', ocorrencia_pagamento: 'mensal', multiplicador: 1, divisor_informado: 30 },
