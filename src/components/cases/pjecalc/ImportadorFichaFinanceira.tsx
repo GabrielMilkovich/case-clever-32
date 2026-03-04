@@ -127,7 +127,7 @@ export function ImportadorFichaFinanceira({ caseId, onImported }: Props) {
         // Create pipeline record
         const { data: pipeline } = await supabase.from("document_pipeline").insert({
           case_id: caseId,
-          document_id: doc?.id || crypto.randomUUID(),
+          document_id: crypto.randomUUID(),
           user_id: userId,
           pipeline_type: tipoDoc === "contracheque" ? "CONTRACHEQUE" : "FICHA_FINANCEIRA",
           template_detectado: tipoDoc,
