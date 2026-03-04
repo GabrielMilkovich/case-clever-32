@@ -1,0 +1,210 @@
+/**
+ * Motor de Reflexos Automáticos
+ * Gera reflexos padrão (13º, Férias+1/3, Aviso, RSR) a partir de verbas base.
+ * Baseado na estrutura real do PJC: Reflexo → FormulaReflexo → BaseVerba → ItemBaseVerba
+ */
+
+export interface ReflexoTemplate {
+  sufixo: string;
+  caracteristica: string;
+  ocorrencia_pagamento: string;
+  comportamento_reflexo: 'valor_mensal' | 'media_valor_absoluto' | 'media_valor_corrigido' | 'media_quantidade';
+  periodo_media_reflexo?: string;
+  tratamento_fracao_mes: 'manter_fracao' | 'integralizar' | 'desprezar' | 'desprezar_menor_15';
+  multiplicador: number;
+  divisor_tipo: string;
+  divisor_valor: number;
+  tipo_quantidade: string;
+  gerar_principal: 'devido' | 'diferenca';
+  gerar_reflexo: 'devido' | 'diferenca';
+  incidencias: { fgts: boolean; irpf: boolean; cs: boolean };
+  ordem_offset: number;
+}
+
+// Templates padrão de reflexos do PJe-Calc
+export const REFLEXO_TEMPLATES: ReflexoTemplate[] = [
+  {
+    sufixo: '13º SALÁRIO',
+    caracteristica: '13_salario',
+    ocorrencia_pagamento: 'dezembro',
+    comportamento_reflexo: 'media_valor_absoluto',
+    tratamento_fracao_mes: 'desprezar_menor_15',
+    multiplicador: 1,
+    divisor_tipo: 'informado',
+    divisor_valor: 12,
+    tipo_quantidade: 'avos',
+    gerar_principal: 'diferenca',
+    gerar_reflexo: 'diferenca',
+    incidencias: { fgts: true, irpf: true, cs: true },
+    ordem_offset: 100,
+  },
+  {
+    sufixo: 'FÉRIAS + 1/3',
+    caracteristica: 'ferias',
+    ocorrencia_pagamento: 'periodo_aquisitivo',
+    comportamento_reflexo: 'media_valor_absoluto',
+    tratamento_fracao_mes: 'desprezar_menor_15',
+    multiplicador: 1.3333,
+    divisor_tipo: 'informado',
+    divisor_valor: 12,
+    tipo_quantidade: 'avos',
+    gerar_principal: 'diferenca',
+    gerar_reflexo: 'diferenca',
+    incidencias: { fgts: true, irpf: true, cs: true },
+    ordem_offset: 200,
+  },
+  {
+    sufixo: 'AVISO PRÉVIO',
+    caracteristica: 'aviso_previo',
+    ocorrencia_pagamento: 'desligamento',
+    comportamento_reflexo: 'media_valor_absoluto',
+    tratamento_fracao_mes: 'integralizar',
+    multiplicador: 1,
+    divisor_tipo: 'informado',
+    divisor_valor: 12,
+    tipo_quantidade: 'avos',
+    gerar_principal: 'diferenca',
+    gerar_reflexo: 'diferenca',
+    incidencias: { fgts: true, irpf: true, cs: true },
+    ordem_offset: 300,
+  },
+  {
+    sufixo: 'REPOUSO SEMANAL REMUNERADO',
+    caracteristica: 'comum',
+    ocorrencia_pagamento: 'mensal',
+    comportamento_reflexo: 'valor_mensal',
+    tratamento_fracao_mes: 'manter_fracao',
+    multiplicador: 1,
+    divisor_tipo: 'dias_uteis',
+    divisor_valor: 22,
+    tipo_quantidade: 'calendario',
+    gerar_principal: 'diferenca',
+    gerar_reflexo: 'diferenca',
+    incidencias: { fgts: true, irpf: true, cs: true },
+    ordem_offset: 50,
+  },
+  {
+    sufixo: 'MULTA ART. 477 CLT',
+    caracteristica: 'comum',
+    ocorrencia_pagamento: 'desligamento',
+    comportamento_reflexo: 'media_valor_absoluto',
+    tratamento_fracao_mes: 'integralizar',
+    multiplicador: 1,
+    divisor_tipo: 'informado',
+    divisor_valor: 1,
+    tipo_quantidade: 'informada',
+    gerar_principal: 'diferenca',
+    gerar_reflexo: 'diferenca',
+    incidencias: { fgts: false, irpf: false, cs: false },
+    ordem_offset: 400,
+  },
+];
+
+export interface VerbaBase {
+  id: string;
+  nome: string;
+  ordem: number;
+  incidencias: { fgts: boolean; irpf: boolean; cs: boolean };
+}
+
+export interface ReflexoGerado {
+  nome: string;
+  tipo: 'reflexa';
+  verba_principal_id: string;
+  verba_principal_nome: string;
+  caracteristica: string;
+  ocorrencia_pagamento: string;
+  comportamento_reflexo: string;
+  tratamento_fracao_mes: string;
+  multiplicador: number;
+  divisor_tipo: string;
+  divisor_valor: number;
+  tipo_quantidade: string;
+  gerar_principal: string;
+  gerar_reflexo: string;
+  incidencias: { fgts: boolean; irpf: boolean; cs: boolean };
+  ordem: number;
+  base_verbas: string[]; // IDs das verbas base
+}
+
+/**
+ * Gera todos os reflexos padrão para uma lista de verbas base.
+ * Exclui reflexos que não fazem sentido (ex: RSR sobre verba que já é RSR).
+ */
+export function gerarReflexosPadrao(
+  verbasBase: VerbaBase[],
+  templates: ReflexoTemplate[] = REFLEXO_TEMPLATES,
+  excludeTemplates: string[] = [],
+): ReflexoGerado[] {
+  const reflexos: ReflexoGerado[] = [];
+
+  for (const vb of verbasBase) {
+    const nomeUpper = vb.nome.toUpperCase();
+
+    for (const tmpl of templates) {
+      // Skip excluded templates
+      if (excludeTemplates.includes(tmpl.sufixo)) continue;
+
+      // Skip RSR sobre RSR
+      if (tmpl.sufixo.includes('REPOUSO') && nomeUpper.includes('REPOUSO')) continue;
+      if (tmpl.sufixo.includes('REPOUSO') && nomeUpper.includes('RSR')) continue;
+
+      // Skip 13º sobre 13º
+      if (tmpl.sufixo.includes('13º') && nomeUpper.includes('13')) continue;
+
+      // Skip Aviso sobre Aviso
+      if (tmpl.sufixo.includes('AVISO') && nomeUpper.includes('AVISO')) continue;
+
+      // Skip Férias sobre Férias
+      if (tmpl.sufixo.includes('FÉRIAS') && nomeUpper.includes('FÉRIAS')) continue;
+      if (tmpl.sufixo.includes('FÉRIAS') && nomeUpper.includes('FERIAS')) continue;
+
+      // Skip multa 477 sobre multa 477
+      if (tmpl.sufixo.includes('477') && nomeUpper.includes('477')) continue;
+
+      reflexos.push({
+        nome: `${tmpl.sufixo} SOBRE ${vb.nome}`,
+        tipo: 'reflexa',
+        verba_principal_id: vb.id,
+        verba_principal_nome: vb.nome,
+        caracteristica: tmpl.caracteristica,
+        ocorrencia_pagamento: tmpl.ocorrencia_pagamento,
+        comportamento_reflexo: tmpl.comportamento_reflexo,
+        tratamento_fracao_mes: tmpl.tratamento_fracao_mes,
+        multiplicador: tmpl.multiplicador,
+        divisor_tipo: tmpl.divisor_tipo,
+        divisor_valor: tmpl.divisor_valor,
+        tipo_quantidade: tmpl.tipo_quantidade,
+        gerar_principal: tmpl.gerar_principal,
+        gerar_reflexo: tmpl.gerar_reflexo,
+        incidencias: { ...tmpl.incidencias },
+        ordem: vb.ordem + tmpl.ordem_offset,
+        base_verbas: [vb.id],
+      });
+    }
+  }
+
+  return reflexos.sort((a, b) => a.ordem - b.ordem);
+}
+
+/**
+ * Gera reflexos seletivos (o usuário escolhe quais templates aplicar)
+ */
+export function gerarReflexosSeletivos(
+  verbasBase: VerbaBase[],
+  templateSufixos: string[],
+): ReflexoGerado[] {
+  const templates = REFLEXO_TEMPLATES.filter(t => templateSufixos.includes(t.sufixo));
+  return gerarReflexosPadrao(verbasBase, templates);
+}
+
+/**
+ * Lista os nomes dos templates disponíveis
+ */
+export function listarTemplatesReflexo(): { sufixo: string; caracteristica: string; descricao: string }[] {
+  return REFLEXO_TEMPLATES.map(t => ({
+    sufixo: t.sufixo,
+    caracteristica: t.caracteristica,
+    descricao: `${t.sufixo} — ${t.comportamento_reflexo}, div ${t.divisor_valor}, mult ${t.multiplicador}`,
+  }));
+}
