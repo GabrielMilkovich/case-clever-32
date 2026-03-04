@@ -159,32 +159,28 @@ export function ModuloCartaoPontoDiario({ caseId, dataAdmissao, dataDemissao, ca
     setGenerating(true);
     try {
       // Aplicar jornada fixa em todos os dias normais do mês
-      const updates: Promise<any>[] = [];
       for (const r of registros) {
         if (r.tipo === 'folga' || r.tipo === 'feriado' || r.tipo === 'ferias') continue;
         const dow = new Date(r.data).getDay();
-        if (dow === 0) continue; // domingo
-        if (dow === 6 && !jornadaFixa.sabado) continue; // sábado
+        if (dow === 0) continue;
+        if (dow === 6 && !jornadaFixa.sabado) continue;
         
         const ht = calcHorasEntre(jornadaFixa.entrada_1, jornadaFixa.saida_1) +
                     calcHorasEntre(jornadaFixa.entrada_2, jornadaFixa.saida_2);
         const jornadadiaria = cargaHoraria / (jornadaFixa.sabado ? 26 : 22);
         const he = Math.max(0, ht - jornadadiaria);
         
-        updates.push(
-          supabase.from("pjecalc_ponto_diario" as any).update({
-            entrada_1: jornadaFixa.entrada_1,
-            saida_1: jornadaFixa.saida_1,
-            entrada_2: jornadaFixa.entrada_2,
-            saida_2: jornadaFixa.saida_2,
-            horas_trabalhadas: Math.round(ht * 100) / 100,
-            horas_extras_diarias: Math.round(he * 100) / 100,
-            frequencia: `${jornadaFixa.entrada_1}-${jornadaFixa.saida_1} / ${jornadaFixa.entrada_2}-${jornadaFixa.saida_2}`,
-            origem: 'FIXADA',
-          }).eq("id", r.id)
-        );
+        await supabase.from("pjecalc_ponto_diario" as any).update({
+          entrada_1: jornadaFixa.entrada_1,
+          saida_1: jornadaFixa.saida_1,
+          entrada_2: jornadaFixa.entrada_2,
+          saida_2: jornadaFixa.saida_2,
+          horas_trabalhadas: Math.round(ht * 100) / 100,
+          horas_extras_diarias: Math.round(he * 100) / 100,
+          frequencia: `${jornadaFixa.entrada_1}-${jornadaFixa.saida_1} / ${jornadaFixa.entrada_2}-${jornadaFixa.saida_2}`,
+          origem: 'FIXADA',
+        }).eq("id", r.id);
       }
-      await Promise.all(updates);
       qc.invalidateQueries({ queryKey: ["pjecalc_ponto_diario", caseId, mesAtual] });
       toast.success("Jornada fixada aplicada");
       setShowFixar(false);
@@ -234,8 +230,9 @@ export function ModuloCartaoPontoDiario({ caseId, dataAdmissao, dataDemissao, ca
   const sincronizarTotais = async () => {
     try {
       // Buscar todos os meses com dados
-      const { data: todos } = await supabase.from("pjecalc_ponto_diario" as any)
+      const res = await supabase.from("pjecalc_ponto_diario" as any)
         .select("*").eq("case_id", caseId).order("data");
+      const todos = (res as any).data;
       if (!todos || todos.length === 0) return;
 
       // Agrupar por competência
