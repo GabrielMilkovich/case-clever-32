@@ -4007,6 +4007,99 @@ export type Database = {
           },
         ]
       }
+      pjecalc_ponto_diario: {
+        Row: {
+          case_id: string
+          created_at: string | null
+          data: string
+          dia_semana: string | null
+          entrada_1: string | null
+          entrada_2: string | null
+          entrada_3: string | null
+          frequencia: string | null
+          horas_extras_diarias: number | null
+          horas_extras_dsr: number | null
+          horas_extras_semanais: number | null
+          horas_noturnas: number | null
+          horas_trabalhadas: number | null
+          id: string
+          intervalo_suprimido: number | null
+          observacao: string | null
+          origem: string | null
+          saida_1: string | null
+          saida_2: string | null
+          saida_3: string | null
+          sobreaviso: number | null
+          tipo: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          case_id: string
+          created_at?: string | null
+          data: string
+          dia_semana?: string | null
+          entrada_1?: string | null
+          entrada_2?: string | null
+          entrada_3?: string | null
+          frequencia?: string | null
+          horas_extras_diarias?: number | null
+          horas_extras_dsr?: number | null
+          horas_extras_semanais?: number | null
+          horas_noturnas?: number | null
+          horas_trabalhadas?: number | null
+          id?: string
+          intervalo_suprimido?: number | null
+          observacao?: string | null
+          origem?: string | null
+          saida_1?: string | null
+          saida_2?: string | null
+          saida_3?: string | null
+          sobreaviso?: number | null
+          tipo?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          case_id?: string
+          created_at?: string | null
+          data?: string
+          dia_semana?: string | null
+          entrada_1?: string | null
+          entrada_2?: string | null
+          entrada_3?: string | null
+          frequencia?: string | null
+          horas_extras_diarias?: number | null
+          horas_extras_dsr?: number | null
+          horas_extras_semanais?: number | null
+          horas_noturnas?: number | null
+          horas_trabalhadas?: number | null
+          id?: string
+          intervalo_suprimido?: number | null
+          observacao?: string | null
+          origem?: string | null
+          saida_1?: string | null
+          saida_2?: string | null
+          saida_3?: string | null
+          sobreaviso?: number | null
+          tipo?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pjecalc_ponto_diario_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "pjecalc_ponto_diario_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pjecalc_previdencia_privada_config: {
         Row: {
           apurar: boolean
@@ -5105,6 +5198,10 @@ export type Database = {
       }
       pjecalc_batch_update_ocorrencias: {
         Args: { p_calculo_id: string; p_changes: Json; p_filtro: Json }
+        Returns: number
+      }
+      pjecalc_calc_horas_entre: {
+        Args: { h_fim: string; h_inicio: string }
         Returns: number
       }
       queue_case_documents: {

@@ -30,6 +30,7 @@ import { ModuloIR } from "@/components/cases/pjecalc/ModuloIR";
 import { ModuloCorrecao } from "@/components/cases/pjecalc/ModuloCorrecao";
 import { ModuloResumo } from "@/components/cases/pjecalc/ModuloResumo";
 import { ModuloCartaoPonto } from "@/components/cases/pjecalc/ModuloCartaoPonto";
+import { ModuloCartaoPontoDiario } from "@/components/cases/pjecalc/ModuloCartaoPontoDiario";
 import { ModuloSeguroDesemprego } from "@/components/cases/pjecalc/ModuloSeguroDesemprego";
 import { ModuloHonorarios } from "@/components/cases/pjecalc/ModuloHonorarios";
 import { ModuloCustas } from "@/components/cases/pjecalc/ModuloCustas";
@@ -294,7 +295,7 @@ export default function PjeCalcPage() {
         case 'faltas': return renderFaltas();
         case 'ferias': return renderFerias();
         case 'historico': return renderHistorico();
-        case 'cartao_ponto': return <ModuloCartaoPonto caseId={caseId!} dataAdmissao={formParams.data_admissao} dataDemissao={formParams.data_demissao} />;
+        case 'cartao_ponto': return <ModuloCartaoPontoDiario caseId={caseId!} dataAdmissao={formParams.data_admissao} dataDemissao={formParams.data_demissao} cargaHoraria={formParams.carga_horaria_padrao} />;
         case 'verbas': return renderVerbas();
         case 'fgts': return <ModuloFGTS caseId={caseId!} />;
         case 'cs': return <ModuloCS caseId={caseId!} />;

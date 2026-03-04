@@ -1,0 +1,162 @@
+/**
+ * PJe-Calc .PJC Export
+ * Generates a JSON-based archive that can be imported into PJe-Calc systems.
+ * The .PJC format is essentially a compressed JSON containing all calculation data.
+ */
+import type { PjeLiquidacaoResult } from "./engine";
+
+export interface PJCData {
+  versao: string;
+  formato: 'MRDcalc-PJC';
+  gerado_em: string;
+  processo: {
+    numero?: string;
+    reclamante?: string;
+    reclamada?: string;
+    cpf_reclamante?: string;
+    cnpj_reclamada?: string;
+    vara?: string;
+    tribunal?: string;
+    estado?: string;
+    municipio?: string;
+  };
+  parametros: {
+    data_admissao?: string;
+    data_demissao?: string;
+    data_ajuizamento?: string;
+    data_citacao?: string;
+    carga_horaria: number;
+    sabado_dia_util: boolean;
+    prescricao_quinquenal: boolean;
+    prescricao_fgts: boolean;
+    projetar_aviso: boolean;
+    limitar_avos: boolean;
+    zerar_negativos: boolean;
+  };
+  historico_salarial: {
+    periodo_inicio: string;
+    periodo_fim: string;
+    valor: number;
+    nome?: string;
+  }[];
+  faltas: {
+    data_inicial: string;
+    data_final: string;
+    justificada: boolean;
+    tipo?: string;
+  }[];
+  ferias: {
+    periodo_aquisitivo_inicio: string;
+    periodo_aquisitivo_fim: string;
+    situacao: string;
+    prazo_dias: number;
+    dobra: boolean;
+    periodos_gozo?: { inicio: string; fim: string; dias: number }[];
+  }[];
+  verbas: {
+    id: string;
+    nome: string;
+    tipo: string;
+    caracteristica: string;
+    periodo_inicio: string;
+    periodo_fim: string;
+    divisor: number;
+    multiplicador: number;
+    quantidade: number;
+    tipo_divisor: string;
+    tipo_quantidade: string;
+    incidencias: {
+      fgts: boolean;
+      irpf: boolean;
+      cs: boolean;
+    };
+    verba_principal_id?: string;
+    comportamento_reflexo?: string;
+  }[];
+  cartao_ponto?: {
+    data: string;
+    entrada_1?: string;
+    saida_1?: string;
+    entrada_2?: string;
+    saida_2?: string;
+    horas_trabalhadas: number;
+    horas_extras_diarias: number;
+    tipo: string;
+  }[];
+  fgts: {
+    apurar: boolean;
+    multa_percentual: number;
+    saldos_saques: { data: string; valor: number }[];
+  };
+  contribuicao_social: {
+    apurar_segurado: boolean;
+    apurar_empresa: boolean;
+    aliquota_empresa: number;
+    aliquota_sat: number;
+    aliquota_terceiros: number;
+  };
+  imposto_renda: {
+    apurar: boolean;
+    dependentes: number;
+    tributacao_exclusiva_13: boolean;
+  };
+  correcao: {
+    indice: string;
+    juros_tipo: string;
+    juros_percentual: number;
+    data_liquidacao: string;
+  };
+  honorarios: {
+    percentual_sucumbenciais: number;
+    percentual_contratuais: number;
+  };
+  pensao?: {
+    percentual: number;
+    base: string;
+  };
+  previdencia_privada?: {
+    percentual: number;
+  };
+  multas: {
+    multa_477: boolean;
+    multa_467: boolean;
+  };
+  resultado?: PjeLiquidacaoResult;
+}
+
+export function exportarPJC(
+  data: PJCData,
+): string {
+  return JSON.stringify(data, null, 2);
+}
+
+export function downloadPJC(
+  data: PJCData,
+  nomeArquivo?: string,
+) {
+  const json = exportarPJC(data);
+  const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nomeArquivo || `PROCESSO_${data.processo.numero?.replace(/\D/g, '') || 'CALCULO'}_${data.processo.reclamante?.replace(/\s+/g, '_') || 'RECLAMANTE'}.PJC`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+export function importarPJC(conteudo: string): PJCData {
+  try {
+    const data = JSON.parse(conteudo);
+    if (!data.formato || !data.versao) {
+      throw new Error('Formato inválido: não é um arquivo .PJC válido');
+    }
+    return data as PJCData;
+  } catch (e) {
+    if (e instanceof SyntaxError) {
+      throw new Error('Arquivo .PJC corrompido ou inválido');
+    }
+    throw e;
+  }
+}
