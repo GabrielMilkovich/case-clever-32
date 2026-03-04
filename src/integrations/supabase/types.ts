@@ -6303,6 +6303,7 @@ export type Database = {
         Args: { h_fim: string; h_inicio: string }
         Returns: number
       }
+      pjecalc_get_calculo_id: { Args: { p_case_id: string }; Returns: string }
       queue_case_documents: {
         Args: { p_case_id: string; p_priority?: number }
         Returns: number
