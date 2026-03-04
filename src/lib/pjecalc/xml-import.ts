@@ -118,11 +118,11 @@ export async function importarXMLParaCalculo(caseId: string, xmlString: string):
     // Import verbas
     if (parsed.verbas && parsed.verbas.length > 0) {
       // Delete existing verbas
-      await supabase.from("pjecalc_verbas").delete().eq("case_id", caseId);
+      await supabase.from("pjecalc_verbas" as any).delete().eq("case_id", caseId);
 
       for (let i = 0; i < parsed.verbas.length; i++) {
         const v = parsed.verbas[i];
-        await supabase.from("pjecalc_verbas").insert({
+        await supabase.from("pjecalc_verbas" as any).insert({
           case_id: caseId,
           nome: v.nome,
           tipo: v.tipo as any,

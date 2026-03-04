@@ -156,7 +156,7 @@ export function ImportadorFichaFinanceira({ caseId, onImported }: Props) {
           const avg = sorted.reduce((s, v) => s + v.valor, 0) / sorted.length;
 
           const { data: inserted, error } = await supabase
-            .from("pjecalc_historico_salarial")
+            .from("pjecalc_historico_salarial" as any)
             .insert({
               case_id: caseId,
               nome: `${rub.denominacao} (${CATEGORIA_LABELS[rub.categoria] || rub.categoria})`,

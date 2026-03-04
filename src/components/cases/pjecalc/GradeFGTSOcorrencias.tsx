@@ -23,7 +23,7 @@ export function GradeFGTSOcorrencias({ caseId }: Props) {
   const { data: ocorrencias = [], isLoading } = useQuery({
     queryKey,
     queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_fgts_ocorrencias")
+      const { data } = await supabase.from("pjecalc_fgts_ocorrencias" as any)
         .select("*").eq("calculo_id", caseId).order("competencia");
       return (data || []) as any[];
     },
@@ -33,13 +33,13 @@ export function GradeFGTSOcorrencias({ caseId }: Props) {
     setGenerating(true);
     try {
       if (strategy === 'SOBRESCREVER_TUDO') {
-        await supabase.from("pjecalc_fgts_ocorrencias").delete().eq("calculo_id", caseId);
+        await supabase.from("pjecalc_fgts_ocorrencias" as any).delete().eq("calculo_id", caseId);
       } else {
-        await supabase.from("pjecalc_fgts_ocorrencias").delete().eq("calculo_id", caseId).eq("origem", "CALCULADA");
+        await supabase.from("pjecalc_fgts_ocorrencias" as any).delete().eq("calculo_id", caseId).eq("origem", "CALCULADA");
       }
 
       // Get params for period
-      const { data: params } = await supabase.from("pjecalc_parametros").select("*").eq("case_id", caseId).maybeSingle();
+      const { data: params } = await supabase.from("pjecalc_parametros" as any).select("*").eq("case_id", caseId).maybeSingle();
       if (!params?.data_admissao) { toast.error("Preencha parâmetros primeiro."); setGenerating(false); return; }
 
       const start = new Date(params.data_admissao + "T00:00:00");
@@ -63,7 +63,7 @@ export function GradeFGTSOcorrencias({ caseId }: Props) {
         cur.setMonth(cur.getMonth() + 1);
       }
 
-      if (rows.length > 0) await supabase.from("pjecalc_fgts_ocorrencias").insert(rows);
+      if (rows.length > 0) await supabase.from("pjecalc_fgts_ocorrencias" as any).insert(rows);
       qc.invalidateQueries({ queryKey });
       toast.success(`${rows.length} ocorrências FGTS geradas`);
     } catch (e) { toast.error((e as Error).message); }
@@ -79,7 +79,7 @@ export function GradeFGTSOcorrencias({ caseId }: Props) {
       updates.base_total = baseTotal;
       updates.valor = Math.round(baseTotal * (newRow.aliquota || 0.08) * 100) / 100;
     }
-    await supabase.from("pjecalc_fgts_ocorrencias").update(updates).eq("id", id);
+    await supabase.from("pjecalc_fgts_ocorrencias" as any).update(updates).eq("id", id);
     qc.invalidateQueries({ queryKey });
   };
 

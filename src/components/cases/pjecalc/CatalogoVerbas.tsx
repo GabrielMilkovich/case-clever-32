@@ -94,7 +94,7 @@ export function CatalogoVerbas({ caseId, periodoInicio, periodoFim, ordemBase, o
       let ordem = ordemBase;
       for (const idx of selected) {
         const v = CATALOGO[idx];
-        await supabase.from("pjecalc_verbas").insert({
+        await supabase.from("pjecalc_verbas" as any).insert({
           case_id: caseId,
           nome: v.nome,
           tipo: v.tipo,

@@ -72,7 +72,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
   const { data: params } = useQuery({
     queryKey: ["pjecalc_parametros", caseId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("pjecalc_parametros").select("*").eq("case_id", caseId).maybeSingle();
+      const { data, error } = await supabase.from("pjecalc_parametros" as any).select("*").eq("case_id", caseId).maybeSingle();
       if (error) throw error;
       return data;
     },
@@ -81,7 +81,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
   const { data: contract } = useQuery({
     queryKey: ["employment_contract", caseId],
     queryFn: async () => {
-      const { data } = await supabase.from("employment_contracts").select("*").eq("case_id", caseId).maybeSingle();
+      const { data } = await supabase.from("employment_contracts" as any).select("*").eq("case_id", caseId).maybeSingle();
       return data;
     },
   });
@@ -89,7 +89,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
   const { data: faltas = [] } = useQuery({
     queryKey: ["pjecalc_faltas", caseId],
     queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_faltas").select("*").eq("case_id", caseId).order("data_inicial");
+      const { data } = await supabase.from("pjecalc_faltas" as any).select("*").eq("case_id", caseId).order("data_inicial");
       return data || [];
     },
   });
@@ -97,7 +97,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
   const { data: ferias = [] } = useQuery({
     queryKey: ["pjecalc_ferias", caseId],
     queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_ferias").select("*").eq("case_id", caseId).order("periodo_aquisitivo_inicio");
+      const { data } = await supabase.from("pjecalc_ferias" as any).select("*").eq("case_id", caseId).order("periodo_aquisitivo_inicio");
       return data || [];
     },
   });
@@ -105,7 +105,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
   const { data: historicos = [] } = useQuery({
     queryKey: ["pjecalc_historico", caseId],
     queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_historico_salarial").select("*").eq("case_id", caseId).order("periodo_inicio");
+      const { data } = await supabase.from("pjecalc_historico_salarial" as any).select("*").eq("case_id", caseId).order("periodo_inicio");
       return data || [];
     },
   });
@@ -113,7 +113,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
   const { data: verbas = [] } = useQuery({
     queryKey: ["pjecalc_verbas", caseId],
     queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_verbas").select("*").eq("case_id", caseId).order("ordem");
+      const { data } = await supabase.from("pjecalc_verbas" as any).select("*").eq("case_id", caseId).order("ordem");
       return data || [];
     },
   });

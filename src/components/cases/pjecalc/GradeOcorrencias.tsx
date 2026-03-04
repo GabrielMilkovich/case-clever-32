@@ -61,7 +61,7 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
   const { data: ocorrencias = [], isLoading } = useQuery({
     queryKey,
     queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_ocorrencias")
+      const { data } = await supabase.from("pjecalc_ocorrencias" as any)
         .select("*")
         .eq("calculo_id", caseId)
         .eq("verba_id", verbaId)
@@ -75,7 +75,7 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
     setGenerating(true);
     try {
       if (strategy === 'SOBRESCREVER_TUDO') {
-        await supabase.from("pjecalc_ocorrencias").delete().eq("calculo_id", caseId).eq("verba_id", verbaId);
+        await supabase.from("pjecalc_ocorrencias" as any).delete().eq("calculo_id", caseId).eq("verba_id", verbaId);
       }
 
       const start = new Date(periodoInicio + "T00:00:00");
@@ -108,7 +108,7 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
 
       if (strategy === 'MANTER_ALTERACOES_MANUAIS') {
         // Delete only CALCULADA rows, then insert new ones
-        await supabase.from("pjecalc_ocorrencias")
+        await supabase.from("pjecalc_ocorrencias" as any)
           .delete()
           .eq("calculo_id", caseId)
           .eq("verba_id", verbaId)
@@ -116,7 +116,7 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
       }
 
       if (rows.length > 0) {
-        await supabase.from("pjecalc_ocorrencias").insert(rows);
+        await supabase.from("pjecalc_ocorrencias" as any).insert(rows);
       }
 
       qc.invalidateQueries({ queryKey });
@@ -139,7 +139,7 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
       updates.total = Math.round((diferenca + newRow.correcao + newRow.juros) * 100) / 100;
     }
 
-    await supabase.from("pjecalc_ocorrencias").update(updates).eq("id", id);
+    await supabase.from("pjecalc_ocorrencias" as any).update(updates).eq("id", id);
     qc.invalidateQueries({ queryKey });
   }, [ocorrencias, caseId, verbaId, qc, queryKey]);
 
@@ -194,7 +194,7 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
   const deleteSelected = async () => {
     if (selectedRows.size === 0) return;
     for (const id of selectedRows) {
-      await supabase.from("pjecalc_ocorrencias").delete().eq("id", id);
+      await supabase.from("pjecalc_ocorrencias" as any).delete().eq("id", id);
     }
     setSelectedRows(new Set());
     qc.invalidateQueries({ queryKey });
