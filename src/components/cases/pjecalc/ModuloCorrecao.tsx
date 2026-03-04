@@ -121,6 +121,9 @@ export function ModuloCorrecao({ caseId }: Props) {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Correção, Juros e Multa</h2>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowCombinacoes(!showCombinacoes)}>
+            <TrendingUp className="h-4 w-4 mr-1" /> {showCombinacoes ? 'Ocultar' : 'Combinações por Data'}
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setShowIndexInfo(!showIndexInfo)}>
             <Info className="h-4 w-4 mr-1" /> {showIndexInfo ? 'Ocultar' : 'Índices'}
           </Button>
@@ -265,6 +268,19 @@ export function ModuloCorrecao({ caseId }: Props) {
           <p className="text-[10px] text-muted-foreground">ADC 58/59: IPCA-E pré-judicial + SELIC pós-citação. Art. 39, §1º, Lei 8.177/91: juros 1% a.m. pro rata die entre ajuizamento e citação.</p>
         </CardContent>
       </Card>
+
+      {/* Combinação por Data (estilo PJe-Calc) */}
+      {showCombinacoes && (
+        <CombinacaoPorData
+          combinacoesIndice={combinacoesIndice}
+          combinacoesJuros={combinacoesJuros}
+          onChange={(indice, juros) => {
+            setCombinacoesIndice(indice);
+            setCombinacoesJuros(juros);
+          }}
+        />
+      )}
+
       <Card>
         <CardHeader className="pb-3"><CardTitle className="text-sm">Multas</CardTitle></CardHeader>
         <CardContent className="space-y-3">
