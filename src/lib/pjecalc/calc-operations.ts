@@ -74,70 +74,70 @@ export async function duplicarCalculo(caseId: string, novoCliente?: string): Pro
 
   // 2. Copy parametros
   const { data: params } = await supabase
-    .from("pjecalc_parametros")
+    .from("pjecalc_parametros" as any)
     .select("*")
     .eq("case_id", caseId)
     .maybeSingle();
 
   if (params) {
     const { id, case_id, created_at, updated_at, ...paramsCopy } = params as any;
-    await supabase.from("pjecalc_parametros").insert({ ...paramsCopy, case_id: newCaseId });
+    await supabase.from("pjecalc_parametros" as any).insert({ ...paramsCopy, case_id: newCaseId });
   }
 
   // 3. Copy faltas
   const { data: faltas } = await supabase
-    .from("pjecalc_faltas")
+    .from("pjecalc_faltas" as any)
     .select("*")
     .eq("case_id", caseId);
 
   if (faltas?.length) {
-    const faltasCopy = faltas.map((f: any) => {
+    const faltasCopy = (faltas as any[]).map((f: any) => {
       const { id, case_id, created_at, ...rest } = f;
       return { ...rest, case_id: newCaseId };
     });
-    await supabase.from("pjecalc_faltas").insert(faltasCopy);
+    await supabase.from("pjecalc_faltas" as any).insert(faltasCopy);
   }
 
   // 4. Copy ferias
   const { data: ferias } = await supabase
-    .from("pjecalc_ferias")
+    .from("pjecalc_ferias" as any)
     .select("*")
     .eq("case_id", caseId);
 
   if (ferias?.length) {
-    const feriasCopy = ferias.map((f: any) => {
+    const feriasCopy = (ferias as any[]).map((f: any) => {
       const { id, case_id, created_at, ...rest } = f;
       return { ...rest, case_id: newCaseId };
     });
-    await supabase.from("pjecalc_ferias").insert(feriasCopy);
+    await supabase.from("pjecalc_ferias" as any).insert(feriasCopy);
   }
 
   // 5. Copy historico salarial
   const { data: historicos } = await supabase
-    .from("pjecalc_historico_salarial")
+    .from("pjecalc_historico_salarial" as any)
     .select("*")
     .eq("case_id", caseId);
 
   if (historicos?.length) {
-    const histCopy = historicos.map((h: any) => {
+    const histCopy = (historicos as any[]).map((h: any) => {
       const { id, case_id, created_at, ...rest } = h;
       return { ...rest, case_id: newCaseId };
     });
-    await supabase.from("pjecalc_historico_salarial").insert(histCopy);
+    await supabase.from("pjecalc_historico_salarial" as any).insert(histCopy);
   }
 
   // 6. Copy verbas
   const { data: verbas } = await supabase
-    .from("pjecalc_verbas")
+    .from("pjecalc_verbas" as any)
     .select("*")
     .eq("case_id", caseId);
 
   if (verbas?.length) {
-    const verbasCopy = verbas.map((v: any) => {
+    const verbasCopy = (verbas as any[]).map((v: any) => {
       const { id, case_id, created_at, ...rest } = v;
       return { ...rest, case_id: newCaseId };
     });
-    await supabase.from("pjecalc_verbas").insert(verbasCopy);
+    await supabase.from("pjecalc_verbas" as any).insert(verbasCopy);
   }
 
   // 7. Copy configs (FGTS, CS, IR, Correção, Honorários, Custas, Seguro)

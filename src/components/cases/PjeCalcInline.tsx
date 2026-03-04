@@ -267,9 +267,9 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
 
       // ── Auto-populate Histórico Salarial ──
       if (autoParams.data_admissao && autoParams.ultima_remuneracao) {
-        const existing = await supabase.from("pjecalc_historico_salarial").select("id").eq("case_id", caseId);
+        const existing = await supabase.from("pjecalc_historico_salarial" as any).select("id").eq("case_id", caseId);
         if (!existing.data?.length) {
-          const { error } = await supabase.from("pjecalc_historico_salarial").insert({
+          const { error } = await supabase.from("pjecalc_historico_salarial" as any).insert({
             case_id: caseId,
             nome: 'Salário Base',
             periodo_inicio: autoParams.data_admissao,
@@ -284,11 +284,11 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
       }
 
       // ── Auto-generate verbas if empty (with verba_principal_id linkage) ──
-      const existingVerbas = await supabase.from("pjecalc_verbas").select("id").eq("case_id", caseId);
+      const existingVerbas = await supabase.from("pjecalc_verbas" as any).select("id").eq("case_id", caseId);
       if (!existingVerbas.data?.length && autoParams.data_admissao) {
         const periodo = { inicio: autoParams.data_admissao, fim: autoParams.data_demissao || new Date().toISOString().slice(0, 10) };
         // 1. Insert principal first to get its ID
-        const { data: principalData, error: principalError } = await supabase.from("pjecalc_verbas").insert({
+        const { data: principalData, error: principalError } = await supabase.from("pjecalc_verbas" as any).insert({
           case_id: caseId, nome: 'Horas Extras 50%', caracteristica: 'comum', ocorrencia_pagamento: 'mensal',
           tipo: 'principal', multiplicador: 1.5, divisor_informado: autoParams.carga_horaria_padrao || 220,
           periodo_inicio: periodo.inicio, periodo_fim: periodo.fim, ordem: 0,
@@ -303,7 +303,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
           { nome: 'Férias + 1/3', caracteristica: 'ferias', ocorrencia_pagamento: 'periodo_aquisitivo', tipo: 'reflexa', multiplicador: 1.3333, divisor_informado: 12, ordem: 3 },
         ];
         for (const ref of reflexas) {
-          const { error } = await supabase.from("pjecalc_verbas").insert({
+          const { error } = await supabase.from("pjecalc_verbas" as any).insert({
             case_id: caseId, ...ref, periodo_inicio: periodo.inicio, periodo_fim: periodo.fim,
             verba_principal_id: principalId,
             base_calculo: { historicos: [], verbas: principalId ? [principalId] : [], tabelas: [], proporcionalizar: false, integralizar: false },
@@ -373,9 +373,9 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
         comentarios: formParams.comentarios,
       };
       if (params?.id) {
-        await supabase.from("pjecalc_parametros").update(payload).eq("id", params.id);
+        await supabase.from("pjecalc_parametros" as any).update(payload).eq("id", params.id);
       } else {
-        await supabase.from("pjecalc_parametros").insert(payload);
+        await supabase.from("pjecalc_parametros" as any).insert(payload);
       }
       queryClient.invalidateQueries({ queryKey: ["pjecalc_parametros", caseId] });
       toast.success("Parâmetros salvos!");
@@ -528,7 +528,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Faltas</h2>
         <Button size="sm" onClick={async () => {
-          await supabase.from("pjecalc_faltas").insert({ case_id: caseId, data_inicial: new Date().toISOString().slice(0, 10), data_final: new Date().toISOString().slice(0, 10), justificada: false });
+          await supabase.from("pjecalc_faltas" as any).insert({ case_id: caseId, data_inicial: new Date().toISOString().slice(0, 10), data_final: new Date().toISOString().slice(0, 10), justificada: false });
           queryClient.invalidateQueries({ queryKey: ["pjecalc_faltas", caseId] });
         }}><Plus className="h-4 w-4 mr-1" /> Nova Falta</Button>
       </div>
@@ -539,11 +539,11 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
           {faltas.map((f: any) => (
             <Card key={f.id}>
               <CardContent className="p-3 flex items-center gap-3">
-                <Input type="date" defaultValue={f.data_inicial} className="h-8 text-xs w-36" onBlur={e => supabase.from("pjecalc_faltas").update({ data_inicial: e.target.value }).eq("id", f.id)} />
+                <Input type="date" defaultValue={f.data_inicial} className="h-8 text-xs w-36" onBlur={e => supabase.from("pjecalc_faltas" as any).update({ data_inicial: e.target.value }).eq("id", f.id)} />
                 <span className="text-xs text-muted-foreground">a</span>
-                <Input type="date" defaultValue={f.data_final} className="h-8 text-xs w-36" onBlur={e => supabase.from("pjecalc_faltas").update({ data_final: e.target.value }).eq("id", f.id)} />
-                <div className="flex items-center gap-1"><Checkbox defaultChecked={f.justificada} onCheckedChange={v => supabase.from("pjecalc_faltas").update({ justificada: !!v }).eq("id", f.id)} /><Label className="text-xs">Justificada</Label></div>
-                <Button variant="ghost" size="icon" className="h-7 w-7 ml-auto" onClick={async () => { await supabase.from("pjecalc_faltas").delete().eq("id", f.id); queryClient.invalidateQueries({ queryKey: ["pjecalc_faltas", caseId] }); }}><Trash2 className="h-3 w-3" /></Button>
+                <Input type="date" defaultValue={f.data_final} className="h-8 text-xs w-36" onBlur={e => supabase.from("pjecalc_faltas" as any).update({ data_final: e.target.value }).eq("id", f.id)} />
+                <div className="flex items-center gap-1"><Checkbox defaultChecked={f.justificada} onCheckedChange={v => supabase.from("pjecalc_faltas" as any).update({ justificada: !!v }).eq("id", f.id)} /><Label className="text-xs">Justificada</Label></div>
+                <Button variant="ghost" size="icon" className="h-7 w-7 ml-auto" onClick={async () => { await supabase.from("pjecalc_faltas" as any).delete().eq("id", f.id); queryClient.invalidateQueries({ queryKey: ["pjecalc_faltas", caseId] }); }}><Trash2 className="h-3 w-3" /></Button>
               </CardContent>
             </Card>
           ))}
@@ -608,7 +608,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
             });
             aqInicio = new Date(aqFim); aqInicio.setDate(aqInicio.getDate() + 1);
           }
-          if (periodos.length > 0) await supabase.from("pjecalc_ferias").insert(periodos);
+          if (periodos.length > 0) await supabase.from("pjecalc_ferias" as any).insert(periodos);
           queryClient.invalidateQueries({ queryKey: ["pjecalc_ferias", caseId] });
           toast.success(`${periodos.length} período(s) gerado(s) com prazo Art. 130 CLT`);
         }}><Calculator className="h-4 w-4 mr-1" /> Gerar Automaticamente</Button>
@@ -627,13 +627,13 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
                   <td className="p-2 font-mono">{f.periodo_concessivo_inicio} a {f.periodo_concessivo_fim}</td>
                   <td className="p-2 text-center">{f.prazo_dias}d</td>
                   <td className="p-2 text-center">
-                    <Select defaultValue={f.situacao} onValueChange={async v => { await supabase.from("pjecalc_ferias").update({ situacao: v }).eq("id", f.id); queryClient.invalidateQueries({ queryKey: ["pjecalc_ferias", caseId] }); }}>
+                    <Select defaultValue={f.situacao} onValueChange={async v => { await supabase.from("pjecalc_ferias" as any).update({ situacao: v }).eq("id", f.id); queryClient.invalidateQueries({ queryKey: ["pjecalc_ferias", caseId] }); }}>
                       <SelectTrigger className="h-7 text-xs w-28"><SelectValue /></SelectTrigger>
                       <SelectContent><SelectItem value="gozadas">Gozadas</SelectItem><SelectItem value="indenizadas">Indenizadas</SelectItem><SelectItem value="perdidas">Perdidas</SelectItem><SelectItem value="gozadas_parcialmente">Goz. Parcial</SelectItem></SelectContent>
                     </Select>
                   </td>
-                  <td className="p-2 text-center"><Checkbox defaultChecked={f.dobra} onCheckedChange={v => supabase.from("pjecalc_ferias").update({ dobra: !!v }).eq("id", f.id)} /></td>
-                  <td className="p-2 text-center"><Checkbox defaultChecked={f.abono} onCheckedChange={v => supabase.from("pjecalc_ferias").update({ abono: !!v }).eq("id", f.id)} /></td>
+                  <td className="p-2 text-center"><Checkbox defaultChecked={f.dobra} onCheckedChange={v => supabase.from("pjecalc_ferias" as any).update({ dobra: !!v }).eq("id", f.id)} /></td>
+                  <td className="p-2 text-center"><Checkbox defaultChecked={f.abono} onCheckedChange={v => supabase.from("pjecalc_ferias" as any).update({ abono: !!v }).eq("id", f.id)} /></td>
                 </tr>
               ))}
             </tbody>
@@ -650,7 +650,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
         <h2 className="text-lg font-semibold">Histórico Salarial</h2>
         <Button size="sm" onClick={async () => {
           if (!formParams.data_admissao) { toast.error("Preencha a data de admissão."); return; }
-          await supabase.from("pjecalc_historico_salarial").insert({ case_id: caseId, nome: `Salário Base ${historicos.length + 1}`, periodo_inicio: formParams.data_admissao, periodo_fim: formParams.data_demissao || new Date().toISOString().slice(0, 10), tipo_valor: 'informado', incidencia_fgts: true, incidencia_cs: true });
+          await supabase.from("pjecalc_historico_salarial" as any).insert({ case_id: caseId, nome: `Salário Base ${historicos.length + 1}`, periodo_inicio: formParams.data_admissao, periodo_fim: formParams.data_demissao || new Date().toISOString().slice(0, 10), tipo_valor: 'informado', incidencia_fgts: true, incidencia_cs: true });
           queryClient.invalidateQueries({ queryKey: ["pjecalc_historico", caseId] });
         }}><Plus className="h-4 w-4 mr-1" /> Nova Base</Button>
       </div>
@@ -691,7 +691,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
           <Button size="sm" variant="outline" onClick={async () => {
             const periodo = formParams.data_admissao && formParams.data_demissao ? { inicio: formParams.data_admissao, fim: formParams.data_demissao } : { inicio: new Date().toISOString().slice(0, 10), fim: new Date().toISOString().slice(0, 10) };
             // 1. Insert principal first
-            const { data: principalData } = await supabase.from("pjecalc_verbas").insert({
+            const { data: principalData } = await supabase.from("pjecalc_verbas" as any).insert({
               case_id: caseId, nome: 'Horas Extras 50%', caracteristica: 'comum', ocorrencia_pagamento: 'mensal',
               tipo: 'principal', multiplicador: 1.5, divisor_informado: formParams.carga_horaria_padrao || 220,
               periodo_inicio: periodo.inicio, periodo_fim: periodo.fim, ordem: verbas.length,
@@ -704,7 +704,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
               { nome: 'Férias + 1/3', caracteristica: 'ferias', ocorrencia_pagamento: 'periodo_aquisitivo', multiplicador: 1.3333, divisor_informado: 12 },
             ];
             for (let i = 0; i < reflexas.length; i++) {
-              await supabase.from("pjecalc_verbas").insert({
+              await supabase.from("pjecalc_verbas" as any).insert({
                 case_id: caseId, ...reflexas[i], tipo: 'reflexa',
                 periodo_inicio: periodo.inicio, periodo_fim: periodo.fim,
                 ordem: verbas.length + 1 + i,
@@ -718,7 +718,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
           <Button size="sm" onClick={async () => {
             const periodo = formParams.data_admissao && formParams.data_demissao ? { inicio: formParams.data_admissao, fim: formParams.data_demissao } : { inicio: new Date().toISOString().slice(0, 10), fim: new Date().toISOString().slice(0, 10) };
             // Only allow creating reflexa if there's at least one principal
-            await supabase.from("pjecalc_verbas").insert({ case_id: caseId, nome: `Verba ${verbas.length + 1}`, tipo: 'principal', periodo_inicio: periodo.inicio, periodo_fim: periodo.fim, ordem: verbas.length });
+            await supabase.from("pjecalc_verbas" as any).insert({ case_id: caseId, nome: `Verba ${verbas.length + 1}`, tipo: 'principal', periodo_inicio: periodo.inicio, periodo_fim: periodo.fim, ordem: verbas.length });
             queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] });
           }}><Plus className="h-4 w-4 mr-1" /> Manual</Button>
         </div>

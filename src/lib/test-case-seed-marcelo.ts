@@ -9,7 +9,7 @@ export async function seedCasoMarcelo(): Promise<string> {
   if (!user) throw new Error("Sessão expirada");
 
   // 1. Case
-  const { data: c, error: cErr } = await supabase.from("cases" as any).insert({
+  const { data: c, error: cErr } = await supabase.from("cases").insert({
     cliente: "Marcelo Henrique Pires",
     numero_processo: "0012458-77.2023.5.03.0015",
     tribunal: "15ª Vara do Trabalho de Contagem - TRT 3ª Região",
@@ -18,7 +18,7 @@ export async function seedCasoMarcelo(): Promise<string> {
     tags: ["teste_completo", "caso_marcelo"],
   }).select("id").single();
   if (cErr || !c) throw new Error("Erro ao criar caso: " + cErr?.message);
-  const caseId = c.id;
+  const caseId = (c as any).id;
 
   try {
     // 2. Parties
@@ -207,7 +207,7 @@ export async function seedCasoMarcelo(): Promise<string> {
     }).select("id").single();
 
     // 10. Reflexas para cada principal
-    const principalIds = [he50?.id, he100?.id, adicNot?.id, intervalo?.id, periculosidade?.id].filter(Boolean);
+    const principalIds = [(he50 as any)?.id, (he100 as any)?.id, (adicNot as any)?.id, (intervalo as any)?.id, (periculosidade as any)?.id].filter(Boolean);
     let ordem = 5;
 
     for (const principalId of principalIds) {

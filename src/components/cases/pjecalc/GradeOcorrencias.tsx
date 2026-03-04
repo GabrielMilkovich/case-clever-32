@@ -66,7 +66,7 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
         .eq("calculo_id", caseId)
         .eq("verba_id", verbaId)
         .order("competencia");
-      return (data || []) as Ocorrencia[];
+      return (data || []) as unknown as Ocorrencia[];
     },
   });
 

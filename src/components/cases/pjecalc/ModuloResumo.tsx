@@ -375,7 +375,7 @@ export function ModuloResumo({ caseId }: Props) {
           .eq("origem", "CALCULADA");
         // Insert in batches of 500
         for (let i = 0; i < ocRows.length; i += 500) {
-          await supabase.from("pjecalc_ocorrencias").insert(ocRows.slice(i, i + 500));
+          await supabase.from("pjecalc_ocorrencias" as any).insert(ocRows.slice(i, i + 500));
         }
       }
 

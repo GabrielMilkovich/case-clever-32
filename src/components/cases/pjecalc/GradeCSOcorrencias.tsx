@@ -52,10 +52,10 @@ export function GradeCSOcorrencias({ caseId }: Props) {
       }
 
       const { data: params } = await supabase.from("pjecalc_parametros" as any).select("*").eq("case_id", caseId).maybeSingle();
-      if (!params?.data_admissao) { toast.error("Preencha parâmetros."); setGenerating(false); return; }
+      if (!(params as any)?.data_admissao) { toast.error("Preencha parâmetros."); setGenerating(false); return; }
 
-      const start = new Date(params.data_admissao + "T00:00:00");
-      const end = new Date((params.data_demissao || new Date().toISOString().slice(0, 10)) + "T00:00:00");
+      const start = new Date((params as any).data_admissao + "T00:00:00");
+      const end = new Date(((params as any).data_demissao || new Date().toISOString().slice(0, 10)) + "T00:00:00");
       const existingOcs = aba === 'DEVIDOS' ? devidos : pagos;
       const existingInformadas = strategy === 'MANTER_ALTERACOES_MANUAIS'
         ? existingOcs.filter((o: any) => o.origem === 'INFORMADA').map((o: any) => o.competencia) : [];
