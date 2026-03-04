@@ -205,7 +205,7 @@ export async function seedAdvancedTestCase(): Promise<string | null> {
     }
 
     // 10. FGTS config
-    await supabase.from("pjecalc_fgts_config").insert({
+    await supabase.from("pjecalc_fgts_config" as any).insert({
       case_id: caseId,
       apurar: true,
       multa_apurar: true,
@@ -216,7 +216,7 @@ export async function seedAdvancedTestCase(): Promise<string | null> {
     });
 
     // 11. Honorários
-    await supabase.from("pjecalc_honorarios").insert({
+    await supabase.from("pjecalc_honorarios" as any).insert({
       case_id: caseId,
       apurar_sucumbenciais: true,
       percentual_sucumbenciais: 10,

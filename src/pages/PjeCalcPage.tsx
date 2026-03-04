@@ -125,7 +125,7 @@ export default function PjeCalcPage() {
   const { data: params, isLoading: paramsLoading } = useQuery({
     queryKey: ["pjecalc_parametros", caseId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("pjecalc_parametros").select("*").eq("case_id", caseId).maybeSingle();
+      const { data, error } = await supabase.from("pjecalc_parametros" as any).select("*").eq("case_id", caseId).maybeSingle();
       if (error) throw error;
       return data;
     },
@@ -142,7 +142,7 @@ export default function PjeCalcPage() {
   const { data: faltas = [] } = useQuery({
     queryKey: ["pjecalc_faltas", caseId],
     queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_faltas").select("*").eq("case_id", caseId).order("data_inicial");
+      const { data } = await supabase.from("pjecalc_faltas" as any).select("*").eq("case_id", caseId).order("data_inicial");
       return data || [];
     },
   });
@@ -150,7 +150,7 @@ export default function PjeCalcPage() {
   const { data: ferias = [] } = useQuery({
     queryKey: ["pjecalc_ferias", caseId],
     queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_ferias").select("*").eq("case_id", caseId).order("periodo_aquisitivo_inicio");
+      const { data } = await supabase.from("pjecalc_ferias" as any).select("*").eq("case_id", caseId).order("periodo_aquisitivo_inicio");
       return data || [];
     },
   });
@@ -158,7 +158,7 @@ export default function PjeCalcPage() {
   const { data: historicos = [] } = useQuery({
     queryKey: ["pjecalc_historico", caseId],
     queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_historico_salarial").select("*").eq("case_id", caseId).order("periodo_inicio");
+      const { data } = await supabase.from("pjecalc_historico_salarial" as any).select("*").eq("case_id", caseId).order("periodo_inicio");
       return data || [];
     },
   });
@@ -166,7 +166,7 @@ export default function PjeCalcPage() {
   const { data: verbas = [] } = useQuery({
     queryKey: ["pjecalc_verbas", caseId],
     queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_verbas").select("*").eq("case_id", caseId).order("ordem");
+      const { data } = await supabase.from("pjecalc_verbas" as any).select("*").eq("case_id", caseId).order("ordem");
       return data || [];
     },
   });
@@ -755,7 +755,7 @@ export default function PjeCalcPage() {
                       <Button variant="outline" size="sm" className="h-7 text-[10px] px-2" onClick={() => setSelectedVerbaForGrid(v)}>
                         <BarChart3 className="h-3 w-3 mr-1" /> Grade
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={async () => { await supabase.from("pjecalc_verbas").delete().eq("id", v.id); queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] }); registrarAuditLog(caseId!, 'Verbas', 'exclusao', { valorAnterior: v.nome }); }}><Trash2 className="h-3 w-3" /></Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={async () => { await supabase.from("pjecalc_verbas" as any).delete().eq("id", v.id); queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] }); registrarAuditLog(caseId!, 'Verbas', 'exclusao', { valorAnterior: v.nome }); }}><Trash2 className="h-3 w-3" /></Button>
                     </div>
                   </div>
                 </CardContent>

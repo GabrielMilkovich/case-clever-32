@@ -232,7 +232,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
       if (factMap.municipio || factMap.cidade) autoParams.municipio = factMap.municipio || factMap.cidade;
 
       if (params?.id) {
-        const { error } = await supabase.from("pjecalc_parametros").update(autoParams).eq("id", params.id);
+        const { error } = await supabase.from("pjecalc_parametros" as any).update(autoParams).eq("id", params.id);
         if (error) errors.push(`Parâmetros: ${error.message}`);
       } else {
         // Ensure NOT NULL columns have fallback values
@@ -240,7 +240,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
         if (!autoParams.data_ajuizamento) autoParams.data_ajuizamento = new Date().toISOString().slice(0, 10);
         autoParams.regime_trabalho = 'tempo_integral';
         autoParams.sabado_dia_util = true;
-        const { error } = await supabase.from("pjecalc_parametros").insert(autoParams);
+        const { error } = await supabase.from("pjecalc_parametros" as any).insert(autoParams);
         if (error) errors.push(`Parâmetros: ${error.message}`);
       }
 
@@ -559,7 +559,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
         <h2 className="text-lg font-semibold">Férias</h2>
         <Button size="sm" variant="outline" onClick={async () => {
           if (!formParams.data_admissao || !formParams.data_demissao) { toast.error("Preencha as datas nos Parâmetros."); return; }
-          await supabase.from("pjecalc_ferias").delete().eq("case_id", caseId);
+          await supabase.from("pjecalc_ferias" as any).delete().eq("case_id", caseId);
           const adm = new Date(formParams.data_admissao), dem = new Date(formParams.data_demissao);
           const periodos: any[] = [];
           let aqInicio = new Date(adm);
@@ -665,7 +665,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
                 <Badge variant="secondary" className="text-[10px]">{h.tipo_valor}</Badge>
                 {h.incidencia_fgts && <Badge variant="outline" className="text-[10px]">FGTS</Badge>}
                 {h.incidencia_cs && <Badge variant="outline" className="text-[10px]">CS</Badge>}
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={async () => { await supabase.from("pjecalc_historico_salarial").delete().eq("id", h.id); queryClient.invalidateQueries({ queryKey: ["pjecalc_historico", caseId] }); }}><Trash2 className="h-3 w-3" /></Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={async () => { await supabase.from("pjecalc_historico_salarial" as any).delete().eq("id", h.id); queryClient.invalidateQueries({ queryKey: ["pjecalc_historico", caseId] }); }}><Trash2 className="h-3 w-3" /></Button>
               </div>
             </div>
           </CardHeader>
@@ -745,7 +745,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-[10px] font-mono">{principal.periodo_inicio?.slice(0, 7)} → {principal.periodo_fim?.slice(0, 7)}</Badge>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={async () => { await supabase.from("pjecalc_verbas").delete().eq("id", principal.id); queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] }); }}><Trash2 className="h-3 w-3" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={async () => { await supabase.from("pjecalc_verbas" as any).delete().eq("id", principal.id); queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] }); }}><Trash2 className="h-3 w-3" /></Button>
                       </div>
                     </div>
                   </CardContent>
