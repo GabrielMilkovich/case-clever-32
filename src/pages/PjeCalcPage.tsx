@@ -52,6 +52,7 @@ import { DashboardProdutividade } from "@/components/cases/pjecalc/DashboardProd
 import { AuditLog, registrarAuditLog } from "@/components/cases/pjecalc/AuditLog";
 import { ObservacoesModulo } from "@/components/cases/pjecalc/ObservacoesModulo";
 import { AssistenteContextual } from "@/components/cases/pjecalc/AssistenteContextual";
+import { ImportadorFichaFinanceira } from "@/components/cases/pjecalc/ImportadorFichaFinanceira";
 import { MemoriaCalculoExpandida } from "@/components/cases/pjecalc/MemoriaCalculoExpandida";
 import { ComparacaoCenarios } from "@/components/cases/pjecalc/ComparacaoCenarios";
 import { calcularCompletude, getRastreabilidadeGeral, type ModuleStatus } from "@/lib/pjecalc/completude";
