@@ -2581,6 +2581,8 @@ export type Database = {
       pjecalc_atualizacao_config: {
         Row: {
           calculo_id: string
+          combinacoes_indice: string | null
+          combinacoes_juros: string | null
           created_at: string | null
           id: string
           observacoes: string | null
@@ -2590,6 +2592,8 @@ export type Database = {
         }
         Insert: {
           calculo_id: string
+          combinacoes_indice?: string | null
+          combinacoes_juros?: string | null
           created_at?: string | null
           id?: string
           observacoes?: string | null
@@ -2599,6 +2603,8 @@ export type Database = {
         }
         Update: {
           calculo_id?: string
+          combinacoes_indice?: string | null
+          combinacoes_juros?: string | null
           created_at?: string | null
           id?: string
           observacoes?: string | null
