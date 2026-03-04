@@ -9,7 +9,7 @@ export async function seedCasoMarcelo(): Promise<string> {
   if (!user) throw new Error("Sessão expirada");
 
   // 1. Case
-  const { data: c, error: cErr } = await supabase.from("cases").insert({
+  const { data: c, error: cErr } = await supabase.from("cases" as any).insert({
     cliente: "Marcelo Henrique Pires",
     numero_processo: "0012458-77.2023.5.03.0015",
     tribunal: "15ª Vara do Trabalho de Contagem - TRT 3ª Região",
@@ -22,13 +22,13 @@ export async function seedCasoMarcelo(): Promise<string> {
 
   try {
     // 2. Parties
-    await supabase.from("parties").insert([
+    await supabase.from("parties" as any).insert([
       { case_id: caseId, nome: "Marcelo Henrique Pires", tipo: "reclamante" as any, documento: "456.321.987-22", documento_tipo: "CPF" },
       { case_id: caseId, nome: "Horizonte Serviços Industriais LTDA", tipo: "reclamada" as any, documento: "27.654.321/0001-40", documento_tipo: "CNPJ" },
     ]);
 
     // 3. Employment contract
-    await supabase.from("employment_contracts").insert({
+    await supabase.from("employment_contracts" as any).insert({
       case_id: caseId,
       data_admissao: "2017-06-17",
       data_demissao: "2023-11-23",
@@ -60,7 +60,7 @@ export async function seedCasoMarcelo(): Promise<string> {
       { chave: "uf", valor: "MG", tipo: "texto" as any },
       { chave: "municipio", valor: "Contagem", tipo: "texto" as any },
     ];
-    await supabase.from("facts").insert(
+    await supabase.from("facts" as any).insert(
       facts.map(f => ({
         case_id: caseId, ...f,
         origem: "manual" as any, confirmado: true,
@@ -70,7 +70,7 @@ export async function seedCasoMarcelo(): Promise<string> {
 
     // 5. Parâmetros
     // Aviso prévio: 17/06/2017 → 23/11/2023 = ~6 anos 5 meses → 30 + 6×3 = 48 dias
-    await supabase.from("pjecalc_parametros").insert({
+    await supabase.from("pjecalc_parametros" as any).insert({
       case_id: caseId,
       data_admissao: "2017-06-17",
       data_demissao: "2023-11-23",
@@ -101,12 +101,12 @@ export async function seedCasoMarcelo(): Promise<string> {
       { nome: "Salário", periodo_inicio: "2022-01-01", periodo_fim: "2023-06-30", valor_informado: 2950, tipo_valor: "mensal" },
       { nome: "Salário", periodo_inicio: "2023-07-01", periodo_fim: "2023-11-23", valor_informado: 3400, tipo_valor: "mensal" },
     ];
-    await supabase.from("pjecalc_historico_salarial").insert(
+    await supabase.from("pjecalc_historico_salarial" as any).insert(
       hist.map(h => ({ case_id: caseId, ...h, incidencia_fgts: true, incidencia_cs: true }))
     );
 
     // 7. Faltas
-    await supabase.from("pjecalc_faltas").insert([
+    await supabase.from("pjecalc_faltas" as any).insert([
       { case_id: caseId, data_inicial: "2018-02-12", data_final: "2018-02-12", justificada: false },
       { case_id: caseId, data_inicial: "2019-09-05", data_final: "2019-09-06", justificada: false },
       { case_id: caseId, data_inicial: "2021-04-14", data_final: "2021-04-14", justificada: true, justificativa: "Falta justificada" },
@@ -114,7 +114,7 @@ export async function seedCasoMarcelo(): Promise<string> {
     ]);
 
     // 8. Férias
-    await supabase.from("pjecalc_ferias").insert([
+    await supabase.from("pjecalc_ferias" as any).insert([
       {
         case_id: caseId,
         periodo_aquisitivo_inicio: "2017-06-17", periodo_aquisitivo_fim: "2018-06-16",
@@ -162,7 +162,7 @@ export async function seedCasoMarcelo(): Promise<string> {
     const incidenciasPadrao = { dsr: true, decimo_terceiro: true, ferias: true, fgts: true, aviso_previo: true };
 
     // HE 50%
-    const { data: he50 } = await supabase.from("pjecalc_verbas").insert({
+    const { data: he50 } = await supabase.from("pjecalc_verbas" as any).insert({
       case_id: caseId, nome: "Horas Extras 50%", tipo: "principal", caracteristica: "comum",
       ocorrencia_pagamento: "mensal", multiplicador: 1.5, divisor_informado: 220,
       quantidade_informada: 22, tipo_quantidade: "informada",
@@ -171,7 +171,7 @@ export async function seedCasoMarcelo(): Promise<string> {
     }).select("id").single();
 
     // HE 100%
-    const { data: he100 } = await supabase.from("pjecalc_verbas").insert({
+    const { data: he100 } = await supabase.from("pjecalc_verbas" as any).insert({
       case_id: caseId, nome: "Horas Extras 100%", tipo: "principal", caracteristica: "comum",
       ocorrencia_pagamento: "mensal", multiplicador: 2.0, divisor_informado: 220,
       quantidade_informada: 9, tipo_quantidade: "informada",
@@ -180,7 +180,7 @@ export async function seedCasoMarcelo(): Promise<string> {
     }).select("id").single();
 
     // Adicional Noturno
-    const { data: adicNot } = await supabase.from("pjecalc_verbas").insert({
+    const { data: adicNot } = await supabase.from("pjecalc_verbas" as any).insert({
       case_id: caseId, nome: "Adicional Noturno", tipo: "principal", caracteristica: "comum",
       ocorrencia_pagamento: "mensal", multiplicador: 0.2, divisor_informado: 220,
       quantidade_informada: 48, tipo_quantidade: "informada",
@@ -189,7 +189,7 @@ export async function seedCasoMarcelo(): Promise<string> {
     }).select("id").single();
 
     // Intervalo Intrajornada Suprimido
-    const { data: intervalo } = await supabase.from("pjecalc_verbas").insert({
+    const { data: intervalo } = await supabase.from("pjecalc_verbas" as any).insert({
       case_id: caseId, nome: "Intervalo Intrajornada Suprimido", tipo: "principal", caracteristica: "comum",
       ocorrencia_pagamento: "mensal", multiplicador: 1.5, divisor_informado: 220,
       quantidade_informada: 22, tipo_quantidade: "informada",
@@ -198,7 +198,7 @@ export async function seedCasoMarcelo(): Promise<string> {
     }).select("id").single();
 
     // Adicional de Periculosidade
-    const { data: periculosidade } = await supabase.from("pjecalc_verbas").insert({
+    const { data: periculosidade } = await supabase.from("pjecalc_verbas" as any).insert({
       case_id: caseId, nome: "Adicional de Periculosidade", tipo: "principal", caracteristica: "comum",
       ocorrencia_pagamento: "mensal", multiplicador: 0.3, divisor_informado: 1,
       quantidade_informada: 1, tipo_quantidade: "informada",
@@ -217,7 +217,7 @@ export async function seedCasoMarcelo(): Promise<string> {
         { nome: "Férias + 1/3", caracteristica: "ferias", ocorrencia_pagamento: "periodo_aquisitivo", multiplicador: 1.3333, divisor_informado: 12 },
       ];
       for (const ref of reflexas) {
-        await supabase.from("pjecalc_verbas").insert({
+        await supabase.from("pjecalc_verbas" as any).insert({
           case_id: caseId, ...ref, tipo: "reflexa",
           periodo_inicio: periodo.inicio, periodo_fim: periodo.fim,
           ordem: ordem++,
@@ -228,7 +228,7 @@ export async function seedCasoMarcelo(): Promise<string> {
     }
 
     // 11. FGTS config
-    await supabase.from("pjecalc_fgts_config").insert({
+    await supabase.from("pjecalc_fgts_config" as any).insert({
       case_id: caseId,
       apurar: true,
       multa_apurar: true,
@@ -284,7 +284,7 @@ export async function seedCasoMarcelo(): Promise<string> {
     });
 
     // 15. Honorários sucumbenciais
-    await supabase.from("pjecalc_honorarios").insert({
+    await supabase.from("pjecalc_honorarios" as any).insert({
       case_id: caseId,
       apurar_sucumbenciais: true,
       percentual_sucumbenciais: 10,

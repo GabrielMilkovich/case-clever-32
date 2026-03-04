@@ -27,7 +27,7 @@ export function GradeCSOcorrencias({ caseId }: Props) {
   const { data: devidos = [] } = useQuery({
     queryKey: queryKeyD,
     queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_cs_ocorrencias")
+      const { data } = await supabase.from("pjecalc_cs_ocorrencias" as any)
         .select("*").eq("calculo_id", caseId).eq("aba", "DEVIDOS").order("competencia");
       return (data || []) as any[];
     },
@@ -36,7 +36,7 @@ export function GradeCSOcorrencias({ caseId }: Props) {
   const { data: pagos = [] } = useQuery({
     queryKey: queryKeyP,
     queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_cs_ocorrencias")
+      const { data } = await supabase.from("pjecalc_cs_ocorrencias" as any)
         .select("*").eq("calculo_id", caseId).eq("aba", "PAGOS").order("competencia");
       return (data || []) as any[];
     },
@@ -46,12 +46,12 @@ export function GradeCSOcorrencias({ caseId }: Props) {
     setGenerating(true);
     try {
       if (strategy === 'SOBRESCREVER_TUDO') {
-        await supabase.from("pjecalc_cs_ocorrencias").delete().eq("calculo_id", caseId).eq("aba", aba);
+        await supabase.from("pjecalc_cs_ocorrencias" as any).delete().eq("calculo_id", caseId).eq("aba", aba);
       } else {
-        await supabase.from("pjecalc_cs_ocorrencias").delete().eq("calculo_id", caseId).eq("aba", aba).eq("origem", "CALCULADA");
+        await supabase.from("pjecalc_cs_ocorrencias" as any).delete().eq("calculo_id", caseId).eq("aba", aba).eq("origem", "CALCULADA");
       }
 
-      const { data: params } = await supabase.from("pjecalc_parametros").select("*").eq("case_id", caseId).maybeSingle();
+      const { data: params } = await supabase.from("pjecalc_parametros" as any).select("*").eq("case_id", caseId).maybeSingle();
       if (!params?.data_admissao) { toast.error("Preencha parâmetros."); setGenerating(false); return; }
 
       const start = new Date(params.data_admissao + "T00:00:00");
@@ -73,7 +73,7 @@ export function GradeCSOcorrencias({ caseId }: Props) {
         cur.setMonth(cur.getMonth() + 1);
       }
 
-      if (rows.length > 0) await supabase.from("pjecalc_cs_ocorrencias").insert(rows);
+      if (rows.length > 0) await supabase.from("pjecalc_cs_ocorrencias" as any).insert(rows);
       qc.invalidateQueries({ queryKey: aba === 'DEVIDOS' ? queryKeyD : queryKeyP });
       toast.success(`${rows.length} ocorrências CS (${aba}) geradas`);
     } catch (e) { toast.error((e as Error).message); }
@@ -82,17 +82,17 @@ export function GradeCSOcorrencias({ caseId }: Props) {
 
   const updateCell = async (id: string, field: string, value: number | boolean, aba: string) => {
     const updates: any = { [field]: value, origem: 'INFORMADA', updated_at: new Date().toISOString() };
-    await supabase.from("pjecalc_cs_ocorrencias").update(updates).eq("id", id);
+    await supabase.from("pjecalc_cs_ocorrencias" as any).update(updates).eq("id", id);
     qc.invalidateQueries({ queryKey: aba === 'DEVIDOS' ? queryKeyD : queryKeyP });
   };
 
   const copiarDevidosParaPagos = async () => {
-    await supabase.from("pjecalc_cs_ocorrencias").delete().eq("calculo_id", caseId).eq("aba", "PAGOS");
+    await supabase.from("pjecalc_cs_ocorrencias" as any).delete().eq("calculo_id", caseId).eq("aba", "PAGOS");
     const rows = devidos.map((d: any) => ({
       calculo_id: caseId, competencia: d.competencia, aba: 'PAGOS', ativa: d.ativa, origem: 'CALCULADA',
       base: d.base, segurado: d.segurado, empresa: d.empresa, sat: d.sat, terceiros: d.terceiros, total: d.total,
     }));
-    if (rows.length > 0) await supabase.from("pjecalc_cs_ocorrencias").insert(rows);
+    if (rows.length > 0) await supabase.from("pjecalc_cs_ocorrencias" as any).insert(rows);
     qc.invalidateQueries({ queryKey: queryKeyP });
     toast.success(`${rows.length} valores copiados Devidos → Pagos`);
   };
