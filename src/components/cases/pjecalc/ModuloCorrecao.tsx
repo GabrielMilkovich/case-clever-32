@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Save, Loader2, Info, TrendingUp } from "lucide-react";
+import { CombinacaoPorData } from "./CombinacaoPorData";
+import type { CombinacaoIndice, CombinacaoJuros } from "@/lib/pjecalc/correction-by-date";
 
 // =====================================================
 // 11 ÍNDICES OFICIAIS DO PJe-CALC CSJT
@@ -53,24 +55,41 @@ export function ModuloCorrecao({ caseId }: Props) {
     data_liquidacao: new Date().toISOString().slice(0, 10),
   });
 
+  const [combinacoesIndice, setCombinacoesIndice] = useState<CombinacaoIndice[]>([
+    { ate: "", indice: "IPCAE" },
+  ]);
+  const [combinacoesJuros, setCombinacoesJuros] = useState<CombinacaoJuros[]>([
+    { ate: "", tipo: "TRD_SIMPLES", percentual: 1 },
+  ]);
+  const [showCombinacoes, setShowCombinacoes] = useState(false);
+
   useEffect(() => {
-    if (data) setForm({
-      indice: data.indice || 'IPCA-E',
-      indice_pos_citacao: data.indice_pos_citacao || 'SELIC',
-      transicao_adc58: data.transicao_adc58 ?? true,
-      data_citacao: data.data_citacao || '',
-      epoca: data.epoca || 'mensal',
-      data_fixa: data.data_fixa || '',
-      juros_tipo: data.juros_tipo || 'selic',
-      juros_percentual: data.juros_percentual ?? 1,
-      juros_inicio: data.juros_inicio || 'ajuizamento',
-      juros_pro_rata: data.juros_pro_rata ?? true,
-      multa_523: data.multa_523 ?? false,
-      multa_523_percentual: data.multa_523_percentual ?? 10,
-      multa_467: data.multa_467 ?? false,
-      multa_467_percentual: data.multa_467_percentual ?? 50,
-      data_liquidacao: data.data_liquidacao || new Date().toISOString().slice(0, 10),
-    });
+    if (data) {
+      setForm({
+        indice: data.indice || 'IPCA-E',
+        indice_pos_citacao: data.indice_pos_citacao || 'SELIC',
+        transicao_adc58: data.transicao_adc58 ?? true,
+        data_citacao: data.data_citacao || '',
+        epoca: data.epoca || 'mensal',
+        data_fixa: data.data_fixa || '',
+        juros_tipo: data.juros_tipo || 'selic',
+        juros_percentual: data.juros_percentual ?? 1,
+        juros_inicio: data.juros_inicio || 'ajuizamento',
+        juros_pro_rata: data.juros_pro_rata ?? true,
+        multa_523: data.multa_523 ?? false,
+        multa_523_percentual: data.multa_523_percentual ?? 10,
+        multa_467: data.multa_467 ?? false,
+        multa_467_percentual: data.multa_467_percentual ?? 50,
+        data_liquidacao: data.data_liquidacao || new Date().toISOString().slice(0, 10),
+      });
+      // Load combinações if stored
+      if (data.combinacoes_indice) {
+        try { setCombinacoesIndice(JSON.parse(data.combinacoes_indice)); } catch {}
+      }
+      if (data.combinacoes_juros) {
+        try { setCombinacoesJuros(JSON.parse(data.combinacoes_juros)); } catch {}
+      }
+    }
   }, [data]);
 
   const save = async () => {
@@ -83,6 +102,8 @@ export function ModuloCorrecao({ caseId }: Props) {
         multa_467_percentual: Number(form.multa_467_percentual),
         data_fixa: form.data_fixa || null,
         data_citacao: form.data_citacao || null,
+        combinacoes_indice: JSON.stringify(combinacoesIndice),
+        combinacoes_juros: JSON.stringify(combinacoesJuros),
       };
       if (data?.id) await supabase.from("pjecalc_correcao_config" as any).update(payload).eq("id", data.id);
       else await supabase.from("pjecalc_correcao_config" as any).insert(payload);
@@ -100,6 +121,9 @@ export function ModuloCorrecao({ caseId }: Props) {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Correção, Juros e Multa</h2>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowCombinacoes(!showCombinacoes)}>
+            <TrendingUp className="h-4 w-4 mr-1" /> {showCombinacoes ? 'Ocultar' : 'Combinações por Data'}
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setShowIndexInfo(!showIndexInfo)}>
             <Info className="h-4 w-4 mr-1" /> {showIndexInfo ? 'Ocultar' : 'Índices'}
           </Button>
@@ -244,6 +268,19 @@ export function ModuloCorrecao({ caseId }: Props) {
           <p className="text-[10px] text-muted-foreground">ADC 58/59: IPCA-E pré-judicial + SELIC pós-citação. Art. 39, §1º, Lei 8.177/91: juros 1% a.m. pro rata die entre ajuizamento e citação.</p>
         </CardContent>
       </Card>
+
+      {/* Combinação por Data (estilo PJe-Calc) */}
+      {showCombinacoes && (
+        <CombinacaoPorData
+          combinacoesIndice={combinacoesIndice}
+          combinacoesJuros={combinacoesJuros}
+          onChange={(indice, juros) => {
+            setCombinacoesIndice(indice);
+            setCombinacoesJuros(juros);
+          }}
+        />
+      )}
+
       <Card>
         <CardHeader className="pb-3"><CardTitle className="text-sm">Multas</CardTitle></CardHeader>
         <CardContent className="space-y-3">

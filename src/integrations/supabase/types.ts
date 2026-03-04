@@ -2581,6 +2581,8 @@ export type Database = {
       pjecalc_atualizacao_config: {
         Row: {
           calculo_id: string
+          combinacoes_indice: string | null
+          combinacoes_juros: string | null
           created_at: string | null
           id: string
           observacoes: string | null
@@ -2590,6 +2592,8 @@ export type Database = {
         }
         Insert: {
           calculo_id: string
+          combinacoes_indice?: string | null
+          combinacoes_juros?: string | null
           created_at?: string | null
           id?: string
           observacoes?: string | null
@@ -2599,6 +2603,8 @@ export type Database = {
         }
         Update: {
           calculo_id?: string
+          combinacoes_indice?: string | null
+          combinacoes_juros?: string | null
           created_at?: string | null
           id?: string
           observacoes?: string | null
@@ -5086,10 +5092,25 @@ export type Database = {
       pjecalc_correcao_config: {
         Row: {
           case_id: string | null
-          config: Json | null
+          combinacoes_indice: string | null
+          combinacoes_juros: string | null
           created_at: string | null
+          data_citacao: string | null
+          data_fixa: string | null
+          data_liquidacao: string | null
+          epoca: string | null
           id: string | null
-          indice_correcao: string | null
+          indice: string | null
+          indice_pos_citacao: string | null
+          juros_inicio: string | null
+          juros_percentual: number | null
+          juros_pro_rata: boolean | null
+          juros_tipo: string | null
+          multa_467: boolean | null
+          multa_467_percentual: number | null
+          multa_523: boolean | null
+          multa_523_percentual: number | null
+          transicao_adc58: boolean | null
         }
         Relationships: [
           {
