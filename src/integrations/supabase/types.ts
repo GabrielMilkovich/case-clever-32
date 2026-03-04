@@ -1227,6 +1227,88 @@ export type Database = {
           },
         ]
       }
+      document_pipeline: {
+        Row: {
+          case_id: string
+          created_at: string
+          document_id: string
+          empresa_detectada: string | null
+          hash: string | null
+          id: string
+          metadata: Json | null
+          pages_count: number | null
+          periodo_detectado_fim: string | null
+          periodo_detectado_inicio: string | null
+          pipeline_type: Database["public"]["Enums"]["pipeline_doc_type"]
+          status: string
+          template_detectado: string | null
+          template_version: string | null
+          updated_at: string
+          user_id: string
+          validation_warnings: Json | null
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          document_id: string
+          empresa_detectada?: string | null
+          hash?: string | null
+          id?: string
+          metadata?: Json | null
+          pages_count?: number | null
+          periodo_detectado_fim?: string | null
+          periodo_detectado_inicio?: string | null
+          pipeline_type?: Database["public"]["Enums"]["pipeline_doc_type"]
+          status?: string
+          template_detectado?: string | null
+          template_version?: string | null
+          updated_at?: string
+          user_id: string
+          validation_warnings?: Json | null
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          document_id?: string
+          empresa_detectada?: string | null
+          hash?: string | null
+          id?: string
+          metadata?: Json | null
+          pages_count?: number | null
+          periodo_detectado_fim?: string | null
+          periodo_detectado_inicio?: string | null
+          pipeline_type?: Database["public"]["Enums"]["pipeline_doc_type"]
+          status?: string
+          template_detectado?: string | null
+          template_version?: string | null
+          updated_at?: string
+          user_id?: string
+          validation_warnings?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_pipeline_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "document_pipeline_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_pipeline_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_queue: {
         Row: {
           case_id: string
@@ -1476,6 +1558,98 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      extracao_item: {
+        Row: {
+          bbox: Json | null
+          case_id: string
+          competencia: string | null
+          confidence: number | null
+          created_at: string
+          evidence_text: string | null
+          field_key: string
+          id: string
+          page: number | null
+          pipeline_id: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source_doc_id: string | null
+          status: Database["public"]["Enums"]["extracao_status"]
+          target_field: string | null
+          target_table: string | null
+          valor: string | null
+        }
+        Insert: {
+          bbox?: Json | null
+          case_id: string
+          competencia?: string | null
+          confidence?: number | null
+          created_at?: string
+          evidence_text?: string | null
+          field_key: string
+          id?: string
+          page?: number | null
+          pipeline_id: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_doc_id?: string | null
+          status?: Database["public"]["Enums"]["extracao_status"]
+          target_field?: string | null
+          target_table?: string | null
+          valor?: string | null
+        }
+        Update: {
+          bbox?: Json | null
+          case_id?: string
+          competencia?: string | null
+          confidence?: number | null
+          created_at?: string
+          evidence_text?: string | null
+          field_key?: string
+          id?: string
+          page?: number | null
+          pipeline_id?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_doc_id?: string | null
+          status?: Database["public"]["Enums"]["extracao_status"]
+          target_field?: string | null
+          target_table?: string | null
+          valor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extracao_item_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "extracao_item_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extracao_item_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "document_pipeline"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extracao_item_source_doc_id_fkey"
+            columns: ["source_doc_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
             referencedColumns: ["id"]
           },
         ]
@@ -1802,6 +1976,86 @@ export type Database = {
             columns: ["chunk_id"]
             isOneToOne: false
             referencedRelation: "doc_chunks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fonte_conflito: {
+        Row: {
+          campo: string
+          case_id: string
+          competencia: string
+          created_at: string
+          fonte_a_doc_id: string | null
+          fonte_b_doc_id: string | null
+          id: string
+          justificativa: string | null
+          resolvido_em: string | null
+          resolvido_por: string | null
+          status: string
+          valor_escolhido: string | null
+          valor_fonte_a: string | null
+          valor_fonte_b: string | null
+        }
+        Insert: {
+          campo: string
+          case_id: string
+          competencia: string
+          created_at?: string
+          fonte_a_doc_id?: string | null
+          fonte_b_doc_id?: string | null
+          id?: string
+          justificativa?: string | null
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          status?: string
+          valor_escolhido?: string | null
+          valor_fonte_a?: string | null
+          valor_fonte_b?: string | null
+        }
+        Update: {
+          campo?: string
+          case_id?: string
+          competencia?: string
+          created_at?: string
+          fonte_a_doc_id?: string | null
+          fonte_b_doc_id?: string | null
+          id?: string
+          justificativa?: string | null
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          status?: string
+          valor_escolhido?: string | null
+          valor_fonte_a?: string | null
+          valor_fonte_b?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fonte_conflito_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "fonte_conflito_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fonte_conflito_fonte_a_doc_id_fkey"
+            columns: ["fonte_a_doc_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fonte_conflito_fonte_b_doc_id_fkey"
+            columns: ["fonte_b_doc_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
             referencedColumns: ["id"]
           },
         ]
@@ -4485,6 +4739,54 @@ export type Database = {
           },
         ]
       }
+      rubrica_map: {
+        Row: {
+          categoria: string | null
+          codigo_original: string
+          created_at: string
+          created_by: string | null
+          descricao_original: string
+          empresa_pattern: string | null
+          id: string
+          is_pgto: boolean | null
+          priority: number | null
+          regex_pattern: string | null
+          rubrica_destino: string
+          updated_at: string
+          version: number | null
+        }
+        Insert: {
+          categoria?: string | null
+          codigo_original: string
+          created_at?: string
+          created_by?: string | null
+          descricao_original: string
+          empresa_pattern?: string | null
+          id?: string
+          is_pgto?: boolean | null
+          priority?: number | null
+          regex_pattern?: string | null
+          rubrica_destino: string
+          updated_at?: string
+          version?: number | null
+        }
+        Update: {
+          categoria?: string | null
+          codigo_original?: string
+          created_at?: string
+          created_by?: string | null
+          descricao_original?: string
+          empresa_pattern?: string | null
+          id?: string
+          is_pgto?: boolean | null
+          priority?: number | null
+          regex_pattern?: string | null
+          rubrica_destino?: string
+          updated_at?: string
+          version?: number | null
+        }
+        Relationships: []
+      }
       rubrica_requirements: {
         Row: {
           alerta_sem_prova: string | null
@@ -6318,9 +6620,17 @@ export type Database = {
         | "cartao_ponto"
         | "sentenca"
         | "outro"
+      extracao_status: "AUTO" | "REVISAR" | "CONFIRMADO" | "REJEITADO"
       fact_origem: "ia_extracao" | "usuario" | "documento"
       fact_type: "data" | "moeda" | "numero" | "texto" | "boolean"
       party_type: "reclamante" | "reclamada"
+      pipeline_doc_type:
+        | "CTPS"
+        | "CARTAO_PONTO"
+        | "FICHA_FINANCEIRA"
+        | "CONTRACHEQUE"
+        | "PJC"
+        | "OUTRO"
       processing_status:
         | "pending"
         | "queued"
@@ -6474,9 +6784,18 @@ export const Constants = {
         "sentenca",
         "outro",
       ],
+      extracao_status: ["AUTO", "REVISAR", "CONFIRMADO", "REJEITADO"],
       fact_origem: ["ia_extracao", "usuario", "documento"],
       fact_type: ["data", "moeda", "numero", "texto", "boolean"],
       party_type: ["reclamante", "reclamada"],
+      pipeline_doc_type: [
+        "CTPS",
+        "CARTAO_PONTO",
+        "FICHA_FINANCEIRA",
+        "CONTRACHEQUE",
+        "PJC",
+        "OUTRO",
+      ],
       processing_status: [
         "pending",
         "queued",
