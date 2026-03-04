@@ -31,6 +31,8 @@ import { ModuloCartaoPontoDiario } from "./ModuloCartaoPontoDiario";
 import { ImportadorFichaFinanceira } from "./ImportadorFichaFinanceira";
 import { ExtractionReviewPanel } from "./ExtractionReviewPanel";
 import { ValidationPanel } from "./ValidationPanel";
+import { CTPSUploader } from "./CTPSUploader";
+import { DocumentPipelineStatus } from "./DocumentPipelineStatus";
 import { calcularCompletude, type ModuleStatus } from "@/lib/pjecalc/completude";
 import type { ValidationInput } from "@/lib/pjecalc/validation-engine";
 
@@ -164,40 +166,38 @@ export function WizardCalculo({ caseId, onComplete, onExit }: WizardProps) {
       case 'ctps':
         return (
           <div className="space-y-4">
-            <Card>
-              <CardHeader><CardTitle className="text-sm">Upload CTPS</CardTitle></CardHeader>
-              <CardContent>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Faça upload da CTPS para extrair automaticamente férias, faltas e afastamentos.
-                  Após upload, revise os dados extraídos no módulo Férias e Faltas do cálculo.
-                </p>
-                <div className="flex gap-2">
-                  <Badge variant="outline">{ferias.length} férias</Badge>
-                  <Badge variant="outline">{faltas.length} faltas/afastamentos</Badge>
-                </div>
-                {ferias.length === 0 && faltas.length === 0 && (
-                  <div className="mt-4 p-4 rounded-lg border border-dashed border-muted-foreground/30 text-center">
-                    <Upload className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
-                    <p className="text-xs text-muted-foreground">
-                      Nenhum evento cadastrado. Use o módulo completo (Férias/Faltas na sidebar) para cadastrar manualmente
-                      ou importar via documento.
-                    </p>
+            <CTPSUploader caseId={caseId} onExtracted={() => {
+              qc.invalidateQueries({ queryKey: ["pjecalc_ferias", caseId] });
+              qc.invalidateQueries({ queryKey: ["pjecalc_faltas", caseId] });
+            }} />
+            
+            <DocumentPipelineStatus caseId={caseId} />
+
+            {(ferias.length > 0 || faltas.length > 0) && (
+              <Card>
+                <CardHeader><CardTitle className="text-sm">Eventos Registrados</CardTitle></CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex gap-2 mb-2">
+                    <Badge variant="outline">{ferias.length} férias</Badge>
+                    <Badge variant="outline">{faltas.length} faltas/afastamentos</Badge>
                   </div>
-                )}
-                {ferias.length > 0 && (
-                  <div className="mt-4 space-y-2">
-                    <h4 className="text-xs font-semibold">Férias Registradas</h4>
-                    {ferias.map((f: any, i: number) => (
-                      <div key={i} className="flex items-center gap-2 text-xs p-2 rounded bg-muted/30">
-                        <CheckCircle2 className="h-3 w-3 text-[hsl(var(--success))]" />
-                        <span>{f.periodo_aquisitivo_inicio} → {f.periodo_aquisitivo_fim}</span>
-                        <Badge variant="secondary" className="text-[9px]">{f.situacao || 'GOZADAS'}</Badge>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  {ferias.map((f: any, i: number) => (
+                    <div key={i} className="flex items-center gap-2 text-xs p-2 rounded bg-muted/30">
+                      <CheckCircle2 className="h-3 w-3 text-[hsl(var(--success))]" />
+                      <span>{f.periodo_aquisitivo_inicio} → {f.periodo_aquisitivo_fim}</span>
+                      <Badge variant="secondary" className="text-[9px]">{f.situacao || 'GOZADAS'}</Badge>
+                    </div>
+                  ))}
+                  {faltas.map((f: any, i: number) => (
+                    <div key={`f${i}`} className="flex items-center gap-2 text-xs p-2 rounded bg-muted/30">
+                      <AlertTriangle className="h-3 w-3 text-amber-500" />
+                      <span>{f.data_inicial} → {f.data_final}</span>
+                      <Badge variant="outline" className="text-[9px]">{f.tipo_falta || f.motivo || 'FALTA'}</Badge>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
           </div>
         );
       case 'ponto':
