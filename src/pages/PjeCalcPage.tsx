@@ -633,12 +633,15 @@ export default function PjeCalcPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Histórico Salarial</h2>
-        <Button size="sm" onClick={async () => {
-          if (!formParams.data_admissao) { toast.error("Preencha a data de admissão."); return; }
-          await supabase.from("pjecalc_historico_salarial").insert({ case_id: caseId!, nome: `Salário Base ${historicos.length + 1}`, periodo_inicio: formParams.data_admissao, periodo_fim: formParams.data_demissao || new Date().toISOString().slice(0, 10), tipo_valor: 'informado', incidencia_fgts: true, incidencia_cs: true });
-          queryClient.invalidateQueries({ queryKey: ["pjecalc_historico", caseId] });
-          registrarAuditLog(caseId!, 'Histórico', 'criacao');
-        }}><Plus className="h-4 w-4 mr-1" /> Nova Base</Button>
+        <div className="flex gap-2">
+          <ImportadorFichaFinanceira caseId={caseId!} onImported={() => queryClient.invalidateQueries({ queryKey: ["pjecalc_historico", caseId] })} />
+          <Button size="sm" onClick={async () => {
+            if (!formParams.data_admissao) { toast.error("Preencha a data de admissão."); return; }
+            await supabase.from("pjecalc_historico_salarial").insert({ case_id: caseId!, nome: `Salário Base ${historicos.length + 1}`, periodo_inicio: formParams.data_admissao, periodo_fim: formParams.data_demissao || new Date().toISOString().slice(0, 10), tipo_valor: 'informado', incidencia_fgts: true, incidencia_cs: true });
+            queryClient.invalidateQueries({ queryKey: ["pjecalc_historico", caseId] });
+            registrarAuditLog(caseId!, 'Histórico', 'criacao');
+          }}><Plus className="h-4 w-4 mr-1" /> Nova Base</Button>
+        </div>
       </div>
       <p className="text-xs text-muted-foreground">Cadastre as bases de cálculo.</p>
       {historicos.length === 0 ? (
