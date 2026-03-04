@@ -2157,6 +2157,148 @@ export type Database = {
           },
         ]
       }
+      pjecalc_apuracao_diaria: {
+        Row: {
+          calculo_id: string
+          created_at: string | null
+          data: string
+          documento_id: string | null
+          feriado_nome: string | null
+          frequencia_str: string | null
+          horas_extras_diaria: number | null
+          horas_extras_semanal: number | null
+          horas_noturnas: number | null
+          horas_trabalhadas: number | null
+          id: string
+          is_afastamento: boolean | null
+          is_compensado: boolean | null
+          is_dsr: boolean | null
+          is_falta: boolean | null
+          is_feriado: boolean | null
+          is_ferias: boolean | null
+          minutos_art253: number | null
+          minutos_art384: number | null
+          minutos_extra_diaria: number | null
+          minutos_extra_feriado: number | null
+          minutos_extra_repouso: number | null
+          minutos_extra_semanal: number | null
+          minutos_interjornada: number | null
+          minutos_intrajornada: number | null
+          minutos_noturno: number | null
+          minutos_trabalhados: number | null
+          origem: string | null
+          pagina: number | null
+        }
+        Insert: {
+          calculo_id: string
+          created_at?: string | null
+          data: string
+          documento_id?: string | null
+          feriado_nome?: string | null
+          frequencia_str?: string | null
+          horas_extras_diaria?: number | null
+          horas_extras_semanal?: number | null
+          horas_noturnas?: number | null
+          horas_trabalhadas?: number | null
+          id?: string
+          is_afastamento?: boolean | null
+          is_compensado?: boolean | null
+          is_dsr?: boolean | null
+          is_falta?: boolean | null
+          is_feriado?: boolean | null
+          is_ferias?: boolean | null
+          minutos_art253?: number | null
+          minutos_art384?: number | null
+          minutos_extra_diaria?: number | null
+          minutos_extra_feriado?: number | null
+          minutos_extra_repouso?: number | null
+          minutos_extra_semanal?: number | null
+          minutos_interjornada?: number | null
+          minutos_intrajornada?: number | null
+          minutos_noturno?: number | null
+          minutos_trabalhados?: number | null
+          origem?: string | null
+          pagina?: number | null
+        }
+        Update: {
+          calculo_id?: string
+          created_at?: string | null
+          data?: string
+          documento_id?: string | null
+          feriado_nome?: string | null
+          frequencia_str?: string | null
+          horas_extras_diaria?: number | null
+          horas_extras_semanal?: number | null
+          horas_noturnas?: number | null
+          horas_trabalhadas?: number | null
+          id?: string
+          is_afastamento?: boolean | null
+          is_compensado?: boolean | null
+          is_dsr?: boolean | null
+          is_falta?: boolean | null
+          is_feriado?: boolean | null
+          is_ferias?: boolean | null
+          minutos_art253?: number | null
+          minutos_art384?: number | null
+          minutos_extra_diaria?: number | null
+          minutos_extra_feriado?: number | null
+          minutos_extra_repouso?: number | null
+          minutos_extra_semanal?: number | null
+          minutos_interjornada?: number | null
+          minutos_intrajornada?: number | null
+          minutos_noturno?: number | null
+          minutos_trabalhados?: number | null
+          origem?: string | null
+          pagina?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pjecalc_apuracao_diaria_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_calculos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pjecalc_atualizacao_config: {
+        Row: {
+          calculo_id: string
+          created_at: string | null
+          id: string
+          observacoes: string | null
+          regime_padrao: string | null
+          regimes: Json
+          tipo: string
+        }
+        Insert: {
+          calculo_id: string
+          created_at?: string | null
+          id?: string
+          observacoes?: string | null
+          regime_padrao?: string | null
+          regimes?: Json
+          tipo: string
+        }
+        Update: {
+          calculo_id?: string
+          created_at?: string | null
+          id?: string
+          observacoes?: string | null
+          regime_padrao?: string | null
+          regimes?: Json
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pjecalc_atualizacao_config_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_calculos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pjecalc_audit_log: {
         Row: {
           acao: string
@@ -2199,109 +2341,133 @@ export type Database = {
         }
         Relationships: []
       }
-      pjecalc_cartao_ponto: {
+      pjecalc_calculos: {
         Row: {
-          adicional_noturno_pct: number | null
+          aviso_previo_dias: number | null
+          aviso_previo_tipo: string | null
           case_id: string
-          competencia: string
-          created_at: string
-          dados_extras: Json | null
-          dias_trabalhados: number | null
-          dias_uteis: number | null
-          dsr_horas: number | null
-          horas_extras_100: number | null
-          horas_extras_50: number | null
-          horas_normais: number | null
-          horas_noturnas: number | null
-          id: string
-          intervalo_suprimido: number | null
-          observacoes: string | null
-          sobreaviso: number | null
-        }
-        Insert: {
-          adicional_noturno_pct?: number | null
-          case_id: string
-          competencia: string
-          created_at?: string
-          dados_extras?: Json | null
-          dias_trabalhados?: number | null
-          dias_uteis?: number | null
-          dsr_horas?: number | null
-          horas_extras_100?: number | null
-          horas_extras_50?: number | null
-          horas_normais?: number | null
-          horas_noturnas?: number | null
-          id?: string
-          intervalo_suprimido?: number | null
-          observacoes?: string | null
-          sobreaviso?: number | null
-        }
-        Update: {
-          adicional_noturno_pct?: number | null
-          case_id?: string
-          competencia?: string
-          created_at?: string
-          dados_extras?: Json | null
-          dias_trabalhados?: number | null
-          dias_uteis?: number | null
-          dsr_horas?: number | null
-          horas_extras_100?: number | null
-          horas_extras_50?: number | null
-          horas_normais?: number | null
-          horas_noturnas?: number | null
-          id?: string
-          intervalo_suprimido?: number | null
-          observacoes?: string | null
-          sobreaviso?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pjecalc_cartao_ponto_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: false
-            referencedRelation: "case_processing_stats"
-            referencedColumns: ["case_id"]
-          },
-          {
-            foreignKeyName: "pjecalc_cartao_ponto_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: false
-            referencedRelation: "cases"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pjecalc_cartao_ponto_colunas: {
-        Row: {
-          case_id: string
-          colunas: Json
           created_at: string | null
+          custas_limite: number | null
+          custas_percentual: number | null
+          data_admissao: string | null
+          data_ajuizamento: string | null
+          data_demissao: string | null
+          data_fim_calculo: string | null
+          data_inicio_calculo: string | null
+          data_liquidacao: string | null
+          divisor_horas: number | null
+          hash_estado: string | null
+          honorarios_percentual: number | null
+          honorarios_sobre: string | null
           id: string
+          jornada_contratual_horas: number | null
+          multa_467_habilitada: boolean | null
+          multa_477_habilitada: boolean | null
+          observacoes: string | null
+          percentual_adicional_noturno: number | null
+          percentual_he_100: number | null
+          percentual_he_50: number | null
+          processo_cnj: string | null
+          reclamado_cnpj: string | null
+          reclamado_nome: string | null
+          reclamante_cpf: string | null
+          reclamante_nome: string | null
+          status: string | null
+          tipo_demissao: string | null
+          tribunal: string | null
+          updated_at: string | null
+          user_id: string
+          vara: string | null
+          versao: number | null
         }
         Insert: {
+          aviso_previo_dias?: number | null
+          aviso_previo_tipo?: string | null
           case_id: string
-          colunas?: Json
           created_at?: string | null
+          custas_limite?: number | null
+          custas_percentual?: number | null
+          data_admissao?: string | null
+          data_ajuizamento?: string | null
+          data_demissao?: string | null
+          data_fim_calculo?: string | null
+          data_inicio_calculo?: string | null
+          data_liquidacao?: string | null
+          divisor_horas?: number | null
+          hash_estado?: string | null
+          honorarios_percentual?: number | null
+          honorarios_sobre?: string | null
           id?: string
+          jornada_contratual_horas?: number | null
+          multa_467_habilitada?: boolean | null
+          multa_477_habilitada?: boolean | null
+          observacoes?: string | null
+          percentual_adicional_noturno?: number | null
+          percentual_he_100?: number | null
+          percentual_he_50?: number | null
+          processo_cnj?: string | null
+          reclamado_cnpj?: string | null
+          reclamado_nome?: string | null
+          reclamante_cpf?: string | null
+          reclamante_nome?: string | null
+          status?: string | null
+          tipo_demissao?: string | null
+          tribunal?: string | null
+          updated_at?: string | null
+          user_id: string
+          vara?: string | null
+          versao?: number | null
         }
         Update: {
+          aviso_previo_dias?: number | null
+          aviso_previo_tipo?: string | null
           case_id?: string
-          colunas?: Json
           created_at?: string | null
+          custas_limite?: number | null
+          custas_percentual?: number | null
+          data_admissao?: string | null
+          data_ajuizamento?: string | null
+          data_demissao?: string | null
+          data_fim_calculo?: string | null
+          data_inicio_calculo?: string | null
+          data_liquidacao?: string | null
+          divisor_horas?: number | null
+          hash_estado?: string | null
+          honorarios_percentual?: number | null
+          honorarios_sobre?: string | null
           id?: string
+          jornada_contratual_horas?: number | null
+          multa_467_habilitada?: boolean | null
+          multa_477_habilitada?: boolean | null
+          observacoes?: string | null
+          percentual_adicional_noturno?: number | null
+          percentual_he_100?: number | null
+          percentual_he_50?: number | null
+          processo_cnj?: string | null
+          reclamado_cnpj?: string | null
+          reclamado_nome?: string | null
+          reclamante_cpf?: string | null
+          reclamante_nome?: string | null
+          status?: string | null
+          tipo_demissao?: string | null
+          tribunal?: string | null
+          updated_at?: string | null
+          user_id?: string
+          vara?: string | null
+          versao?: number | null
         }
         Relationships: [
           {
-            foreignKeyName: "pjecalc_cartao_ponto_colunas_case_id_fkey"
+            foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
-            foreignKeyName: "pjecalc_cartao_ponto_colunas_case_id_fkey"
+            foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -2357,66 +2523,6 @@ export type Database = {
           },
         ]
       }
-      pjecalc_correcao_config: {
-        Row: {
-          case_id: string
-          created_at: string
-          data_fixa: string | null
-          data_liquidacao: string | null
-          epoca: string | null
-          id: string
-          indice: string | null
-          juros_inicio: string | null
-          juros_percentual: number | null
-          juros_tipo: string | null
-          multa_523: boolean | null
-          multa_523_percentual: number | null
-        }
-        Insert: {
-          case_id: string
-          created_at?: string
-          data_fixa?: string | null
-          data_liquidacao?: string | null
-          epoca?: string | null
-          id?: string
-          indice?: string | null
-          juros_inicio?: string | null
-          juros_percentual?: number | null
-          juros_tipo?: string | null
-          multa_523?: boolean | null
-          multa_523_percentual?: number | null
-        }
-        Update: {
-          case_id?: string
-          created_at?: string
-          data_fixa?: string | null
-          data_liquidacao?: string | null
-          epoca?: string | null
-          id?: string
-          indice?: string | null
-          juros_inicio?: string | null
-          juros_percentual?: number | null
-          juros_tipo?: string | null
-          multa_523?: boolean | null
-          multa_523_percentual?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pjecalc_correcao_config_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: true
-            referencedRelation: "case_processing_stats"
-            referencedColumns: ["case_id"]
-          },
-          {
-            foreignKeyName: "pjecalc_correcao_config_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: true
-            referencedRelation: "cases"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       pjecalc_correcao_monetaria: {
         Row: {
           acumulado: number | null
@@ -2458,406 +2564,97 @@ export type Database = {
           },
         ]
       }
-      pjecalc_cs_config: {
+      pjecalc_evento_intervalo: {
         Row: {
-          aliquota_empresa_fixa: number | null
-          aliquota_sat_fixa: number | null
-          aliquota_segurado_fixa: number | null
-          aliquota_segurado_tipo: string | null
-          aliquota_terceiros_fixa: number | null
-          apurar_empresa: boolean | null
-          apurar_sat: boolean | null
-          apurar_segurado: boolean | null
-          apurar_terceiros: boolean | null
-          case_id: string
-          cobrar_reclamante: boolean | null
-          created_at: string
-          cs_sobre_salarios_pagos: boolean | null
+          calculo_id: string
+          confianca: number | null
+          created_at: string | null
+          data_fim: string
+          data_inicio: string
+          documento_id: string | null
+          ferias_abono: boolean | null
+          ferias_aquisitivo_fim: string | null
+          ferias_aquisitivo_inicio: string | null
+          ferias_concessivo_fim: string | null
+          ferias_concessivo_inicio: string | null
+          ferias_dias: number | null
+          ferias_dias_abono: number | null
+          ferias_dobra: boolean | null
+          ferias_gozo2_fim: string | null
+          ferias_gozo2_inicio: string | null
+          ferias_gozo3_fim: string | null
+          ferias_gozo3_inicio: string | null
+          ferias_situacao: string | null
           id: string
-          limitar_teto: boolean | null
-          periodos_simples: Json | null
+          justificado: boolean | null
+          motivo: string | null
+          observacoes: string | null
+          pagina: number | null
+          status_revisao: string | null
+          tipo: string
         }
         Insert: {
-          aliquota_empresa_fixa?: number | null
-          aliquota_sat_fixa?: number | null
-          aliquota_segurado_fixa?: number | null
-          aliquota_segurado_tipo?: string | null
-          aliquota_terceiros_fixa?: number | null
-          apurar_empresa?: boolean | null
-          apurar_sat?: boolean | null
-          apurar_segurado?: boolean | null
-          apurar_terceiros?: boolean | null
-          case_id: string
-          cobrar_reclamante?: boolean | null
-          created_at?: string
-          cs_sobre_salarios_pagos?: boolean | null
+          calculo_id: string
+          confianca?: number | null
+          created_at?: string | null
+          data_fim: string
+          data_inicio: string
+          documento_id?: string | null
+          ferias_abono?: boolean | null
+          ferias_aquisitivo_fim?: string | null
+          ferias_aquisitivo_inicio?: string | null
+          ferias_concessivo_fim?: string | null
+          ferias_concessivo_inicio?: string | null
+          ferias_dias?: number | null
+          ferias_dias_abono?: number | null
+          ferias_dobra?: boolean | null
+          ferias_gozo2_fim?: string | null
+          ferias_gozo2_inicio?: string | null
+          ferias_gozo3_fim?: string | null
+          ferias_gozo3_inicio?: string | null
+          ferias_situacao?: string | null
           id?: string
-          limitar_teto?: boolean | null
-          periodos_simples?: Json | null
+          justificado?: boolean | null
+          motivo?: string | null
+          observacoes?: string | null
+          pagina?: number | null
+          status_revisao?: string | null
+          tipo: string
         }
         Update: {
-          aliquota_empresa_fixa?: number | null
-          aliquota_sat_fixa?: number | null
-          aliquota_segurado_fixa?: number | null
-          aliquota_segurado_tipo?: string | null
-          aliquota_terceiros_fixa?: number | null
-          apurar_empresa?: boolean | null
-          apurar_sat?: boolean | null
-          apurar_segurado?: boolean | null
-          apurar_terceiros?: boolean | null
-          case_id?: string
-          cobrar_reclamante?: boolean | null
-          created_at?: string
-          cs_sobre_salarios_pagos?: boolean | null
-          id?: string
-          limitar_teto?: boolean | null
-          periodos_simples?: Json | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pjecalc_cs_config_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: true
-            referencedRelation: "case_processing_stats"
-            referencedColumns: ["case_id"]
-          },
-          {
-            foreignKeyName: "pjecalc_cs_config_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: true
-            referencedRelation: "cases"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pjecalc_cs_ocorrencias: {
-        Row: {
-          aba: string
-          ativa: boolean
-          base: number
-          calculo_id: string
-          competencia: string
-          empresa: number
-          id: string
-          origem: string
-          sat: number
-          segurado: number
-          terceiros: number
-          total: number
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          aba?: string
-          ativa?: boolean
-          base?: number
-          calculo_id: string
-          competencia: string
-          empresa?: number
-          id?: string
-          origem?: string
-          sat?: number
-          segurado?: number
-          terceiros?: number
-          total?: number
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          aba?: string
-          ativa?: boolean
-          base?: number
           calculo_id?: string
-          competencia?: string
-          empresa?: number
+          confianca?: number | null
+          created_at?: string | null
+          data_fim?: string
+          data_inicio?: string
+          documento_id?: string | null
+          ferias_abono?: boolean | null
+          ferias_aquisitivo_fim?: string | null
+          ferias_aquisitivo_inicio?: string | null
+          ferias_concessivo_fim?: string | null
+          ferias_concessivo_inicio?: string | null
+          ferias_dias?: number | null
+          ferias_dias_abono?: number | null
+          ferias_dobra?: boolean | null
+          ferias_gozo2_fim?: string | null
+          ferias_gozo2_inicio?: string | null
+          ferias_gozo3_fim?: string | null
+          ferias_gozo3_inicio?: string | null
+          ferias_situacao?: string | null
           id?: string
-          origem?: string
-          sat?: number
-          segurado?: number
-          terceiros?: number
-          total?: number
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Relationships: []
-      }
-      pjecalc_custas: {
-        Row: {
-          apurar: boolean | null
-          assistencia_judiciaria: boolean | null
-          case_id: string
-          created_at: string
-          id: string
-          isento: boolean | null
-          percentual: number | null
-          valor_maximo: number | null
-          valor_minimo: number | null
-        }
-        Insert: {
-          apurar?: boolean | null
-          assistencia_judiciaria?: boolean | null
-          case_id: string
-          created_at?: string
-          id?: string
-          isento?: boolean | null
-          percentual?: number | null
-          valor_maximo?: number | null
-          valor_minimo?: number | null
-        }
-        Update: {
-          apurar?: boolean | null
-          assistencia_judiciaria?: boolean | null
-          case_id?: string
-          created_at?: string
-          id?: string
-          isento?: boolean | null
-          percentual?: number | null
-          valor_maximo?: number | null
-          valor_minimo?: number | null
+          justificado?: boolean | null
+          motivo?: string | null
+          observacoes?: string | null
+          pagina?: number | null
+          status_revisao?: string | null
+          tipo?: string
         }
         Relationships: [
           {
-            foreignKeyName: "pjecalc_custas_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: true
-            referencedRelation: "case_processing_stats"
-            referencedColumns: ["case_id"]
-          },
-          {
-            foreignKeyName: "pjecalc_custas_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: true
-            referencedRelation: "cases"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pjecalc_custas_config: {
-        Row: {
-          apurar: boolean | null
-          assistencia_judiciaria: boolean | null
-          case_id: string
-          created_at: string
-          id: string
-          isento: boolean | null
-          percentual: number | null
-          valor_maximo: number | null
-          valor_minimo: number | null
-        }
-        Insert: {
-          apurar?: boolean | null
-          assistencia_judiciaria?: boolean | null
-          case_id: string
-          created_at?: string
-          id?: string
-          isento?: boolean | null
-          percentual?: number | null
-          valor_maximo?: number | null
-          valor_minimo?: number | null
-        }
-        Update: {
-          apurar?: boolean | null
-          assistencia_judiciaria?: boolean | null
-          case_id?: string
-          created_at?: string
-          id?: string
-          isento?: boolean | null
-          percentual?: number | null
-          valor_maximo?: number | null
-          valor_minimo?: number | null
-        }
-        Relationships: []
-      }
-      pjecalc_custas_judiciais: {
-        Row: {
-          agravo_instrumento: number | null
-          agravo_peticao: number | null
-          atos_oficiais_rural: number | null
-          atos_oficiais_urbana: number | null
-          created_at: string
-          embargos_arrematacao: number | null
-          embargos_execucao: number | null
-          embargos_terceiros: number | null
-          id: string
-          impugnacao_sentenca: number | null
-          piso_custas_conhecimento: number | null
-          recurso_revista: number | null
-          teto_custas_autos: number | null
-          teto_custas_liquidacao: number | null
-          version_id: string | null
-          vigencia_fim: string | null
-          vigencia_inicio: string
-        }
-        Insert: {
-          agravo_instrumento?: number | null
-          agravo_peticao?: number | null
-          atos_oficiais_rural?: number | null
-          atos_oficiais_urbana?: number | null
-          created_at?: string
-          embargos_arrematacao?: number | null
-          embargos_execucao?: number | null
-          embargos_terceiros?: number | null
-          id?: string
-          impugnacao_sentenca?: number | null
-          piso_custas_conhecimento?: number | null
-          recurso_revista?: number | null
-          teto_custas_autos?: number | null
-          teto_custas_liquidacao?: number | null
-          version_id?: string | null
-          vigencia_fim?: string | null
-          vigencia_inicio: string
-        }
-        Update: {
-          agravo_instrumento?: number | null
-          agravo_peticao?: number | null
-          atos_oficiais_rural?: number | null
-          atos_oficiais_urbana?: number | null
-          created_at?: string
-          embargos_arrematacao?: number | null
-          embargos_execucao?: number | null
-          embargos_terceiros?: number | null
-          id?: string
-          impugnacao_sentenca?: number | null
-          piso_custas_conhecimento?: number | null
-          recurso_revista?: number | null
-          teto_custas_autos?: number | null
-          teto_custas_liquidacao?: number | null
-          version_id?: string | null
-          vigencia_fim?: string | null
-          vigencia_inicio?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pjecalc_custas_judiciais_version_id_fkey"
-            columns: ["version_id"]
+            foreignKeyName: "pjecalc_evento_intervalo_calculo_id_fkey"
+            columns: ["calculo_id"]
             isOneToOne: false
-            referencedRelation: "reference_table_versions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pjecalc_dados_processo: {
-        Row: {
-          case_id: string
-          comarca: string | null
-          created_at: string
-          data_citacao: string | null
-          data_distribuicao: string | null
-          data_transito: string | null
-          fase: string | null
-          id: string
-          juiz: string | null
-          numero_processo: string | null
-          objeto: string | null
-          reclamada_cnpj: string | null
-          reclamada_nome: string | null
-          reclamante_cpf: string | null
-          reclamante_nome: string | null
-          rito: string | null
-          tipo_acao: string | null
-          uf: string | null
-          vara: string | null
-        }
-        Insert: {
-          case_id: string
-          comarca?: string | null
-          created_at?: string
-          data_citacao?: string | null
-          data_distribuicao?: string | null
-          data_transito?: string | null
-          fase?: string | null
-          id?: string
-          juiz?: string | null
-          numero_processo?: string | null
-          objeto?: string | null
-          reclamada_cnpj?: string | null
-          reclamada_nome?: string | null
-          reclamante_cpf?: string | null
-          reclamante_nome?: string | null
-          rito?: string | null
-          tipo_acao?: string | null
-          uf?: string | null
-          vara?: string | null
-        }
-        Update: {
-          case_id?: string
-          comarca?: string | null
-          created_at?: string
-          data_citacao?: string | null
-          data_distribuicao?: string | null
-          data_transito?: string | null
-          fase?: string | null
-          id?: string
-          juiz?: string | null
-          numero_processo?: string | null
-          objeto?: string | null
-          reclamada_cnpj?: string | null
-          reclamada_nome?: string | null
-          reclamante_cpf?: string | null
-          reclamante_nome?: string | null
-          rito?: string | null
-          tipo_acao?: string | null
-          uf?: string | null
-          vara?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pjecalc_dados_processo_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: true
-            referencedRelation: "case_processing_stats"
-            referencedColumns: ["case_id"]
-          },
-          {
-            foreignKeyName: "pjecalc_dados_processo_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: true
-            referencedRelation: "cases"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pjecalc_faltas: {
-        Row: {
-          case_id: string
-          created_at: string
-          data_final: string
-          data_inicial: string
-          id: string
-          justificada: boolean | null
-          justificativa: string | null
-        }
-        Insert: {
-          case_id: string
-          created_at?: string
-          data_final: string
-          data_inicial: string
-          id?: string
-          justificada?: boolean | null
-          justificativa?: string | null
-        }
-        Update: {
-          case_id?: string
-          created_at?: string
-          data_final?: string
-          data_inicial?: string
-          id?: string
-          justificada?: boolean | null
-          justificativa?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pjecalc_faltas_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: false
-            referencedRelation: "case_processing_stats"
-            referencedColumns: ["case_id"]
-          },
-          {
-            foreignKeyName: "pjecalc_faltas_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: false
-            referencedRelation: "cases"
+            referencedRelation: "pjecalc_calculos"
             referencedColumns: ["id"]
           },
         ]
@@ -2909,346 +2706,97 @@ export type Database = {
           },
         ]
       }
-      pjecalc_ferias: {
+      pjecalc_hist_salarial: {
         Row: {
-          abono: boolean | null
-          case_id: string
-          created_at: string
-          dobra: boolean | null
-          id: string
-          periodo_aquisitivo_fim: string
-          periodo_aquisitivo_inicio: string
-          periodo_concessivo_fim: string
-          periodo_concessivo_inicio: string
-          periodos_gozo: Json | null
-          prazo_dias: number
-          relativas: string
-          situacao: string
-          updated_at: string
-        }
-        Insert: {
-          abono?: boolean | null
-          case_id: string
-          created_at?: string
-          dobra?: boolean | null
-          id?: string
-          periodo_aquisitivo_fim: string
-          periodo_aquisitivo_inicio: string
-          periodo_concessivo_fim: string
-          periodo_concessivo_inicio: string
-          periodos_gozo?: Json | null
-          prazo_dias?: number
-          relativas: string
-          situacao?: string
-          updated_at?: string
-        }
-        Update: {
-          abono?: boolean | null
-          case_id?: string
-          created_at?: string
-          dobra?: boolean | null
-          id?: string
-          periodo_aquisitivo_fim?: string
-          periodo_aquisitivo_inicio?: string
-          periodo_concessivo_fim?: string
-          periodo_concessivo_inicio?: string
-          periodos_gozo?: Json | null
-          prazo_dias?: number
-          relativas?: string
-          situacao?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pjecalc_ferias_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: false
-            referencedRelation: "case_processing_stats"
-            referencedColumns: ["case_id"]
-          },
-          {
-            foreignKeyName: "pjecalc_ferias_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: false
-            referencedRelation: "cases"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pjecalc_fgts_config: {
-        Row: {
-          apurar: boolean | null
-          case_id: string
-          compor_principal: boolean | null
-          created_at: string
-          deduzir_saldo: boolean | null
-          destino: string | null
-          id: string
-          lc110_05: boolean | null
-          lc110_10: boolean | null
-          multa_apurar: boolean | null
-          multa_base: string | null
-          multa_percentual: number | null
-          multa_tipo: string | null
-          multa_valor_informado: number | null
-          saldos_saques: Json | null
-        }
-        Insert: {
-          apurar?: boolean | null
-          case_id: string
-          compor_principal?: boolean | null
-          created_at?: string
-          deduzir_saldo?: boolean | null
-          destino?: string | null
-          id?: string
-          lc110_05?: boolean | null
-          lc110_10?: boolean | null
-          multa_apurar?: boolean | null
-          multa_base?: string | null
-          multa_percentual?: number | null
-          multa_tipo?: string | null
-          multa_valor_informado?: number | null
-          saldos_saques?: Json | null
-        }
-        Update: {
-          apurar?: boolean | null
-          case_id?: string
-          compor_principal?: boolean | null
-          created_at?: string
-          deduzir_saldo?: boolean | null
-          destino?: string | null
-          id?: string
-          lc110_05?: boolean | null
-          lc110_10?: boolean | null
-          multa_apurar?: boolean | null
-          multa_base?: string | null
-          multa_percentual?: number | null
-          multa_tipo?: string | null
-          multa_valor_informado?: number | null
-          saldos_saques?: Json | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pjecalc_fgts_config_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: true
-            referencedRelation: "case_processing_stats"
-            referencedColumns: ["case_id"]
-          },
-          {
-            foreignKeyName: "pjecalc_fgts_config_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: true
-            referencedRelation: "cases"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pjecalc_fgts_ocorrencias: {
-        Row: {
-          aliquota: number
-          ativa: boolean
-          base_historico: number
-          base_total: number
-          base_verbas: number
           calculo_id: string
-          competencia: string
+          created_at: string | null
           id: string
-          multa: number
-          origem: string
-          recolhido: number
-          updated_at: string
-          updated_by: string | null
-          valor: number
-        }
-        Insert: {
-          aliquota?: number
-          ativa?: boolean
-          base_historico?: number
-          base_total?: number
-          base_verbas?: number
-          calculo_id: string
-          competencia: string
-          id?: string
-          multa?: number
-          origem?: string
-          recolhido?: number
-          updated_at?: string
-          updated_by?: string | null
-          valor?: number
-        }
-        Update: {
-          aliquota?: number
-          ativa?: boolean
-          base_historico?: number
-          base_total?: number
-          base_verbas?: number
-          calculo_id?: string
-          competencia?: string
-          id?: string
-          multa?: number
-          origem?: string
-          recolhido?: number
-          updated_at?: string
-          updated_by?: string | null
-          valor?: number
-        }
-        Relationships: []
-      }
-      pjecalc_historico_ocorrencias: {
-        Row: {
-          competencia: string
-          created_at: string
-          historico_id: string
-          id: string
-          tipo: string
-          valor: number
-        }
-        Insert: {
-          competencia: string
-          created_at?: string
-          historico_id: string
-          id?: string
-          tipo?: string
-          valor?: number
-        }
-        Update: {
-          competencia?: string
-          created_at?: string
-          historico_id?: string
-          id?: string
-          tipo?: string
-          valor?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pjecalc_historico_ocorrencias_historico_id_fkey"
-            columns: ["historico_id"]
-            isOneToOne: false
-            referencedRelation: "pjecalc_historico_salarial"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pjecalc_historico_salarial: {
-        Row: {
-          base_referencia: string | null
-          case_id: string
-          categoria_piso: string | null
-          created_at: string
-          cs_recolhida: boolean | null
-          fgts_recolhido: boolean | null
-          id: string
-          incidencia_cs: boolean | null
-          incidencia_fgts: boolean | null
+          incide_fgts: boolean | null
+          incide_inss: boolean | null
+          incide_ir: boolean | null
           nome: string
-          periodo_fim: string
-          periodo_inicio: string
-          quantidade: number | null
-          tipo_valor: string
-          updated_at: string
-          valor_informado: number | null
-        }
-        Insert: {
-          base_referencia?: string | null
-          case_id: string
-          categoria_piso?: string | null
-          created_at?: string
-          cs_recolhida?: boolean | null
-          fgts_recolhido?: boolean | null
-          id?: string
-          incidencia_cs?: boolean | null
-          incidencia_fgts?: boolean | null
-          nome: string
-          periodo_fim: string
-          periodo_inicio: string
-          quantidade?: number | null
-          tipo_valor?: string
-          updated_at?: string
-          valor_informado?: number | null
-        }
-        Update: {
-          base_referencia?: string | null
-          case_id?: string
-          categoria_piso?: string | null
-          created_at?: string
-          cs_recolhida?: boolean | null
-          fgts_recolhido?: boolean | null
-          id?: string
-          incidencia_cs?: boolean | null
-          incidencia_fgts?: boolean | null
-          nome?: string
-          periodo_fim?: string
-          periodo_inicio?: string
-          quantidade?: number | null
-          tipo_valor?: string
-          updated_at?: string
-          valor_informado?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pjecalc_historico_salarial_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: false
-            referencedRelation: "case_processing_stats"
-            referencedColumns: ["case_id"]
-          },
-          {
-            foreignKeyName: "pjecalc_historico_salarial_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: false
-            referencedRelation: "cases"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pjecalc_honorarios: {
-        Row: {
-          apurar_contratuais: boolean | null
-          apurar_sucumbenciais: boolean | null
-          base_sucumbenciais: string | null
-          case_id: string
-          created_at: string
-          id: string
-          percentual_contratuais: number | null
-          percentual_sucumbenciais: number | null
+          observacoes: string | null
+          tipo_variacao: string | null
           valor_fixo: number | null
         }
         Insert: {
-          apurar_contratuais?: boolean | null
-          apurar_sucumbenciais?: boolean | null
-          base_sucumbenciais?: string | null
-          case_id: string
-          created_at?: string
+          calculo_id: string
+          created_at?: string | null
           id?: string
-          percentual_contratuais?: number | null
-          percentual_sucumbenciais?: number | null
+          incide_fgts?: boolean | null
+          incide_inss?: boolean | null
+          incide_ir?: boolean | null
+          nome: string
+          observacoes?: string | null
+          tipo_variacao?: string | null
           valor_fixo?: number | null
         }
         Update: {
-          apurar_contratuais?: boolean | null
-          apurar_sucumbenciais?: boolean | null
-          base_sucumbenciais?: string | null
-          case_id?: string
-          created_at?: string
+          calculo_id?: string
+          created_at?: string | null
           id?: string
-          percentual_contratuais?: number | null
-          percentual_sucumbenciais?: number | null
+          incide_fgts?: boolean | null
+          incide_inss?: boolean | null
+          incide_ir?: boolean | null
+          nome?: string
+          observacoes?: string | null
+          tipo_variacao?: string | null
           valor_fixo?: number | null
         }
         Relationships: [
           {
-            foreignKeyName: "pjecalc_honorarios_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: true
-            referencedRelation: "case_processing_stats"
-            referencedColumns: ["case_id"]
+            foreignKeyName: "pjecalc_hist_salarial_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_calculos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pjecalc_hist_salarial_mes: {
+        Row: {
+          calculo_id: string
+          competencia: string
+          created_at: string | null
+          documento_id: string | null
+          hist_salarial_id: string
+          id: string
+          origem: string | null
+          valor: number
+        }
+        Insert: {
+          calculo_id: string
+          competencia: string
+          created_at?: string | null
+          documento_id?: string | null
+          hist_salarial_id: string
+          id?: string
+          origem?: string | null
+          valor?: number
+        }
+        Update: {
+          calculo_id?: string
+          competencia?: string
+          created_at?: string | null
+          documento_id?: string | null
+          hist_salarial_id?: string
+          id?: string
+          origem?: string | null
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pjecalc_hist_salarial_mes_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_calculos"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "pjecalc_honorarios_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: true
-            referencedRelation: "cases"
+            foreignKeyName: "pjecalc_hist_salarial_mes_hist_salarial_id_fkey"
+            columns: ["hist_salarial_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_hist_salarial"
             referencedColumns: ["id"]
           },
         ]
@@ -3348,108 +2896,6 @@ export type Database = {
         }
         Relationships: []
       }
-      pjecalc_ir_config: {
-        Row: {
-          aposentado_65: boolean | null
-          apurar: boolean | null
-          case_id: string
-          cobrar_reclamado: boolean | null
-          created_at: string
-          deduzir_cs: boolean | null
-          deduzir_honorarios: boolean | null
-          deduzir_pensao: boolean | null
-          deduzir_prev_privada: boolean | null
-          dependentes: number | null
-          id: string
-          incidir_sobre_juros: boolean | null
-          tributacao_exclusiva_13: boolean | null
-          tributacao_separada_ferias: boolean | null
-        }
-        Insert: {
-          aposentado_65?: boolean | null
-          apurar?: boolean | null
-          case_id: string
-          cobrar_reclamado?: boolean | null
-          created_at?: string
-          deduzir_cs?: boolean | null
-          deduzir_honorarios?: boolean | null
-          deduzir_pensao?: boolean | null
-          deduzir_prev_privada?: boolean | null
-          dependentes?: number | null
-          id?: string
-          incidir_sobre_juros?: boolean | null
-          tributacao_exclusiva_13?: boolean | null
-          tributacao_separada_ferias?: boolean | null
-        }
-        Update: {
-          aposentado_65?: boolean | null
-          apurar?: boolean | null
-          case_id?: string
-          cobrar_reclamado?: boolean | null
-          created_at?: string
-          deduzir_cs?: boolean | null
-          deduzir_honorarios?: boolean | null
-          deduzir_pensao?: boolean | null
-          deduzir_prev_privada?: boolean | null
-          dependentes?: number | null
-          id?: string
-          incidir_sobre_juros?: boolean | null
-          tributacao_exclusiva_13?: boolean | null
-          tributacao_separada_ferias?: boolean | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pjecalc_ir_config_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: true
-            referencedRelation: "case_processing_stats"
-            referencedColumns: ["case_id"]
-          },
-          {
-            foreignKeyName: "pjecalc_ir_config_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: true
-            referencedRelation: "cases"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pjecalc_ir_faixas: {
-        Row: {
-          aliquota: number
-          competencia_fim: string | null
-          competencia_inicio: string
-          created_at: string | null
-          deducao: number
-          deducao_dependente: number
-          faixa: number
-          id: string
-          valor_ate: number
-        }
-        Insert: {
-          aliquota: number
-          competencia_fim?: string | null
-          competencia_inicio: string
-          created_at?: string | null
-          deducao?: number
-          deducao_dependente?: number
-          faixa: number
-          id?: string
-          valor_ate: number
-        }
-        Update: {
-          aliquota?: number
-          competencia_fim?: string | null
-          competencia_inicio?: string
-          created_at?: string | null
-          deducao?: number
-          deducao_dependente?: number
-          faixa?: number
-          id?: string
-          valor_ate?: number
-        }
-        Relationships: []
-      }
       pjecalc_juros_mora: {
         Row: {
           acumulado: number | null
@@ -3477,485 +2923,111 @@ export type Database = {
         }
         Relationships: []
       }
-      pjecalc_liquidacao_resultado: {
+      pjecalc_ocorrencia_calculo: {
         Row: {
-          case_id: string
-          created_at: string
-          data_liquidacao: string | null
-          duplicado_de: string | null
-          engine_version: string | null
-          fechado_em: string | null
-          fechado_por: string | null
-          id: string
-          resultado: Json
-          status: string
-          total_bruto: number | null
-          total_liquido: number | null
-          total_reclamada: number | null
-          total_reclamante: number | null
-        }
-        Insert: {
-          case_id: string
-          created_at?: string
-          data_liquidacao?: string | null
-          duplicado_de?: string | null
-          engine_version?: string | null
-          fechado_em?: string | null
-          fechado_por?: string | null
-          id?: string
-          resultado: Json
-          status?: string
-          total_bruto?: number | null
-          total_liquido?: number | null
-          total_reclamada?: number | null
-          total_reclamante?: number | null
-        }
-        Update: {
-          case_id?: string
-          created_at?: string
-          data_liquidacao?: string | null
-          duplicado_de?: string | null
-          engine_version?: string | null
-          fechado_em?: string | null
-          fechado_por?: string | null
-          id?: string
-          resultado?: Json
-          status?: string
-          total_bruto?: number | null
-          total_liquido?: number | null
-          total_reclamada?: number | null
-          total_reclamante?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pjecalc_liquidacao_resultado_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: false
-            referencedRelation: "case_processing_stats"
-            referencedColumns: ["case_id"]
-          },
-          {
-            foreignKeyName: "pjecalc_liquidacao_resultado_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: false
-            referencedRelation: "cases"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pjecalc_metricas: {
-        Row: {
-          case_id: string
+          ativa: boolean | null
+          base_valor: number | null
+          calculo_id: string
+          competencia: string
+          correcao: number | null
           created_at: string | null
-          duracao_ms: number | null
-          evento: string
+          devido: number | null
+          diferenca: number | null
+          divisor: number | null
+          dobra: number | null
+          fator_correcao: number | null
           id: string
-          metadata: Json | null
-          modulo: string | null
-          user_id: string | null
-        }
-        Insert: {
-          case_id: string
-          created_at?: string | null
-          duracao_ms?: number | null
-          evento: string
-          id?: string
-          metadata?: Json | null
-          modulo?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          case_id?: string
-          created_at?: string | null
-          duracao_ms?: number | null
-          evento?: string
-          id?: string
-          metadata?: Json | null
-          modulo?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      pjecalc_multas_config: {
-        Row: {
-          apurar_467: boolean | null
-          apurar_477: boolean | null
-          case_id: string
-          created_at: string | null
-          id: string
-          observacoes: string | null
-          valor_467: number | null
-          valor_477_informado: number | null
-          valor_477_tipo: string | null
-        }
-        Insert: {
-          apurar_467?: boolean | null
-          apurar_477?: boolean | null
-          case_id: string
-          created_at?: string | null
-          id?: string
-          observacoes?: string | null
-          valor_467?: number | null
-          valor_477_informado?: number | null
-          valor_477_tipo?: string | null
-        }
-        Update: {
-          apurar_467?: boolean | null
-          apurar_477?: boolean | null
-          case_id?: string
-          created_at?: string | null
-          id?: string
-          observacoes?: string | null
-          valor_467?: number | null
-          valor_477_informado?: number | null
-          valor_477_tipo?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pjecalc_multas_config_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: false
-            referencedRelation: "case_processing_stats"
-            referencedColumns: ["case_id"]
-          },
-          {
-            foreignKeyName: "pjecalc_multas_config_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: false
-            referencedRelation: "cases"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pjecalc_observacoes: {
-        Row: {
-          case_id: string
-          created_at: string | null
-          created_by: string | null
-          id: string
-          modulo: string
-          texto: string
-          tipo: string | null
+          indice_usado: string | null
+          juros: number | null
+          juros_regime_usado: string | null
+          multiplicador: number | null
+          nome: string
+          origem: string | null
+          pago: number | null
+          quantidade: number | null
+          reflexo_id: string | null
+          taxa_juros: number | null
+          tipo: string
+          total: number | null
           updated_at: string | null
+          verba_base_id: string | null
         }
         Insert: {
-          case_id: string
-          created_at?: string | null
-          created_by?: string | null
-          id?: string
-          modulo: string
-          texto: string
-          tipo?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          case_id?: string
-          created_at?: string | null
-          created_by?: string | null
-          id?: string
-          modulo?: string
-          texto?: string
-          tipo?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      pjecalc_ocorrencias: {
-        Row: {
-          ativa: boolean
-          base_valor: number
+          ativa?: boolean | null
+          base_valor?: number | null
           calculo_id: string
           competencia: string
-          correcao: number
-          devido: number
-          diferenca: number
-          divisor_valor: number
-          dobra: number
-          id: string
-          juros: number
-          meta_json: Json | null
-          multiplicador_valor: number
-          origem: string
-          pago: number
-          parametros_json: Json | null
-          quantidade_valor: number
-          tipo_fracao: string | null
-          total: number
-          updated_at: string
-          updated_by: string | null
-          verba_id: string
-          verba_principal_id: string | null
-        }
-        Insert: {
-          ativa?: boolean
-          base_valor?: number
-          calculo_id: string
-          competencia: string
-          correcao?: number
-          devido?: number
-          diferenca?: number
-          divisor_valor?: number
-          dobra?: number
+          correcao?: number | null
+          created_at?: string | null
+          devido?: number | null
+          diferenca?: number | null
+          divisor?: number | null
+          dobra?: number | null
+          fator_correcao?: number | null
           id?: string
-          juros?: number
-          meta_json?: Json | null
-          multiplicador_valor?: number
-          origem?: string
-          pago?: number
-          parametros_json?: Json | null
-          quantidade_valor?: number
-          tipo_fracao?: string | null
-          total?: number
-          updated_at?: string
-          updated_by?: string | null
-          verba_id: string
-          verba_principal_id?: string | null
+          indice_usado?: string | null
+          juros?: number | null
+          juros_regime_usado?: string | null
+          multiplicador?: number | null
+          nome: string
+          origem?: string | null
+          pago?: number | null
+          quantidade?: number | null
+          reflexo_id?: string | null
+          taxa_juros?: number | null
+          tipo: string
+          total?: number | null
+          updated_at?: string | null
+          verba_base_id?: string | null
         }
         Update: {
-          ativa?: boolean
-          base_valor?: number
+          ativa?: boolean | null
+          base_valor?: number | null
           calculo_id?: string
           competencia?: string
-          correcao?: number
-          devido?: number
-          diferenca?: number
-          divisor_valor?: number
-          dobra?: number
+          correcao?: number | null
+          created_at?: string | null
+          devido?: number | null
+          diferenca?: number | null
+          divisor?: number | null
+          dobra?: number | null
+          fator_correcao?: number | null
           id?: string
-          juros?: number
-          meta_json?: Json | null
-          multiplicador_valor?: number
-          origem?: string
-          pago?: number
-          parametros_json?: Json | null
-          quantidade_valor?: number
-          tipo_fracao?: string | null
-          total?: number
-          updated_at?: string
-          updated_by?: string | null
-          verba_id?: string
-          verba_principal_id?: string | null
-        }
-        Relationships: []
-      }
-      pjecalc_parametros: {
-        Row: {
-          carga_horaria_padrao: number
-          case_id: string
-          comentarios: string | null
-          considerar_feriado_estadual: boolean | null
-          considerar_feriado_municipal: boolean | null
-          created_at: string
-          data_admissao: string
-          data_ajuizamento: string
-          data_demissao: string | null
-          data_final: string | null
-          data_inicial: string | null
-          data_prescricao_quinquenal: string | null
-          estado: string
-          excecoes_carga_horaria: Json | null
-          excecoes_sabado: Json | null
-          id: string
-          limitar_avos_periodo: boolean | null
-          maior_remuneracao: number | null
-          municipio: string
-          pontos_facultativos: Json | null
-          prazo_aviso_dias: number | null
-          prazo_aviso_previo: string
-          prescricao_fgts: boolean | null
-          prescricao_quinquenal: boolean | null
-          projetar_aviso_indenizado: boolean | null
-          regime_trabalho: string
-          sabado_dia_util: boolean | null
-          ultima_remuneracao: number | null
-          updated_at: string
-          zerar_valor_negativo: boolean | null
-        }
-        Insert: {
-          carga_horaria_padrao?: number
-          case_id: string
-          comentarios?: string | null
-          considerar_feriado_estadual?: boolean | null
-          considerar_feriado_municipal?: boolean | null
-          created_at?: string
-          data_admissao: string
-          data_ajuizamento: string
-          data_demissao?: string | null
-          data_final?: string | null
-          data_inicial?: string | null
-          data_prescricao_quinquenal?: string | null
-          estado?: string
-          excecoes_carga_horaria?: Json | null
-          excecoes_sabado?: Json | null
-          id?: string
-          limitar_avos_periodo?: boolean | null
-          maior_remuneracao?: number | null
-          municipio?: string
-          pontos_facultativos?: Json | null
-          prazo_aviso_dias?: number | null
-          prazo_aviso_previo?: string
-          prescricao_fgts?: boolean | null
-          prescricao_quinquenal?: boolean | null
-          projetar_aviso_indenizado?: boolean | null
-          regime_trabalho?: string
-          sabado_dia_util?: boolean | null
-          ultima_remuneracao?: number | null
-          updated_at?: string
-          zerar_valor_negativo?: boolean | null
-        }
-        Update: {
-          carga_horaria_padrao?: number
-          case_id?: string
-          comentarios?: string | null
-          considerar_feriado_estadual?: boolean | null
-          considerar_feriado_municipal?: boolean | null
-          created_at?: string
-          data_admissao?: string
-          data_ajuizamento?: string
-          data_demissao?: string | null
-          data_final?: string | null
-          data_inicial?: string | null
-          data_prescricao_quinquenal?: string | null
-          estado?: string
-          excecoes_carga_horaria?: Json | null
-          excecoes_sabado?: Json | null
-          id?: string
-          limitar_avos_periodo?: boolean | null
-          maior_remuneracao?: number | null
-          municipio?: string
-          pontos_facultativos?: Json | null
-          prazo_aviso_dias?: number | null
-          prazo_aviso_previo?: string
-          prescricao_fgts?: boolean | null
-          prescricao_quinquenal?: boolean | null
-          projetar_aviso_indenizado?: boolean | null
-          regime_trabalho?: string
-          sabado_dia_util?: boolean | null
-          ultima_remuneracao?: number | null
-          updated_at?: string
-          zerar_valor_negativo?: boolean | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pjecalc_parametros_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: true
-            referencedRelation: "case_processing_stats"
-            referencedColumns: ["case_id"]
-          },
-          {
-            foreignKeyName: "pjecalc_parametros_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: true
-            referencedRelation: "cases"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pjecalc_parametros_extras: {
-        Row: {
-          case_id: string
-          created_at: string
-          data_final: string | null
-          data_inicial: string | null
-          id: string
-          observacao: string | null
-          tipo: string
-          updated_at: string
-          valor_booleano: boolean | null
-          valor_numerico: number | null
-          valor_texto: string | null
-        }
-        Insert: {
-          case_id: string
-          created_at?: string
-          data_final?: string | null
-          data_inicial?: string | null
-          id?: string
-          observacao?: string | null
-          tipo: string
-          updated_at?: string
-          valor_booleano?: boolean | null
-          valor_numerico?: number | null
-          valor_texto?: string | null
-        }
-        Update: {
-          case_id?: string
-          created_at?: string
-          data_final?: string | null
-          data_inicial?: string | null
-          id?: string
-          observacao?: string | null
+          indice_usado?: string | null
+          juros?: number | null
+          juros_regime_usado?: string | null
+          multiplicador?: number | null
+          nome?: string
+          origem?: string | null
+          pago?: number | null
+          quantidade?: number | null
+          reflexo_id?: string | null
+          taxa_juros?: number | null
           tipo?: string
-          updated_at?: string
-          valor_booleano?: boolean | null
-          valor_numerico?: number | null
-          valor_texto?: string | null
+          total?: number | null
+          updated_at?: string | null
+          verba_base_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "pjecalc_parametros_extras_case_id_fkey"
-            columns: ["case_id"]
+            foreignKeyName: "pjecalc_ocorrencia_calculo_calculo_id_fkey"
+            columns: ["calculo_id"]
             isOneToOne: false
-            referencedRelation: "case_processing_stats"
-            referencedColumns: ["case_id"]
-          },
-          {
-            foreignKeyName: "pjecalc_parametros_extras_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: false
-            referencedRelation: "cases"
+            referencedRelation: "pjecalc_calculos"
             referencedColumns: ["id"]
           },
-        ]
-      }
-      pjecalc_pensao_config: {
-        Row: {
-          apurar: boolean | null
-          base: string | null
-          beneficiario: string | null
-          case_id: string
-          created_at: string | null
-          id: string
-          observacoes: string | null
-          percentual: number | null
-          valor_fixo: number | null
-        }
-        Insert: {
-          apurar?: boolean | null
-          base?: string | null
-          beneficiario?: string | null
-          case_id: string
-          created_at?: string | null
-          id?: string
-          observacoes?: string | null
-          percentual?: number | null
-          valor_fixo?: number | null
-        }
-        Update: {
-          apurar?: boolean | null
-          base?: string | null
-          beneficiario?: string | null
-          case_id?: string
-          created_at?: string | null
-          id?: string
-          observacoes?: string | null
-          percentual?: number | null
-          valor_fixo?: number | null
-        }
-        Relationships: [
           {
-            foreignKeyName: "pjecalc_pensao_config_case_id_fkey"
-            columns: ["case_id"]
+            foreignKeyName: "pjecalc_ocorrencia_calculo_reflexo_id_fkey"
+            columns: ["reflexo_id"]
             isOneToOne: false
-            referencedRelation: "case_processing_stats"
-            referencedColumns: ["case_id"]
+            referencedRelation: "pjecalc_reflexo"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "pjecalc_pensao_config_case_id_fkey"
-            columns: ["case_id"]
+            foreignKeyName: "pjecalc_ocorrencia_calculo_verba_base_id_fkey"
+            columns: ["verba_base_id"]
             isOneToOne: false
-            referencedRelation: "cases"
+            referencedRelation: "pjecalc_verba_base"
             referencedColumns: ["id"]
           },
         ]
@@ -4007,143 +3079,296 @@ export type Database = {
           },
         ]
       }
-      pjecalc_ponto_diario: {
+      pjecalc_reflexo: {
         Row: {
-          case_id: string
+          ativa: boolean | null
+          calculo_id: string
+          codigo: string | null
+          comportamento_reflexo: string | null
           created_at: string | null
-          data: string
-          dia_semana: string | null
-          entrada_1: string | null
-          entrada_2: string | null
-          entrada_3: string | null
-          frequencia: string | null
-          horas_extras_diarias: number | null
-          horas_extras_dsr: number | null
-          horas_extras_semanais: number | null
-          horas_noturnas: number | null
-          horas_trabalhadas: number | null
+          gerar_principal: boolean | null
+          gerar_reflexo: boolean | null
           id: string
-          intervalo_suprimido: number | null
-          observacao: string | null
-          origem: string | null
-          saida_1: string | null
-          saida_2: string | null
-          saida_3: string | null
-          sobreaviso: number | null
-          tipo: string | null
-          updated_at: string | null
+          incide_fgts: boolean | null
+          incide_inss: boolean | null
+          incide_ir: boolean | null
+          media_meses: number | null
+          media_tipo: string | null
+          nome: string
+          observacoes: string | null
+          ordem: number | null
+          periodo_fim: string | null
+          periodo_inicio: string | null
+          periodo_media_reflexo: string | null
+          tipo: string
+          tratamento_fracao_mes: string | null
         }
         Insert: {
-          case_id: string
+          ativa?: boolean | null
+          calculo_id: string
+          codigo?: string | null
+          comportamento_reflexo?: string | null
           created_at?: string | null
-          data: string
-          dia_semana?: string | null
-          entrada_1?: string | null
-          entrada_2?: string | null
-          entrada_3?: string | null
-          frequencia?: string | null
-          horas_extras_diarias?: number | null
-          horas_extras_dsr?: number | null
-          horas_extras_semanais?: number | null
-          horas_noturnas?: number | null
-          horas_trabalhadas?: number | null
+          gerar_principal?: boolean | null
+          gerar_reflexo?: boolean | null
           id?: string
-          intervalo_suprimido?: number | null
-          observacao?: string | null
-          origem?: string | null
-          saida_1?: string | null
-          saida_2?: string | null
-          saida_3?: string | null
-          sobreaviso?: number | null
-          tipo?: string | null
-          updated_at?: string | null
+          incide_fgts?: boolean | null
+          incide_inss?: boolean | null
+          incide_ir?: boolean | null
+          media_meses?: number | null
+          media_tipo?: string | null
+          nome: string
+          observacoes?: string | null
+          ordem?: number | null
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
+          periodo_media_reflexo?: string | null
+          tipo: string
+          tratamento_fracao_mes?: string | null
         }
         Update: {
-          case_id?: string
+          ativa?: boolean | null
+          calculo_id?: string
+          codigo?: string | null
+          comportamento_reflexo?: string | null
           created_at?: string | null
-          data?: string
-          dia_semana?: string | null
-          entrada_1?: string | null
-          entrada_2?: string | null
-          entrada_3?: string | null
-          frequencia?: string | null
-          horas_extras_diarias?: number | null
-          horas_extras_dsr?: number | null
-          horas_extras_semanais?: number | null
-          horas_noturnas?: number | null
-          horas_trabalhadas?: number | null
+          gerar_principal?: boolean | null
+          gerar_reflexo?: boolean | null
           id?: string
-          intervalo_suprimido?: number | null
-          observacao?: string | null
-          origem?: string | null
-          saida_1?: string | null
-          saida_2?: string | null
-          saida_3?: string | null
-          sobreaviso?: number | null
-          tipo?: string | null
-          updated_at?: string | null
+          incide_fgts?: boolean | null
+          incide_inss?: boolean | null
+          incide_ir?: boolean | null
+          media_meses?: number | null
+          media_tipo?: string | null
+          nome?: string
+          observacoes?: string | null
+          ordem?: number | null
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
+          periodo_media_reflexo?: string | null
+          tipo?: string
+          tratamento_fracao_mes?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "pjecalc_ponto_diario_case_id_fkey"
-            columns: ["case_id"]
+            foreignKeyName: "pjecalc_reflexo_calculo_id_fkey"
+            columns: ["calculo_id"]
             isOneToOne: false
-            referencedRelation: "case_processing_stats"
-            referencedColumns: ["case_id"]
-          },
-          {
-            foreignKeyName: "pjecalc_ponto_diario_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: false
-            referencedRelation: "cases"
+            referencedRelation: "pjecalc_calculos"
             referencedColumns: ["id"]
           },
         ]
       }
-      pjecalc_previdencia_privada_config: {
+      pjecalc_reflexo_base_verba: {
         Row: {
-          apurar: boolean
-          base_calculo: string
-          case_id: string
-          created_at: string | null
-          deduzir_ir: boolean
           id: string
-          observacao: string | null
-          percentual: number
+          integralizar: boolean | null
+          reflexo_id: string
+          verba_base_id: string
         }
         Insert: {
-          apurar?: boolean
-          base_calculo?: string
-          case_id: string
-          created_at?: string | null
-          deduzir_ir?: boolean
           id?: string
-          observacao?: string | null
-          percentual?: number
+          integralizar?: boolean | null
+          reflexo_id: string
+          verba_base_id: string
         }
         Update: {
-          apurar?: boolean
-          base_calculo?: string
-          case_id?: string
-          created_at?: string | null
-          deduzir_ir?: boolean
           id?: string
-          observacao?: string | null
-          percentual?: number
+          integralizar?: boolean | null
+          reflexo_id?: string
+          verba_base_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "pjecalc_previdencia_privada_config_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: true
-            referencedRelation: "case_processing_stats"
-            referencedColumns: ["case_id"]
+            foreignKeyName: "pjecalc_reflexo_base_verba_reflexo_id_fkey"
+            columns: ["reflexo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_reflexo"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "pjecalc_previdencia_privada_config_case_id_fkey"
-            columns: ["case_id"]
+            foreignKeyName: "pjecalc_reflexo_base_verba_verba_base_id_fkey"
+            columns: ["verba_base_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_verba_base"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pjecalc_resultado: {
+        Row: {
+          calculado_em: string | null
+          calculo_id: string
+          created_at: string | null
+          custas: number | null
+          desconto_inss_reclamado: number | null
+          desconto_inss_reclamante: number | null
+          desconto_ir: number | null
+          engine_version: string | null
+          fgts_depositar: number | null
+          fgts_multa_40: number | null
+          hash_resultado: string | null
+          honorarios: number | null
+          id: string
+          multa_467: number | null
+          multa_477: number | null
+          resumo_verbas: Json | null
+          total_bruto: number | null
+          total_correcao: number | null
+          total_diferenca: number | null
+          total_juros: number | null
+          total_liquido_antes_descontos: number | null
+          total_pago: number | null
+          total_reclamado: number | null
+          total_reclamante: number | null
+        }
+        Insert: {
+          calculado_em?: string | null
+          calculo_id: string
+          created_at?: string | null
+          custas?: number | null
+          desconto_inss_reclamado?: number | null
+          desconto_inss_reclamante?: number | null
+          desconto_ir?: number | null
+          engine_version?: string | null
+          fgts_depositar?: number | null
+          fgts_multa_40?: number | null
+          hash_resultado?: string | null
+          honorarios?: number | null
+          id?: string
+          multa_467?: number | null
+          multa_477?: number | null
+          resumo_verbas?: Json | null
+          total_bruto?: number | null
+          total_correcao?: number | null
+          total_diferenca?: number | null
+          total_juros?: number | null
+          total_liquido_antes_descontos?: number | null
+          total_pago?: number | null
+          total_reclamado?: number | null
+          total_reclamante?: number | null
+        }
+        Update: {
+          calculado_em?: string | null
+          calculo_id?: string
+          created_at?: string | null
+          custas?: number | null
+          desconto_inss_reclamado?: number | null
+          desconto_inss_reclamante?: number | null
+          desconto_ir?: number | null
+          engine_version?: string | null
+          fgts_depositar?: number | null
+          fgts_multa_40?: number | null
+          hash_resultado?: string | null
+          honorarios?: number | null
+          id?: string
+          multa_467?: number | null
+          multa_477?: number | null
+          resumo_verbas?: Json | null
+          total_bruto?: number | null
+          total_correcao?: number | null
+          total_diferenca?: number | null
+          total_juros?: number | null
+          total_liquido_antes_descontos?: number | null
+          total_pago?: number | null
+          total_reclamado?: number | null
+          total_reclamante?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pjecalc_resultado_calculo_id_fkey"
+            columns: ["calculo_id"]
             isOneToOne: true
-            referencedRelation: "cases"
+            referencedRelation: "pjecalc_calculos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pjecalc_rubrica_map: {
+        Row: {
+          ativo: boolean | null
+          categoria: string
+          codigo_match: string | null
+          conceito: string
+          created_at: string | null
+          descricao_regex: string | null
+          empresa_cnpj: string | null
+          id: string
+          prioridade: number | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          categoria: string
+          codigo_match?: string | null
+          conceito: string
+          created_at?: string | null
+          descricao_regex?: string | null
+          empresa_cnpj?: string | null
+          id?: string
+          prioridade?: number | null
+        }
+        Update: {
+          ativo?: boolean | null
+          categoria?: string
+          codigo_match?: string | null
+          conceito?: string
+          created_at?: string | null
+          descricao_regex?: string | null
+          empresa_cnpj?: string | null
+          id?: string
+          prioridade?: number | null
+        }
+        Relationships: []
+      }
+      pjecalc_rubrica_raw: {
+        Row: {
+          calculo_id: string
+          classificacao: string
+          codigo: string | null
+          competencia: string
+          confianca: number | null
+          created_at: string | null
+          descricao: string
+          documento_id: string | null
+          id: string
+          pagina: number | null
+          tipo_documento: string | null
+          valor: number
+        }
+        Insert: {
+          calculo_id: string
+          classificacao: string
+          codigo?: string | null
+          competencia: string
+          confianca?: number | null
+          created_at?: string | null
+          descricao: string
+          documento_id?: string | null
+          id?: string
+          pagina?: number | null
+          tipo_documento?: string | null
+          valor: number
+        }
+        Update: {
+          calculo_id?: string
+          classificacao?: string
+          codigo?: string | null
+          competencia?: string
+          confianca?: number | null
+          created_at?: string | null
+          descricao?: string
+          documento_id?: string | null
+          id?: string
+          pagina?: number | null
+          tipo_documento?: string | null
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pjecalc_rubrica_raw_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_calculos"
             referencedColumns: ["id"]
           },
         ]
@@ -4189,51 +3414,6 @@ export type Database = {
           },
         ]
       }
-      pjecalc_salario_familia_config: {
-        Row: {
-          apurar: boolean | null
-          case_id: string
-          created_at: string | null
-          filhos_detalhes: Json | null
-          id: string
-          numero_filhos: number | null
-          observacoes: string | null
-        }
-        Insert: {
-          apurar?: boolean | null
-          case_id: string
-          created_at?: string | null
-          filhos_detalhes?: Json | null
-          id?: string
-          numero_filhos?: number | null
-          observacoes?: string | null
-        }
-        Update: {
-          apurar?: boolean | null
-          case_id?: string
-          created_at?: string | null
-          filhos_detalhes?: Json | null
-          id?: string
-          numero_filhos?: number | null
-          observacoes?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pjecalc_salario_familia_config_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: false
-            referencedRelation: "case_processing_stats"
-            referencedColumns: ["case_id"]
-          },
-          {
-            foreignKeyName: "pjecalc_salario_familia_config_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: false
-            referencedRelation: "cases"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       pjecalc_salario_minimo: {
         Row: {
           competencia: string
@@ -4265,39 +3445,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      pjecalc_seguro_config: {
-        Row: {
-          apurar: boolean | null
-          case_id: string
-          created_at: string
-          id: string
-          observacoes: string | null
-          parcelas: number | null
-          recebeu: boolean | null
-          valor_parcela: number | null
-        }
-        Insert: {
-          apurar?: boolean | null
-          case_id: string
-          created_at?: string
-          id?: string
-          observacoes?: string | null
-          parcelas?: number | null
-          recebeu?: boolean | null
-          valor_parcela?: number | null
-        }
-        Update: {
-          apurar?: boolean | null
-          case_id?: string
-          created_at?: string
-          id?: string
-          observacoes?: string | null
-          parcelas?: number | null
-          recebeu?: boolean | null
-          valor_parcela?: number | null
-        }
-        Relationships: []
       }
       pjecalc_seguro_desemprego: {
         Row: {
@@ -4349,348 +3496,85 @@ export type Database = {
           },
         ]
       }
-      pjecalc_vale_transporte: {
+      pjecalc_verba_base: {
         Row: {
-          created_at: string
+          ativa: boolean | null
+          calculo_id: string
+          caracteristica: string | null
+          codigo: string | null
+          created_at: string | null
+          divisor: number | null
+          fonte: string | null
+          hist_salarial_nome: string | null
           id: string
-          linha: string
-          max_desconto_pct: number
-          municipio: string | null
-          uf: string
-          valor: number
-          version_id: string | null
-          vigencia_fim: string | null
-          vigencia_inicio: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          linha: string
-          max_desconto_pct?: number
-          municipio?: string | null
-          uf: string
-          valor: number
-          version_id?: string | null
-          vigencia_fim?: string | null
-          vigencia_inicio: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          linha?: string
-          max_desconto_pct?: number
-          municipio?: string | null
-          uf?: string
-          valor?: number
-          version_id?: string | null
-          vigencia_fim?: string | null
-          vigencia_inicio?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pjecalc_vale_transporte_version_id_fkey"
-            columns: ["version_id"]
-            isOneToOne: false
-            referencedRelation: "reference_table_versions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pjecalc_verba_ocorrencias: {
-        Row: {
-          ativa: boolean
-          case_id: string | null
-          competencia: string
-          created_at: string
-          data_final: string
-          data_inicial: string
-          devido: number
-          diferenca: number
-          divisor: number
-          dobra: number
-          id: string
-          multiplicador: number
-          pago: number
-          quantidade: number
-          tipo_divisor: string
-          tipo_pago: string
-          tipo_quantidade: string
-          tipo_valor: string
-          valor_base: number
-          verba_id: string
-        }
-        Insert: {
-          ativa?: boolean
-          case_id?: string | null
-          competencia: string
-          created_at?: string
-          data_final: string
-          data_inicial: string
-          devido?: number
-          diferenca?: number
-          divisor?: number
-          dobra?: number
-          id?: string
-          multiplicador?: number
-          pago?: number
-          quantidade?: number
-          tipo_divisor?: string
-          tipo_pago?: string
-          tipo_quantidade?: string
-          tipo_valor?: string
-          valor_base?: number
-          verba_id: string
-        }
-        Update: {
-          ativa?: boolean
-          case_id?: string | null
-          competencia?: string
-          created_at?: string
-          data_final?: string
-          data_inicial?: string
-          devido?: number
-          diferenca?: number
-          divisor?: number
-          dobra?: number
-          id?: string
-          multiplicador?: number
-          pago?: number
-          quantidade?: number
-          tipo_divisor?: string
-          tipo_pago?: string
-          tipo_quantidade?: string
-          tipo_valor?: string
-          valor_base?: number
-          verba_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pjecalc_verba_ocorrencias_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: false
-            referencedRelation: "case_processing_stats"
-            referencedColumns: ["case_id"]
-          },
-          {
-            foreignKeyName: "pjecalc_verba_ocorrencias_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: false
-            referencedRelation: "cases"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pjecalc_verba_ocorrencias_verba_id_fkey"
-            columns: ["verba_id"]
-            isOneToOne: false
-            referencedRelation: "pjecalc_verbas"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pjecalc_verbas: {
-        Row: {
-          assunto_cnj: string | null
-          base_calculo: Json
-          caracteristica: string
-          case_id: string
-          comentarios: string | null
-          compor_principal: boolean
-          comportamento_reflexo: string | null
-          created_at: string
-          divisor_cartao_colunas: Json | null
-          divisor_informado: number | null
-          dobrar_valor_devido: boolean | null
-          exclusoes: Json
-          fracao_mes_modo: string | null
-          gerar_verba_principal: string
-          gerar_verba_reflexa: string
-          id: string
-          incidencias: Json
-          juros_ajuizamento: string
-          media_quantidade: boolean | null
-          multiplicador: number
+          incide_fgts: boolean | null
+          incide_inss: boolean | null
+          incide_ir: boolean | null
+          multiplicador: number | null
           nome: string
-          ocorrencia_pagamento: string
-          ordem: number
-          periodo_fim: string
-          periodo_inicio: string
-          proporcionalizar_devido: boolean | null
-          proporcionalizar_pago: boolean | null
-          quantidade_calendario_tipo: string | null
-          quantidade_cartao_colunas: Json | null
-          quantidade_informada: number | null
-          quantidade_proporcionalizar: boolean | null
-          tipo: string
-          tipo_divisor: string
-          tipo_multiplicador: string | null
-          tipo_quantidade: string
-          updated_at: string
-          valor: string
-          valor_informado_devido: number | null
-          valor_informado_pago: number | null
-          verba_principal_id: string | null
-          verbas_reflexas_base: Json | null
-          zerar_valor_negativo: boolean | null
+          observacoes: string | null
+          ordem: number | null
+          periodicidade: string | null
+          periodo_fim: string | null
+          periodo_inicio: string | null
+          tipo_variacao: string | null
+          updated_at: string | null
         }
         Insert: {
-          assunto_cnj?: string | null
-          base_calculo?: Json
-          caracteristica?: string
-          case_id: string
-          comentarios?: string | null
-          compor_principal?: boolean
-          comportamento_reflexo?: string | null
-          created_at?: string
-          divisor_cartao_colunas?: Json | null
-          divisor_informado?: number | null
-          dobrar_valor_devido?: boolean | null
-          exclusoes?: Json
-          fracao_mes_modo?: string | null
-          gerar_verba_principal?: string
-          gerar_verba_reflexa?: string
+          ativa?: boolean | null
+          calculo_id: string
+          caracteristica?: string | null
+          codigo?: string | null
+          created_at?: string | null
+          divisor?: number | null
+          fonte?: string | null
+          hist_salarial_nome?: string | null
           id?: string
-          incidencias?: Json
-          juros_ajuizamento?: string
-          media_quantidade?: boolean | null
-          multiplicador?: number
+          incide_fgts?: boolean | null
+          incide_inss?: boolean | null
+          incide_ir?: boolean | null
+          multiplicador?: number | null
           nome: string
-          ocorrencia_pagamento?: string
-          ordem?: number
-          periodo_fim: string
-          periodo_inicio: string
-          proporcionalizar_devido?: boolean | null
-          proporcionalizar_pago?: boolean | null
-          quantidade_calendario_tipo?: string | null
-          quantidade_cartao_colunas?: Json | null
-          quantidade_informada?: number | null
-          quantidade_proporcionalizar?: boolean | null
-          tipo?: string
-          tipo_divisor?: string
-          tipo_multiplicador?: string | null
-          tipo_quantidade?: string
-          updated_at?: string
-          valor?: string
-          valor_informado_devido?: number | null
-          valor_informado_pago?: number | null
-          verba_principal_id?: string | null
-          verbas_reflexas_base?: Json | null
-          zerar_valor_negativo?: boolean | null
+          observacoes?: string | null
+          ordem?: number | null
+          periodicidade?: string | null
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
+          tipo_variacao?: string | null
+          updated_at?: string | null
         }
         Update: {
-          assunto_cnj?: string | null
-          base_calculo?: Json
-          caracteristica?: string
-          case_id?: string
-          comentarios?: string | null
-          compor_principal?: boolean
-          comportamento_reflexo?: string | null
-          created_at?: string
-          divisor_cartao_colunas?: Json | null
-          divisor_informado?: number | null
-          dobrar_valor_devido?: boolean | null
-          exclusoes?: Json
-          fracao_mes_modo?: string | null
-          gerar_verba_principal?: string
-          gerar_verba_reflexa?: string
+          ativa?: boolean | null
+          calculo_id?: string
+          caracteristica?: string | null
+          codigo?: string | null
+          created_at?: string | null
+          divisor?: number | null
+          fonte?: string | null
+          hist_salarial_nome?: string | null
           id?: string
-          incidencias?: Json
-          juros_ajuizamento?: string
-          media_quantidade?: boolean | null
-          multiplicador?: number
+          incide_fgts?: boolean | null
+          incide_inss?: boolean | null
+          incide_ir?: boolean | null
+          multiplicador?: number | null
           nome?: string
-          ocorrencia_pagamento?: string
-          ordem?: number
-          periodo_fim?: string
-          periodo_inicio?: string
-          proporcionalizar_devido?: boolean | null
-          proporcionalizar_pago?: boolean | null
-          quantidade_calendario_tipo?: string | null
-          quantidade_cartao_colunas?: Json | null
-          quantidade_informada?: number | null
-          quantidade_proporcionalizar?: boolean | null
-          tipo?: string
-          tipo_divisor?: string
-          tipo_multiplicador?: string | null
-          tipo_quantidade?: string
-          updated_at?: string
-          valor?: string
-          valor_informado_devido?: number | null
-          valor_informado_pago?: number | null
-          verba_principal_id?: string | null
-          verbas_reflexas_base?: Json | null
-          zerar_valor_negativo?: boolean | null
+          observacoes?: string | null
+          ordem?: number | null
+          periodicidade?: string | null
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
+          tipo_variacao?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "pjecalc_verbas_case_id_fkey"
-            columns: ["case_id"]
+            foreignKeyName: "pjecalc_verba_base_calculo_id_fkey"
+            columns: ["calculo_id"]
             isOneToOne: false
-            referencedRelation: "case_processing_stats"
-            referencedColumns: ["case_id"]
-          },
-          {
-            foreignKeyName: "pjecalc_verbas_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: false
-            referencedRelation: "cases"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pjecalc_verbas_verba_principal_id_fkey"
-            columns: ["verba_principal_id"]
-            isOneToOne: false
-            referencedRelation: "pjecalc_verbas"
+            referencedRelation: "pjecalc_calculos"
             referencedColumns: ["id"]
           },
         ]
-      }
-      pjecalc_verbas_padrao: {
-        Row: {
-          ativo: boolean | null
-          caracteristica: string
-          created_at: string
-          divisor_padrao: number | null
-          id: string
-          incidencia_cs: boolean | null
-          incidencia_fgts: boolean | null
-          incidencia_irpf: boolean | null
-          multiplicador_padrao: number | null
-          nome: string
-          ocorrencia_pagamento: string
-          tipo: string
-          valor_tipo: string
-        }
-        Insert: {
-          ativo?: boolean | null
-          caracteristica?: string
-          created_at?: string
-          divisor_padrao?: number | null
-          id?: string
-          incidencia_cs?: boolean | null
-          incidencia_fgts?: boolean | null
-          incidencia_irpf?: boolean | null
-          multiplicador_padrao?: number | null
-          nome: string
-          ocorrencia_pagamento?: string
-          tipo?: string
-          valor_tipo?: string
-        }
-        Update: {
-          ativo?: boolean | null
-          caracteristica?: string
-          created_at?: string
-          divisor_padrao?: number | null
-          id?: string
-          incidencia_cs?: boolean | null
-          incidencia_fgts?: boolean | null
-          incidencia_irpf?: boolean | null
-          multiplicador_padrao?: number | null
-          nome?: string
-          ocorrencia_pagamento?: string
-          tipo?: string
-          valor_tipo?: string
-        }
-        Relationships: []
       }
       profile_calculators: {
         Row: {
