@@ -29,6 +29,7 @@ import { gerarRelatorioMemoriaCalculo } from "@/lib/pjecalc/pdf-report-memoria";
 import { gerarRelatorioDiferenca } from "@/lib/pjecalc/pdf-report-diferenca";
 import { gerarRelatorioCriteriosLegais } from "@/lib/pjecalc/relatorio-criterios";
 import { gerarRelatorioConsolidado } from "@/lib/pjecalc/pdf-report-consolidado";
+import { gerarRelatorioCompleto } from "@/lib/pjecalc/pdf-report-completo";
 import { downloadXML } from "@/lib/pjecalc/xml-export";
 import { fecharCalculo, reabrirCalculo, duplicarCalculo } from "@/lib/pjecalc/calc-operations";
 
@@ -47,6 +48,31 @@ export function ModuloResumo({ caseId }: Props) {
     queryFn: async () => {
       const { data } = await supabase.from("cases").select("*").eq("id", caseId).maybeSingle();
       return data;
+    },
+  });
+
+  // Load additional data for comprehensive report
+  const { data: paramsData } = useQuery({
+    queryKey: ["pjecalc_parametros_report", caseId],
+    queryFn: async () => {
+      const { data } = await supabase.from("pjecalc_parametros" as any).select("*").eq("case_id", caseId).maybeSingle();
+      return data as any;
+    },
+  });
+
+  const { data: correcaoData } = useQuery({
+    queryKey: ["pjecalc_correcao_report", caseId],
+    queryFn: async () => {
+      const { data } = await supabase.from("pjecalc_correcao_config" as any).select("*").eq("case_id", caseId).maybeSingle();
+      return data as any;
+    },
+  });
+
+  const { data: dadosProcessoData } = useQuery({
+    queryKey: ["pjecalc_dados_processo_report", caseId],
+    queryFn: async () => {
+      const { data } = await supabase.from("pjecalc_dados_processo" as any).select("*").eq("case_id", caseId).maybeSingle();
+      return data as any;
     },
   });
 
@@ -448,6 +474,20 @@ export function ModuloResumo({ caseId }: Props) {
     dataLiquidacao: resultado?.data_liquidacao,
     engineVersion: resultado?.engine_version,
   };
+  const reportMetaCompleto = {
+    ...reportMeta,
+    reclamado: dadosProcessoData?.reclamado || '',
+    vara: dadosProcessoData?.vara || caseData?.tribunal || '',
+    perito: dadosProcessoData?.perito || '',
+    dataAdmissao: paramsData?.data_admissao || '',
+    dataDemissao: paramsData?.data_demissao || '',
+    dataAjuizamento: paramsData?.data_ajuizamento || '',
+    funcao: dadosProcessoData?.funcao || '',
+    indiceCorrecao: correcaoData?.indice || 'IPCA-E',
+    jurosTipo: correcaoData?.juros_tipo || 'simples_mensal',
+    jurosPercentual: correcaoData?.juros_percentual ?? 1,
+    jurosInicio: correcaoData?.juros_inicio || 'ajuizamento',
+  };
 
   const handleFechar = async () => {
     if (!resultado?.id) return;
@@ -491,12 +531,21 @@ export function ModuloResumo({ caseId }: Props) {
         <div className="flex gap-2">
           {res && (
             <>
+              {/* Primary Export Button */}
+              <Button size="sm" onClick={() => gerarRelatorioCompleto(res, reportMetaCompleto)} className="bg-primary text-primary-foreground">
+                <FileBarChart className="h-4 w-4 mr-1" /> Exportar PDF
+              </Button>
+
               {/* Reports dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm"><Printer className="h-4 w-4 mr-1" /> Relatórios</Button>
+                  <Button variant="outline" size="sm"><Printer className="h-4 w-4 mr-1" /> Outros Relatórios</Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => gerarRelatorioCompleto(res, reportMetaCompleto)}>
+                    <FileBarChart className="h-4 w-4 mr-2" /> Relatório Completo (PDF)
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => gerarRelatorioPDF(res, reportMeta)}>
                     <FileBarChart className="h-4 w-4 mr-2" /> Resumo da Liquidação
                   </DropdownMenuItem>
