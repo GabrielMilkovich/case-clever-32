@@ -4,7 +4,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
+import * as svc from "@/lib/pjecalc/service";
 import { GitCompareArrows, TrendingUp, TrendingDown, Equal } from "lucide-react";
 import type { PjeLiquidacaoResult } from "@/lib/pjecalc/engine";
 
@@ -16,15 +16,7 @@ const pct = (a: number, b: number) => b !== 0 ? ((a - b) / Math.abs(b) * 100).to
 export function ComparacaoCenarios({ caseId }: Props) {
   const { data: liquidacoes = [] } = useQuery({
     queryKey: ["pjecalc_liquidacoes_all", caseId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("pjecalc_liquidacao_resultado" as any)
-        .select("*")
-        .eq("case_id", caseId)
-        .order("created_at", { ascending: false })
-        .limit(10);
-      return (data || []) as any[];
-    },
+    queryFn: () => svc.getLiquidacoes(caseId, 10),
   });
 
   if (liquidacoes.length < 2) {

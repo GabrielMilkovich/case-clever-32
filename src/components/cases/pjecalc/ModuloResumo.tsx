@@ -54,43 +54,28 @@ export function ModuloResumo({ caseId }: Props) {
   // Load additional data for comprehensive report
   const { data: paramsData } = useQuery({
     queryKey: ["pjecalc_parametros_report", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_parametros" as any).select("*").eq("case_id", caseId).maybeSingle();
-      return data as any;
-    },
+    queryFn: () => svc.getParametros(caseId),
   });
 
   const { data: correcaoData } = useQuery({
     queryKey: ["pjecalc_correcao_report", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_correcao_config" as any).select("*").eq("case_id", caseId).maybeSingle();
-      return data as any;
-    },
+    queryFn: () => svc.getCorrecaoConfig(caseId),
   });
 
   const { data: dadosProcessoData } = useQuery({
     queryKey: ["pjecalc_dados_processo_report", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_dados_processo" as any).select("*").eq("case_id", caseId).maybeSingle();
-      return data as any;
-    },
+    queryFn: () => svc.getDadosProcesso(caseId),
   });
 
   const { data: resultado } = useQuery({
     queryKey: ["pjecalc_liquidacao", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_liquidacao_resultado" as any).select("*").eq("case_id", caseId).order("created_at", { ascending: false }).limit(1).maybeSingle();
-      return data as any;
-    },
+    queryFn: () => svc.getResultado(caseId),
   });
 
   // Load verbas to get verba_principal_id linkage for hierarchical display
   const { data: verbasDB = [] } = useQuery({
     queryKey: ["pjecalc_verbas", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_verbas" as any).select("id, verba_principal_id, tipo").eq("case_id", caseId).order("ordem");
-      return (data || []) as any[];
-    },
+    queryFn: () => svc.getVerbas(caseId),
   });
 
   const executarLiquidacao = async () => {

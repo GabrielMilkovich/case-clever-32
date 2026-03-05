@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { MessageSquare, Plus, Trash2 } from "lucide-react";
+import * as svc from "@/lib/pjecalc/service";
 
 interface Props {
   caseId: string;
@@ -31,21 +32,13 @@ export function ObservacoesModulo({ caseId, modulo }: Props) {
 
   const { data: obs = [] } = useQuery({
     queryKey: ["pjecalc_observacoes", caseId, modulo],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("pjecalc_observacoes" as any)
-        .select("*")
-        .eq("case_id", caseId)
-        .eq("modulo", modulo)
-        .order("created_at", { ascending: false });
-      return (data || []) as any[];
-    },
+    queryFn: () => svc.getObservacoes(caseId, modulo),
   });
 
   const salvar = async () => {
     if (!texto.trim()) return;
     const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from("pjecalc_observacoes" as any).insert({
+    await svc.insertObservacao({
       case_id: caseId,
       modulo,
       tipo,
@@ -98,12 +91,12 @@ export function ObservacoesModulo({ caseId, modulo }: Props) {
 
       {obs.length > 0 && (
         <div className="space-y-1.5 max-h-40 overflow-y-auto">
-          {obs.map((o: any) => (
+          {obs.map((o) => (
             <div key={o.id} className="flex items-start gap-2 text-[10px] bg-muted/30 rounded p-2">
               <Badge variant={tipoBadgeColor[o.tipo] || 'secondary'} className="text-[9px] flex-shrink-0">{o.tipo}</Badge>
               <span className="flex-1">{o.texto}</span>
               <Button variant="ghost" size="icon" className="h-4 w-4 flex-shrink-0" onClick={async () => {
-                await supabase.from("pjecalc_observacoes" as any).delete().eq("id", o.id);
+                await svc.deleteObservacao(o.id);
                 qc.invalidateQueries({ queryKey: ["pjecalc_observacoes", caseId, modulo] });
               }}>
                 <Trash2 className="h-2.5 w-2.5" />

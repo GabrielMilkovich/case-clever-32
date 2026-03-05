@@ -78,7 +78,7 @@ export function ModuloCorrecao({ caseId }: Props) {
         data_liquidacao: form.data_liquidacao, data_citacao: null, data_fixa: null,
         combinacoes_indice: JSON.stringify(form.combinacoes_indice),
         combinacoes_juros: JSON.stringify(form.combinacoes_juros),
-      } as any);
+      } as Record<string, unknown>);
       qc.invalidateQueries({ queryKey: ["pjecalc_correcao_config", caseId] });
       qc.invalidateQueries({ queryKey: ["pjecalc_case_data", caseId] });
       toast.success("Correção/Juros configurados!");
