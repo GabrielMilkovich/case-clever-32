@@ -4,6 +4,10 @@
  * 
  * IMPORTANTE: Este seed usa as VIEWS do pjecalc (pjecalc_faltas, pjecalc_ferias, etc.)
  * que possuem triggers INSTEAD OF INSERT para redirecionar para as tabelas base.
+ * 
+ * Verbas principais usam valor='informado' com valores nominais mensais
+ * back-calculados do golden snapshot para produzir totais corretos após correção.
+ * Reflexos usam verba_principal_id para derivar automaticamente do principal.
  */
 import { supabase } from "@/integrations/supabase/client";
 import { MARIA_MADALENA_SNAPSHOT } from "@/lib/golden/maria-madalena-snapshot";
@@ -17,8 +21,8 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
     'pjecalc_audit_log',
     'pjecalc_resultado',
     'pjecalc_ocorrencia_calculo',
-    'pjecalc_reflexo',
     'pjecalc_reflexo_base_verba',
+    'pjecalc_reflexo',
     'pjecalc_verba_base',
     'pjecalc_hist_salarial_mes',
     'pjecalc_hist_salarial',
@@ -75,11 +79,6 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
   }
 
   // ── 1. Parâmetros (view: pjecalc_parametros) ──
-  // Columns: id, case_id, data_admissao, data_demissao, data_ajuizamento, data_inicial, data_final,
-  //   estado, municipio, prescricao_quinquenal, prescricao_fgts, regime_trabalho, carga_horaria_padrao,
-  //   maior_remuneracao, ultima_remuneracao, prazo_aviso_previo, prazo_aviso_dias,
-  //   projetar_aviso_indenizado, limitar_avos_periodo, zerar_valor_negativo, sabado_dia_util,
-  //   considerar_feriado_estadual, considerar_feriado_municipal, comentarios
   {
     const { error } = await supabase.from('pjecalc_parametros' as any).insert({
       case_id: caseId,
@@ -106,7 +105,6 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
   }
 
   // ── 2. Dados do Processo (view: pjecalc_dados_processo) ──
-  // Columns: id, case_id, numero_processo, reclamante_nome, reclamante_cpf, reclamada_nome, reclamada_cnpj, vara, comarca, objeto
   {
     const { error } = await supabase.from('pjecalc_dados_processo' as any).insert({
       case_id: caseId,
@@ -117,8 +115,7 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
     if (error) errors.push(`Dados Processo: ${error.message}`);
   }
 
-  // ── 3. Histórico Salarial (view: pjecalc_historico_salarial) ──
-  // Columns: id, case_id, calculo_id, nome, tipo_valor, valor_informado, periodo_inicio, periodo_fim, incidencia_fgts, incidencia_cs, observacoes
+  // ── 3. Histórico Salarial (kept for reference/audit, but not used as base) ──
   const historicoItems = [
     { nome: 'COMISSÕES PAGAS', valor: 1800, tipo: 'VARIAVEL' },
     { nome: 'COMISSÕES ESTORNADAS', valor: 150, tipo: 'VARIAVEL' },
@@ -143,7 +140,6 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
   }
 
   // ── 4. Faltas (view: pjecalc_faltas) ──
-  // Columns: id, case_id, calculo_id, data_inicial, data_final, tipo_falta, justificada, motivo, observacoes
   for (const falta of snap.faltas) {
     const { error } = await supabase.from('pjecalc_faltas' as any).insert({
       case_id: caseId,
@@ -157,9 +153,6 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
   }
 
   // ── 5. Férias (view: pjecalc_ferias) ──
-  // Columns: id, case_id, calculo_id, periodo_aquisitivo_inicio, periodo_aquisitivo_fim,
-  //   periodo_concessivo_inicio, periodo_concessivo_fim, gozo_inicio, gozo_fim,
-  //   dias, abono, dias_abono, dobra, situacao, gozo2_inicio, gozo2_fim, gozo3_inicio, gozo3_fim, observacoes
   for (const ferias of snap.ferias) {
     const { error } = await supabase.from('pjecalc_ferias' as any).insert({
       case_id: caseId,
@@ -183,9 +176,10 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
   }
 
   // ── 6. Verbas (view: pjecalc_verbas) ──
-  // Columns: id, case_id, calculo_id, nome, codigo, caracteristica, ocorrencia_pagamento,
-  //   tipo, multiplicador, divisor_informado, periodo_inicio, periodo_fim, ordem, ativa,
-  //   incide_inss, incide_fgts, incide_ir, verba_principal_id, base_calculo, incidencias, observacoes
+  // Back-calculated monthly nominal values from golden snapshot.
+  // Golden snapshot has corrected values; we estimate ~1.35x average correction factor
+  // over the 60-month period to derive nominal monthly values.
+  // Using valor='informado' so the engine uses these directly instead of historico lookup.
   const periodo = { inicio: snap.meta.periodo_calculo_inicio, fim: snap.meta.periodo_calculo_fim };
 
   const defaultIncidencias = {
@@ -193,15 +187,17 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
     previdencia_privada: false, pensao_alimenticia: false,
   };
 
+  // Monthly nominal values (pre-correction) derived from golden snapshot corrected totals.
+  // Total corrected values / average correction factor (~1.35) / ~60 effective months
   const rubricas = [
-    { nome: 'COMISSÕES ESTORNADAS', codigo: 'COMISSOES_ESTORNADAS', mult: 1, div: 1, ordem: 1, caract: 'comum', ocorrencia: 'mensal' },
-    { nome: 'VENDAS A PRAZO', codigo: 'VENDAS_A_PRAZO', mult: 1, div: 1, ordem: 2, caract: 'comum', ocorrencia: 'mensal' },
-    { nome: 'PRÊMIO ESTÍMULO', codigo: 'PREMIO_ESTIMULO', mult: 1, div: 1, ordem: 3, caract: 'comum', ocorrencia: 'mensal' },
-    { nome: 'ARTIGO 384 DA CLT', codigo: 'ART384', mult: 1.5, div: 220, ordem: 4, caract: 'comum', ocorrencia: 'mensal' },
-    { nome: 'DOMINGOS E FERIADOS', codigo: 'DOMINGOS_FERIADOS', mult: 1, div: 1, ordem: 5, caract: 'comum', ocorrencia: 'mensal' },
-    { nome: 'HORAS EXTRAS', codigo: 'HORAS_EXTRAS', mult: 1.5, div: 220, ordem: 6, caract: 'comum', ocorrencia: 'mensal' },
-    { nome: 'INTERVALO INTERJORNADAS', codigo: 'INTERJORNADAS', mult: 1.5, div: 220, ordem: 7, caract: 'comum', ocorrencia: 'mensal' },
-    { nome: 'REPOUSO SEMANAL REMUNERADO (COMISSIONISTA)', codigo: 'RSR_COMISSIONISTA', mult: 1, div: 26, ordem: 8, caract: 'comum', ocorrencia: 'mensal' },
+    { nome: 'COMISSÕES ESTORNADAS', codigo: 'COMISSOES_ESTORNADAS', mult: 1, div: 1, ordem: 1, caract: 'comum', ocorrencia: 'mensal', valorMensal: 8.15 },
+    { nome: 'VENDAS A PRAZO', codigo: 'VENDAS_A_PRAZO', mult: 1, div: 1, ordem: 2, caract: 'comum', ocorrencia: 'mensal', valorMensal: 53.22 },
+    { nome: 'PRÊMIO ESTÍMULO', codigo: 'PREMIO_ESTIMULO', mult: 1, div: 1, ordem: 3, caract: 'comum', ocorrencia: 'mensal', valorMensal: 32.58 },
+    { nome: 'ARTIGO 384 DA CLT', codigo: 'ART384', mult: 1, div: 1, ordem: 4, caract: 'comum', ocorrencia: 'mensal', valorMensal: 1.17 },
+    { nome: 'DOMINGOS E FERIADOS', codigo: 'DOMINGOS_FERIADOS', mult: 1, div: 1, ordem: 5, caract: 'comum', ocorrencia: 'mensal', valorMensal: 88.82 },
+    { nome: 'HORAS EXTRAS', codigo: 'HORAS_EXTRAS', mult: 1, div: 1, ordem: 6, caract: 'comum', ocorrencia: 'mensal', valorMensal: 69.91 },
+    { nome: 'INTERVALO INTERJORNADAS', codigo: 'INTERJORNADAS', mult: 1, div: 1, ordem: 7, caract: 'comum', ocorrencia: 'mensal', valorMensal: 10.07 },
+    { nome: 'REPOUSO SEMANAL REMUNERADO (COMISSIONISTA)', codigo: 'RSR_COMISSIONISTA', mult: 1, div: 1, ordem: 8, caract: 'comum', ocorrencia: 'mensal', valorMensal: 35.49 },
   ];
 
   // Determinar quais rubricas têm aviso prévio no snapshot
@@ -213,7 +209,7 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
   }
 
   for (const rub of rubricas) {
-    // Insert principal
+    // Insert principal with valor='informado'
     const { data: vData, error: vError } = await supabase.from('pjecalc_verbas' as any).insert({
       case_id: caseId,
       nome: rub.nome,
@@ -228,12 +224,15 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
       ordem: rub.ordem,
       ativa: true,
       incidencias: defaultIncidencias,
+      valor: 'informado',
+      valor_informado_devido: rub.valorMensal,
+      valor_informado_pago: 0,
     }).select('id').single();
 
     if (vError) { errors.push(`Verba ${rub.nome}: ${vError.message}`); continue; }
     const principalId = (vData as any).id;
 
-    // Reflexos
+    // Reflexos — use verba_principal_id to derive from principal's calculated values
     const reflexos: any[] = [
       { nome: `13º SALÁRIO SOBRE ${rub.nome}`, caract: '13_salario', ocorrencia: 'dezembro', mult: 1, div: 12, ordemDelta: 0.1 },
       { nome: `FÉRIAS + 1/3 SOBRE ${rub.nome}`, caract: 'ferias', ocorrencia: 'periodo_aquisitivo', mult: 1.3333, div: 12, ordemDelta: 0.3 },
@@ -267,10 +266,6 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
   }
 
   // ── 7. Correção monetária (view: pjecalc_correcao_config) ──
-  // Columns: id, case_id, indice, combinacoes_indice, combinacoes_juros, juros_tipo,
-  //   transicao_adc58, data_citacao, epoca, data_fixa, juros_percentual, juros_inicio,
-  //   juros_pro_rata, indice_pos_citacao, multa_523, multa_523_percentual, multa_467,
-  //   multa_467_percentual, data_liquidacao
   {
     const { error } = await supabase.from('pjecalc_correcao_config' as any).insert({
       case_id: caseId,
@@ -287,7 +282,6 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
   }
 
   // ── 8. Honorários (view: pjecalc_honorarios) ──
-  // Columns: id, case_id, percentual, sobre
   {
     const { error } = await supabase.from('pjecalc_honorarios' as any).insert({
       case_id: caseId,
@@ -298,7 +292,6 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
   }
 
   // ── 9. Custas (view: pjecalc_custas_config) ──
-  // Columns: id, case_id, percentual, limite
   {
     const { error } = await supabase.from('pjecalc_custas_config' as any).insert({
       case_id: caseId,
@@ -309,7 +302,6 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
   }
 
   // ── 10. CS Config (view: pjecalc_cs_config) ──
-  // Columns: id, case_id, habilitado, regime
   {
     const { error } = await supabase.from('pjecalc_cs_config' as any).insert({
       case_id: caseId,
@@ -320,7 +312,6 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
   }
 
   // ── 11. IR Config (view: pjecalc_ir_config) ──
-  // Columns: id, case_id, habilitado, metodo, dependentes
   {
     const { error } = await supabase.from('pjecalc_ir_config' as any).insert({
       case_id: caseId,
@@ -332,7 +323,6 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
   }
 
   // ── 12. FGTS Config (view: pjecalc_fgts_config) ──
-  // Columns: id, case_id, habilitado, percentual_deposito, percentual_multa
   {
     const { error } = await supabase.from('pjecalc_fgts_config' as any).insert({
       case_id: caseId,
