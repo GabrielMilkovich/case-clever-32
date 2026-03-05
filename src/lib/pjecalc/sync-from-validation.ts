@@ -194,45 +194,46 @@ async function upsertConfig(table: string, caseId: string, payload: any, errors:
   }
 }
 
-/** Auto-configura FGTS, CS, IR, Correção, Honorários, Custas, Multas, Seguro */
+/** Auto-configura módulos de config via pjecalc_calculos e pjecalc_correcao_config */
 async function autoConfigureModules(caseId: string, params: any, factMap: Record<string, string>, errors: string[]) {
-  const dataAjuizamento = params.data_ajuizamento || factMap.data_ajuizamento || new Date().toISOString().slice(0, 10);
   const dataCitacao = factMap.data_citacao || factMap.data_notificacao || '';
 
-  // All upserts in parallel — use ACTUAL view column names
-  await Promise.all([
-    // FGTS: habilitado, percentual_deposito, percentual_multa
-    upsertConfig("pjecalc_fgts_config", caseId, {
-      habilitado: true,
-      percentual_deposito: 8,
-      percentual_multa: 40,
-    }, errors, "FGTS Config"),
+  // Wait for pjecalc_calculos to exist (created by trigger on parametros insert)
+  await new Promise(r => setTimeout(r, 300));
 
-    // Contribuição Social: habilitado, regime
-    upsertConfig("pjecalc_cs_config", caseId, {
-      habilitado: true,
-      regime: "CLT",
-    }, errors, "CS Config"),
+  // Get calculo_id
+  const { data: calculoRow } = await supabase
+    .from("pjecalc_calculos")
+    .select("id")
+    .eq("case_id", caseId)
+    .maybeSingle();
 
-    // Imposto de Renda: habilitado, metodo, dependentes
-    upsertConfig("pjecalc_ir_config", caseId, {
-      habilitado: true,
-      metodo: "progressivo",
-      dependentes: 0,
-    }, errors, "IR Config"),
+  if (calculoRow) {
+    // Update writable columns directly on pjecalc_calculos
+    const { error } = await supabase.from("pjecalc_calculos").update({
+      honorarios_percentual: 15,
+      honorarios_sobre: 'condenacao',
+      custas_percentual: 2,
+      custas_limite: 10.64,
+      multa_477_habilitada: true,
+      multa_467_habilitada: false,
+    }).eq("id", (calculoRow as any).id);
+    if (error) errors.push(`Config Calculos: ${error.message}`);
+  }
 
-    // Correção Monetária: indice, epoca, juros_tipo, juros_percentual, juros_inicio, multa_523, data_liquidacao, data_citacao
-    upsertConfig("pjecalc_correcao_config", caseId, {
-      indice: "IPCA-E",
-      epoca: "mensal",
-      juros_tipo: "simples_mensal",
-      juros_percentual: 1,
-      juros_inicio: "ajuizamento",
-      multa_523: false,
-      multa_523_percentual: 0,
-      data_liquidacao: new Date().toISOString().slice(0, 10),
-      ...(dataCitacao ? { data_citacao: dataCitacao } : {}),
-    }, errors, "Correção Config"),
+  // Correção config — this view has its own INSTEAD OF triggers or is a real table mapping
+  await upsertConfig("pjecalc_correcao_config", caseId, {
+    indice: "IPCA-E",
+    epoca: "mensal",
+    juros_tipo: "simples_mensal",
+    juros_percentual: 1,
+    juros_inicio: "ajuizamento",
+    multa_523: false,
+    multa_523_percentual: 0,
+    data_liquidacao: new Date().toISOString().slice(0, 10),
+    ...(dataCitacao ? { data_citacao: dataCitacao } : {}),
+  }, errors, "Correção Config");
+}
 
     // Honorários: percentual, sobre
     upsertConfig("pjecalc_honorarios", caseId, {
