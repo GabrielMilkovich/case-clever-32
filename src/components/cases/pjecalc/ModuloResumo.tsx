@@ -447,7 +447,7 @@ export function ModuloResumo({ caseId }: Props) {
     }
   };
 
-  const res: PjeLiquidacaoResult | null = resultado?.resultado || null;
+  const res = (resultado?.resultado as unknown as PjeLiquidacaoResult) || null;
   const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
   const isFechado = resultado?.status === 'fechado';
   const reportMeta = {
