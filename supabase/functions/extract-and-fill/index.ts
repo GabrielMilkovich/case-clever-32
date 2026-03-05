@@ -1,7 +1,7 @@
 // =====================================================
 // EDGE FUNCTION: EXTRACT-AND-FILL
-// OCR + Extração Estruturada + Auto-Preenchimento PJe-Calc
-// Usa Gemini 2.5 Pro para máxima precisão
+// OCR via Mistral API + Extração Estruturada via OpenAI (Lovable AI)
+// Auto-Preenchimento PJe-Calc
 // =====================================================
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -305,25 +305,93 @@ PARA CARTÃO DE PONTO:
 
 O campo texto_ocr_completo DEVE conter o texto integral do documento.`;
 
-async function callAI(
+// =====================================================
+// STAGE 1: Mistral OCR — extract raw text from document image
+// =====================================================
+async function mistralOCR(
   base64Data: string,
   mimeType: string,
-  apiKey: string
-): Promise<any> {
+  mistralApiKey: string
+): Promise<string> {
   let lastError: Error | null = null;
 
-  // Try Gemini 2.5 Pro first (best accuracy), then Flash as fallback
-  const models = ["google/gemini-2.5-pro", "google/gemini-2.5-flash", "google/gemini-3-flash-preview"];
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    console.log(`[OCR] Mistral attempt ${attempt}`);
+    try {
+      const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${mistralApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "mistral-small-latest",
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: "Extraia TODO o texto deste documento trabalhista brasileiro. Preserve a formatação de tabelas, valores monetários e datas exatamente como aparecem. Inclua TODAS as linhas, colunas e dados sem omitir nada. Retorne apenas o texto extraído, sem comentários."
+                },
+                {
+                  type: "image_url",
+                  image_url: { url: `data:${mimeType};base64,${base64Data}` },
+                },
+              ],
+            },
+          ],
+          max_tokens: 16000,
+          temperature: 0,
+        }),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error(`[OCR] Mistral ${response.status}:`, errText.substring(0, 200));
+        if (response.status === 429) {
+          await delay(RETRY_DELAY_MS * attempt * 3);
+          continue;
+        }
+        lastError = new Error(`Mistral OCR ${response.status}`);
+        if (response.status >= 500) { await delay(RETRY_DELAY_MS * attempt); continue; }
+        break;
+      }
+
+      const data = await response.json();
+      const text = data.choices?.[0]?.message?.content || "";
+      if (text.length > 50) {
+        console.log(`[OCR] Mistral success: ${text.length} chars`);
+        return text;
+      }
+      lastError = new Error("OCR returned too little text");
+      continue;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      await delay(RETRY_DELAY_MS * attempt);
+    }
+  }
+  throw new Error(`Mistral OCR failed: ${lastError?.message}`);
+}
+
+// =====================================================
+// STAGE 2: OpenAI (Lovable AI) — structured extraction from OCR text
+// =====================================================
+async function extractStructured(
+  ocrText: string,
+  lovableApiKey: string
+): Promise<any> {
+  let lastError: Error | null = null;
+  const models = ["openai/gpt-5", "openai/gpt-5-mini"];
 
   for (const model of models) {
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      console.log(`[EXTRACT] Attempt ${attempt} with ${model}`);
-
+      console.log(`[EXTRACT] ${model} attempt ${attempt}`);
       try {
         const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${apiKey}`,
+            Authorization: `Bearer ${lovableApiKey}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -332,16 +400,7 @@ async function callAI(
               { role: "system", content: SYSTEM_PROMPT },
               {
                 role: "user",
-                content: [
-                  {
-                    type: "text",
-                    text: "Analise este documento trabalhista e extraia ABSOLUTAMENTE TODOS os dados usando a função extrair_dados_documento. Não omita nenhuma informação."
-                  },
-                  {
-                    type: "image_url",
-                    image_url: { url: `data:${mimeType};base64,${base64Data}` },
-                  },
-                ],
+                content: `Analise o texto abaixo extraído por OCR de um documento trabalhista e extraia ABSOLUTAMENTE TODOS os dados usando a função extrair_dados_documento. Não omita nenhuma informação.\n\n--- TEXTO DO DOCUMENTO ---\n${ocrText}\n--- FIM DO TEXTO ---`
               },
             ],
             tools: EXTRACTION_TOOLS,
@@ -353,18 +412,11 @@ async function callAI(
 
         if (!response.ok) {
           const errText = await response.text();
-          console.error(`[EXTRACT] API ${response.status}:`, errText.substring(0, 200));
-
-          if (response.status === 429) {
-            await delay(RETRY_DELAY_MS * attempt * 3);
-            continue;
-          }
-          if (response.status >= 500) {
-            await delay(RETRY_DELAY_MS * attempt);
-            continue;
-          }
+          console.error(`[EXTRACT] ${model} ${response.status}:`, errText.substring(0, 200));
+          if (response.status === 429) { await delay(RETRY_DELAY_MS * attempt * 3); continue; }
+          if (response.status >= 500) { await delay(RETRY_DELAY_MS * attempt); continue; }
           lastError = new Error(`API ${response.status}`);
-          break; // next model
+          break;
         }
 
         const data = await response.json();
@@ -372,29 +424,30 @@ async function callAI(
 
         if (toolCall?.function?.arguments) {
           const extracted = JSON.parse(toolCall.function.arguments);
+          // Ensure OCR text is preserved
+          if (!extracted.texto_ocr_completo) extracted.texto_ocr_completo = ocrText;
           console.log(`[EXTRACT] SUCCESS with ${model}: tipo=${extracted.tipo_documento}, rubricas=${extracted.rubricas?.length || 0}`);
           return extracted;
         }
 
-        // Fallback: try parsing from content
         const content = data.choices?.[0]?.message?.content || "";
         const jsonMatch = content.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]);
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (!parsed.texto_ocr_completo) parsed.texto_ocr_completo = ocrText;
+          return parsed;
         }
 
         lastError = new Error("No structured data returned");
         continue;
       } catch (err) {
-        console.error(`[EXTRACT] Error:`, err);
         lastError = err instanceof Error ? err : new Error(String(err));
         await delay(RETRY_DELAY_MS * attempt);
       }
     }
     console.warn(`[EXTRACT] Model ${model} exhausted, trying next...`);
   }
-
-  throw new Error(`Extraction failed: ${lastError?.message}`);
+  throw new Error(`Structured extraction failed: ${lastError?.message}`);
 }
 
 // =====================================================
@@ -967,6 +1020,7 @@ async function processDocumentInBackground(
   document_id: string,
   fileUrl: string,
   doc: any,
+  MISTRAL_API_KEY: string,
   LOVABLE_API_KEY: string,
   supabase: any
 ) {
@@ -1005,8 +1059,12 @@ async function processDocumentInBackground(
     // Free the buffer to reduce memory
     fileBuffer = null;
 
-    // Call AI for structured extraction
-    const extracted = await callAI(base64Data, mimeType, LOVABLE_API_KEY);
+    // Stage 1: Mistral OCR — extract raw text
+    const ocrText = await mistralOCR(base64Data, mimeType, MISTRAL_API_KEY);
+    console.log(`[EXTRACT] OCR complete: ${ocrText.length} chars`);
+
+    // Stage 2: OpenAI structured extraction from OCR text
+    const extracted = await extractStructured(ocrText, LOVABLE_API_KEY);
 
     // Auto-fill pjecalc tables
     const fills = await autoFill(supabase, doc.case_id, extracted);
@@ -1104,6 +1162,9 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
+    const MISTRAL_API_KEY = Deno.env.get("MISTRAL_API_KEY");
+    if (!MISTRAL_API_KEY) throw new Error("MISTRAL_API_KEY not configured");
+
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -1155,7 +1216,7 @@ serve(async (req) => {
 
     // Start background processing — does NOT block the response
     EdgeRuntime.waitUntil(
-      processDocumentInBackground(document_id, fileUrl, doc, LOVABLE_API_KEY, supabase)
+      processDocumentInBackground(document_id, fileUrl, doc, MISTRAL_API_KEY, LOVABLE_API_KEY, supabase)
     );
 
     // Return immediately
