@@ -1,7 +1,7 @@
 /**
  * Seed: Caso Maria Madalena Alves Ferreira vs Via Varejo SA
  * Processo: 1001211-76.2025.5.02.0461
- * Comissionista pura — salário variável com 6 rubricas no histórico salarial
+ * Comissionista pura — 8 verbas principais com reflexas conforme PJe-Calc real
  */
 import { supabase } from "@/integrations/supabase/client";
 
@@ -28,7 +28,7 @@ export async function seedCasoMaria(): Promise<string> {
       { case_id: caseId, nome: "Via Varejo SA", tipo: "reclamada" as any, documento: "33.041.260/0652-90", documento_tipo: "CNPJ" },
     ]);
 
-    // 3. Employment contract — comissionista pura, salário variável
+    // 3. Employment contract
     await supabase.from("employment_contracts" as any).insert({
       case_id: caseId,
       data_admissao: "2015-03-07",
@@ -61,7 +61,7 @@ export async function seedCasoMaria(): Promise<string> {
       }))
     );
 
-    // 5. Parâmetros — this auto-creates pjecalc_calculos via INSTEAD OF trigger
+    // 5. Parâmetros (auto-creates pjecalc_calculos via trigger)
     await supabase.from("pjecalc_parametros" as any).insert({
       case_id: caseId,
       data_admissao: "2015-03-07",
@@ -85,7 +85,7 @@ export async function seedCasoMaria(): Promise<string> {
       maior_remuneracao: 4200,
     });
 
-    // Get calculo_id for direct table inserts
+    // Get calculo_id
     const { data: calculoRow } = await supabase
       .from("pjecalc_calculos")
       .select("id")
@@ -94,7 +94,7 @@ export async function seedCasoMaria(): Promise<string> {
     const calculoId = (calculoRow as any)?.id;
     if (!calculoId) throw new Error("pjecalc_calculos não foi criado pelo trigger");
 
-    // 6. Histórico Salarial — 6 rubricas via tabela real pjecalc_hist_salarial
+    // 6. Histórico Salarial — 6 rubricas comissionista
     const historicoRubricas = [
       { nome: "COMISSÕES PAGAS", tipo_variacao: "variavel", valor_fixo: 1800, incide_fgts: true },
       { nome: "COMISSÕES ESTORNADAS", tipo_variacao: "variavel", valor_fixo: 150, incide_fgts: false },
@@ -116,11 +116,11 @@ export async function seedCasoMaria(): Promise<string> {
       }).select("id").single();
 
       if (histErr || !histInserted) {
-        console.warn(`Erro ao inserir hist_salarial ${rub.nome}:`, histErr?.message);
+        console.warn(`Erro hist_salarial ${rub.nome}:`, histErr?.message);
         continue;
       }
 
-      // Generate monthly occurrences in pjecalc_hist_salarial_mes
+      // Monthly occurrences
       const ocorrencias: any[] = [];
       const cur = new Date(2020, 0, 1);
       const end = new Date(2024, 8, 1);
@@ -128,67 +128,25 @@ export async function seedCasoMaria(): Promise<string> {
         const comp = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`;
         const variation = 0.7 + Math.random() * 0.6;
         let valor = Math.round(rub.valor_fixo * variation * 100) / 100;
-
-        if (rub.nome === "COMISSÕES ESTORNADAS") {
-          valor = -Math.abs(valor);
-        }
-        if (rub.nome === "MÍNIMO GARANTIDO") {
-          valor = Math.random() > 0.4 ? 0 : Math.round(rub.valor_fixo * variation * 100) / 100;
-        }
-
-        ocorrencias.push({
-          calculo_id: calculoId,
-          hist_salarial_id: histInserted.id,
-          competencia: comp,
-          valor,
-          origem: "seed",
-        });
+        if (rub.nome === "COMISSÕES ESTORNADAS") valor = -Math.abs(valor);
+        if (rub.nome === "MÍNIMO GARANTIDO") valor = Math.random() > 0.4 ? 0 : Math.round(rub.valor_fixo * variation * 100) / 100;
+        ocorrencias.push({ calculo_id: calculoId, hist_salarial_id: histInserted.id, competencia: comp, valor, origem: "seed" });
         cur.setMonth(cur.getMonth() + 1);
       }
-
       if (ocorrencias.length > 0) {
-        // Insert in batches of 50 to avoid payload limits
         for (let i = 0; i < ocorrencias.length; i += 50) {
-          const batch = ocorrencias.slice(i, i + 50);
-          const { error: mesErr } = await supabase.from("pjecalc_hist_salarial_mes").insert(batch);
-          if (mesErr) console.warn(`Erro ao inserir mes batch ${rub.nome}:`, mesErr.message);
+          await supabase.from("pjecalc_hist_salarial_mes").insert(ocorrencias.slice(i, i + 50));
         }
       }
     }
 
-    // 7. Férias — via view (INSTEAD OF trigger handles it)
+    // 7. Férias
     await supabase.from("pjecalc_ferias" as any).insert([
-      {
-        case_id: caseId,
-        periodo_aquisitivo_inicio: "2020-03-07", periodo_aquisitivo_fim: "2021-03-06",
-        periodo_concessivo_inicio: "2021-03-07", periodo_concessivo_fim: "2022-03-06",
-        situacao: "gozadas", dias: 30,
-        gozo_inicio: "2021-07-01", gozo_fim: "2021-07-30",
-      },
-      {
-        case_id: caseId,
-        periodo_aquisitivo_inicio: "2021-03-07", periodo_aquisitivo_fim: "2022-03-06",
-        periodo_concessivo_inicio: "2022-03-07", periodo_concessivo_fim: "2023-03-06",
-        situacao: "gozadas", dias: 30,
-        gozo_inicio: "2022-09-01", gozo_fim: "2022-09-30",
-      },
-      {
-        case_id: caseId,
-        periodo_aquisitivo_inicio: "2022-03-07", periodo_aquisitivo_fim: "2023-03-06",
-        periodo_concessivo_inicio: "2023-03-07", periodo_concessivo_fim: "2024-03-06",
-        situacao: "nao_gozadas", dias: 30, dobra: true,
-      },
-      {
-        case_id: caseId,
-        periodo_aquisitivo_inicio: "2023-03-07", periodo_aquisitivo_fim: "2024-03-06",
-        periodo_concessivo_inicio: "2024-03-07", periodo_concessivo_fim: "2025-03-06",
-        situacao: "nao_gozadas", dias: 30, dobra: true,
-      },
-      {
-        case_id: caseId,
-        periodo_aquisitivo_inicio: "2024-03-07", periodo_aquisitivo_fim: "2024-09-15",
-        situacao: "proporcionais", dias: 15,
-      },
+      { case_id: caseId, periodo_aquisitivo_inicio: "2020-03-07", periodo_aquisitivo_fim: "2021-03-06", periodo_concessivo_inicio: "2021-03-07", periodo_concessivo_fim: "2022-03-06", situacao: "gozadas", dias: 30, gozo_inicio: "2021-07-01", gozo_fim: "2021-07-30" },
+      { case_id: caseId, periodo_aquisitivo_inicio: "2021-03-07", periodo_aquisitivo_fim: "2022-03-06", periodo_concessivo_inicio: "2022-03-07", periodo_concessivo_fim: "2023-03-06", situacao: "gozadas", dias: 30, gozo_inicio: "2022-09-01", gozo_fim: "2022-09-30" },
+      { case_id: caseId, periodo_aquisitivo_inicio: "2022-03-07", periodo_aquisitivo_fim: "2023-03-06", periodo_concessivo_inicio: "2023-03-07", periodo_concessivo_fim: "2024-03-06", situacao: "nao_gozadas", dias: 30, dobra: true },
+      { case_id: caseId, periodo_aquisitivo_inicio: "2023-03-07", periodo_aquisitivo_fim: "2024-03-06", periodo_concessivo_inicio: "2024-03-07", periodo_concessivo_fim: "2025-03-06", situacao: "nao_gozadas", dias: 30, dobra: true },
+      { case_id: caseId, periodo_aquisitivo_inicio: "2024-03-07", periodo_aquisitivo_fim: "2024-09-15", situacao: "proporcionais", dias: 15 },
     ]);
 
     // 8. Faltas
@@ -198,135 +156,160 @@ export async function seedCasoMaria(): Promise<string> {
       { case_id: caseId, data_inicial: "2023-03-20", data_final: "2023-03-20", justificada: true, motivo: "Consulta médica" },
     ]);
 
-    // 9. Verbas Principais
-    const incidenciasPadrao = { dsr: true, decimo_terceiro: true, ferias: true, fgts: true, aviso_previo: true };
+    // ===== 9. VERBAS — 8 Principais conforme PJe-Calc real =====
     const periodoCalc = { inicio: "2020-01-20", fim: "2024-09-15" };
 
-    const { data: difComissao } = await supabase.from("pjecalc_verbas" as any).insert({
-      case_id: caseId, nome: "Diferenças de Comissão", tipo: "principal", caracteristica: "comum",
-      ocorrencia_pagamento: "mensal", multiplicador: 1, divisor_informado: 1,
-      periodo_inicio: periodoCalc.inicio, periodo_fim: periodoCalc.fim, ordem: 0,
-      incidencias: incidenciasPadrao,
-    }).select("id").single();
+    // Definição das 8 verbas principais com suas reflexas (conforme screenshots PJe-Calc)
+    const verbasPrincipais = [
+      {
+        nome: "REPOUSO SEMANAL REMUNERADO (COMISSIONISTA)",
+        multiplicador: 1, divisor_informado: 26,
+        reflexas: [
+          { nome: "13º SALÁRIO SOBRE RSR (COMISSIONISTA)", caracteristica: "13_salario", ocorrencia_pagamento: "dezembro", multiplicador: 1, divisor_informado: 12, ativa: true },
+          { nome: "AVISO PRÉVIO SOBRE RSR (COMISSIONISTA)", caracteristica: "aviso_previo", ocorrencia_pagamento: "desligamento", multiplicador: 1, divisor_informado: 12, ativa: true },
+          { nome: "FÉRIAS + 1/3 SOBRE RSR (COMISSIONISTA)", caracteristica: "ferias", ocorrencia_pagamento: "periodo_aquisitivo", multiplicador: 1.3333, divisor_informado: 12, ativa: true },
+          { nome: "MULTA DO ARTIGO 477 DA CLT SOBRE RSR (COMISSIONISTA)", caracteristica: "comum", ocorrencia_pagamento: "desligamento", multiplicador: 1, divisor_informado: 1, ativa: false },
+        ],
+      },
+      {
+        nome: "INTERVALO INTERJORNADAS",
+        multiplicador: 1.5, divisor_informado: 220,
+        reflexas: [
+          { nome: "13º SALÁRIO SOBRE INTERVALO INTERJORNADAS", caracteristica: "13_salario", ocorrencia_pagamento: "dezembro", multiplicador: 1, divisor_informado: 12, ativa: true },
+          { nome: "FÉRIAS + 1/3 SOBRE INTERVALO INTERJORNADAS", caracteristica: "ferias", ocorrencia_pagamento: "periodo_aquisitivo", multiplicador: 1.3333, divisor_informado: 12, ativa: true },
+          { nome: "REPOUSO SEMANAL REMUNERADO E FERIADO SOBRE INTERVALO INTERJORNADAS", caracteristica: "comum", ocorrencia_pagamento: "mensal", multiplicador: 1, divisor_informado: 26, ativa: true },
+          { nome: "AVISO PRÉVIO SOBRE INTERVALO INTERJORNADAS", caracteristica: "aviso_previo", ocorrencia_pagamento: "desligamento", multiplicador: 1, divisor_informado: 12, ativa: false },
+          { nome: "MULTA DO ARTIGO 477 DA CLT SOBRE INTERVALO INTERJORNADAS", caracteristica: "comum", ocorrencia_pagamento: "desligamento", multiplicador: 1, divisor_informado: 1, ativa: false },
+        ],
+      },
+      {
+        nome: "HORAS EXTRAS",
+        multiplicador: 1.5, divisor_informado: 220,
+        reflexas: [
+          { nome: "13º SALÁRIO SOBRE HORAS EXTRAS", caracteristica: "13_salario", ocorrencia_pagamento: "dezembro", multiplicador: 1, divisor_informado: 12, ativa: true },
+          { nome: "AVISO PRÉVIO SOBRE HORAS EXTRAS", caracteristica: "aviso_previo", ocorrencia_pagamento: "desligamento", multiplicador: 1, divisor_informado: 12, ativa: true },
+          { nome: "FÉRIAS + 1/3 SOBRE HORAS EXTRAS", caracteristica: "ferias", ocorrencia_pagamento: "periodo_aquisitivo", multiplicador: 1.3333, divisor_informado: 12, ativa: true },
+          { nome: "REPOUSO SEMANAL REMUNERADO E FERIADO SOBRE HORAS EXTRAS", caracteristica: "comum", ocorrencia_pagamento: "mensal", multiplicador: 1, divisor_informado: 26, ativa: true },
+          { nome: "MULTA DO ARTIGO 477 DA CLT SOBRE HORAS EXTRAS", caracteristica: "comum", ocorrencia_pagamento: "desligamento", multiplicador: 1, divisor_informado: 1, ativa: false },
+        ],
+      },
+      {
+        nome: "DOMINGOS E FERIADOS",
+        multiplicador: 2.0, divisor_informado: 220,
+        reflexas: [
+          { nome: "13º SALÁRIO SOBRE DOMINGOS E FERIADOS", caracteristica: "13_salario", ocorrencia_pagamento: "dezembro", multiplicador: 1, divisor_informado: 12, ativa: true },
+          { nome: "AVISO PRÉVIO SOBRE DOMINGOS E FERIADOS", caracteristica: "aviso_previo", ocorrencia_pagamento: "desligamento", multiplicador: 1, divisor_informado: 12, ativa: true },
+          { nome: "FÉRIAS + 1/3 SOBRE DOMINGOS E FERIADOS", caracteristica: "ferias", ocorrencia_pagamento: "periodo_aquisitivo", multiplicador: 1.3333, divisor_informado: 12, ativa: true },
+          { nome: "REPOUSO SEMANAL REMUNERADO E FERIADO SOBRE DOMINGOS E FERIADOS", caracteristica: "comum", ocorrencia_pagamento: "mensal", multiplicador: 1, divisor_informado: 26, ativa: true },
+          { nome: "MULTA DO ARTIGO 477 DA CLT SOBRE DOMINGOS E FERIADOS", caracteristica: "comum", ocorrencia_pagamento: "desligamento", multiplicador: 1, divisor_informado: 1, ativa: false },
+        ],
+      },
+      {
+        nome: "VENDAS A PRAZO",
+        multiplicador: 1, divisor_informado: 1,
+        reflexas: [
+          { nome: "13º SALÁRIO SOBRE VENDAS A PRAZO", caracteristica: "13_salario", ocorrencia_pagamento: "dezembro", multiplicador: 1, divisor_informado: 12, ativa: true },
+          { nome: "FÉRIAS + 1/3 SOBRE VENDAS A PRAZO", caracteristica: "ferias", ocorrencia_pagamento: "periodo_aquisitivo", multiplicador: 1.3333, divisor_informado: 12, ativa: true },
+          { nome: "AVISO PRÉVIO SOBRE VENDAS A PRAZO", caracteristica: "aviso_previo", ocorrencia_pagamento: "desligamento", multiplicador: 1, divisor_informado: 12, ativa: true },
+          { nome: "MULTA DO ARTIGO 477 DA CLT SOBRE VENDAS A PRAZO", caracteristica: "comum", ocorrencia_pagamento: "desligamento", multiplicador: 1, divisor_informado: 1, ativa: false },
+        ],
+      },
+      {
+        nome: "PRÊMIO ESTÍMULO",
+        multiplicador: 1, divisor_informado: 1,
+        reflexas: [
+          { nome: "13º SALÁRIO SOBRE PRÊMIO ESTÍMULO", caracteristica: "13_salario", ocorrencia_pagamento: "dezembro", multiplicador: 1, divisor_informado: 12, ativa: true },
+          { nome: "FÉRIAS + 1/3 SOBRE PRÊMIO ESTÍMULO", caracteristica: "ferias", ocorrencia_pagamento: "periodo_aquisitivo", multiplicador: 1.3333, divisor_informado: 12, ativa: true },
+          { nome: "AVISO PRÉVIO SOBRE PRÊMIO ESTÍMULO", caracteristica: "aviso_previo", ocorrencia_pagamento: "desligamento", multiplicador: 1, divisor_informado: 12, ativa: true },
+          { nome: "MULTA DO ARTIGO 477 DA CLT SOBRE PRÊMIO ESTÍMULO", caracteristica: "comum", ocorrencia_pagamento: "desligamento", multiplicador: 1, divisor_informado: 1, ativa: false },
+        ],
+      },
+      {
+        nome: "COMISSÕES ESTORNADAS",
+        multiplicador: 1, divisor_informado: 1,
+        reflexas: [
+          { nome: "13º SALÁRIO SOBRE COMISSÕES ESTORNADAS", caracteristica: "13_salario", ocorrencia_pagamento: "dezembro", multiplicador: 1, divisor_informado: 12, ativa: true },
+          { nome: "FÉRIAS + 1/3 SOBRE COMISSÕES ESTORNADAS", caracteristica: "ferias", ocorrencia_pagamento: "periodo_aquisitivo", multiplicador: 1.3333, divisor_informado: 12, ativa: true },
+          { nome: "AVISO PRÉVIO SOBRE COMISSÕES ESTORNADAS", caracteristica: "aviso_previo", ocorrencia_pagamento: "desligamento", multiplicador: 1, divisor_informado: 12, ativa: true },
+          { nome: "MULTA DO ARTIGO 477 DA CLT SOBRE COMISSÕES ESTORNADAS", caracteristica: "comum", ocorrencia_pagamento: "desligamento", multiplicador: 1, divisor_informado: 1, ativa: false },
+        ],
+      },
+      {
+        nome: "ARTIGO 384 DA CLT",
+        multiplicador: 1.5, divisor_informado: 220,
+        reflexas: [
+          { nome: "13º SALÁRIO SOBRE ARTIGO 384 DA CLT", caracteristica: "13_salario", ocorrencia_pagamento: "dezembro", multiplicador: 1, divisor_informado: 12, ativa: true },
+          { nome: "FÉRIAS + 1/3 SOBRE ARTIGO 384 DA CLT", caracteristica: "ferias", ocorrencia_pagamento: "periodo_aquisitivo", multiplicador: 1.3333, divisor_informado: 12, ativa: true },
+          { nome: "REPOUSO SEMANAL REMUNERADO E FERIADO SOBRE ARTIGO 384 DA CLT", caracteristica: "comum", ocorrencia_pagamento: "mensal", multiplicador: 1, divisor_informado: 26, ativa: true },
+          { nome: "AVISO PRÉVIO SOBRE ARTIGO 384 DA CLT", caracteristica: "aviso_previo", ocorrencia_pagamento: "desligamento", multiplicador: 1, divisor_informado: 12, ativa: true },
+          { nome: "MULTA DO ARTIGO 477 DA CLT SOBRE ARTIGO 384 DA CLT", caracteristica: "comum", ocorrencia_pagamento: "desligamento", multiplicador: 1, divisor_informado: 1, ativa: false },
+        ],
+      },
+    ];
 
-    const { data: adicNot } = await supabase.from("pjecalc_verbas" as any).insert({
-      case_id: caseId, nome: "Adicional Noturno 20%", tipo: "principal", caracteristica: "comum",
-      ocorrencia_pagamento: "mensal", multiplicador: 0.2, divisor_informado: 220,
-      periodo_inicio: periodoCalc.inicio, periodo_fim: periodoCalc.fim, ordem: 1,
-      incidencias: incidenciasPadrao,
-    }).select("id").single();
+    const incidenciasPadrao = { dsr: true, decimo_terceiro: true, ferias: true, fgts: true, aviso_previo: true };
+    let ordem = 0;
 
-    const { data: he100 } = await supabase.from("pjecalc_verbas" as any).insert({
-      case_id: caseId, nome: "Horas Extras 100%", tipo: "principal", caracteristica: "comum",
-      ocorrencia_pagamento: "mensal", multiplicador: 2.0, divisor_informado: 220,
-      periodo_inicio: periodoCalc.inicio, periodo_fim: periodoCalc.fim, ordem: 2,
-      incidencias: incidenciasPadrao,
-    }).select("id").single();
+    for (const vp of verbasPrincipais) {
+      // Insert principal
+      const { data: principalData } = await supabase.from("pjecalc_verbas" as any).insert({
+        case_id: caseId,
+        nome: vp.nome,
+        tipo: "principal",
+        caracteristica: "comum",
+        ocorrencia_pagamento: "mensal",
+        multiplicador: vp.multiplicador,
+        divisor_informado: vp.divisor_informado,
+        periodo_inicio: periodoCalc.inicio,
+        periodo_fim: periodoCalc.fim,
+        ordem: ordem++,
+        incidencias: incidenciasPadrao,
+      }).select("id").single();
 
-    // 10. Reflexas
-    const principalIds = [(difComissao as any)?.id, (adicNot as any)?.id, (he100 as any)?.id].filter(Boolean);
-    let ordem = 3;
+      const principalId = (principalData as any)?.id;
+      if (!principalId) continue;
 
-    for (const principalId of principalIds) {
-      const reflexas = [
-        { nome: "DSR", caracteristica: "comum", ocorrencia_pagamento: "mensal", multiplicador: 1, divisor_informado: 30 },
-        { nome: "13º Salário", caracteristica: "13_salario", ocorrencia_pagamento: "dezembro", multiplicador: 1, divisor_informado: 12 },
-        { nome: "Férias + 1/3", caracteristica: "ferias", ocorrencia_pagamento: "periodo_aquisitivo", multiplicador: 1.3333, divisor_informado: 12 },
-      ];
-      for (const ref of reflexas) {
+      // Insert reflexas
+      for (const ref of vp.reflexas) {
         await supabase.from("pjecalc_verbas" as any).insert({
-          case_id: caseId, ...ref, tipo: "reflexa",
-          periodo_inicio: periodoCalc.inicio, periodo_fim: periodoCalc.fim,
+          case_id: caseId,
+          nome: ref.nome,
+          tipo: "reflexa",
+          caracteristica: ref.caracteristica,
+          ocorrencia_pagamento: ref.ocorrencia_pagamento,
+          multiplicador: ref.multiplicador,
+          divisor_informado: ref.divisor_informado,
+          periodo_inicio: periodoCalc.inicio,
+          periodo_fim: periodoCalc.fim,
           ordem: ordem++,
           verba_principal_id: principalId,
+          incidencias: incidenciasPadrao,
           base_calculo: { historicos: [], verbas: [principalId], tabelas: [], proporcionalizar: false, integralizar: false },
+          ativa: ref.ativa,
         });
       }
     }
 
-    // 11. FGTS config
-    await supabase.from("pjecalc_fgts_config" as any).insert({
-      case_id: caseId,
-      apurar: true,
-      multa_apurar: true,
-      multa_percentual: 40,
-      multa_tipo: "sobre_depositos",
-      deduzir_saldo: false,
-    });
+    // 10. FGTS config
+    await supabase.from("pjecalc_fgts_config" as any).insert({ case_id: caseId, apurar: true, multa_apurar: true, multa_percentual: 40, multa_tipo: "sobre_depositos", deduzir_saldo: false });
 
-    // 12. CS config
-    await supabase.from("pjecalc_cs_config" as any).insert({
-      case_id: caseId,
-      apurar_segurado: true,
-      cobrar_reclamante: true,
-      cs_sobre_salarios_pagos: false,
-      aliquota_segurado_tipo: "empregado",
-      limitar_teto: true,
-      apurar_empresa: true,
-      apurar_sat: true,
-      apurar_terceiros: true,
-      aliquota_empregador_tipo: "atividade",
-      aliquota_sat_fixa: 2,
-      aliquota_terceiros_fixa: 5.8,
-    });
+    // 11. CS config
+    await supabase.from("pjecalc_cs_config" as any).insert({ case_id: caseId, apurar_segurado: true, cobrar_reclamante: true, cs_sobre_salarios_pagos: false, aliquota_segurado_tipo: "empregado", limitar_teto: true, apurar_empresa: true, apurar_sat: true, apurar_terceiros: true, aliquota_empregador_tipo: "atividade", aliquota_sat_fixa: 2, aliquota_terceiros_fixa: 5.8 });
 
-    // 13. IR config
-    await supabase.from("pjecalc_ir_config" as any).insert({
-      case_id: caseId,
-      apurar: true,
-      incidir_sobre_juros: false,
-      cobrar_reclamado: false,
-      tributacao_exclusiva_13: true,
-      tributacao_separada_ferias: true,
-      deduzir_cs: true,
-      deduzir_prev_privada: false,
-      deduzir_pensao: false,
-      deduzir_honorarios: false,
-      aposentado_65: false,
-      dependentes: 0,
-    });
+    // 12. IR config
+    await supabase.from("pjecalc_ir_config" as any).insert({ case_id: caseId, apurar: true, incidir_sobre_juros: false, cobrar_reclamado: false, tributacao_exclusiva_13: true, tributacao_separada_ferias: true, deduzir_cs: true, deduzir_prev_privada: false, deduzir_pensao: false, deduzir_honorarios: false, aposentado_65: false, dependentes: 0 });
 
-    // 14. Correção monetária
-    await supabase.from("pjecalc_correcao_config" as any).insert({
-      case_id: caseId,
-      indice: "IPCA-E",
-      epoca: "mensal",
-      juros_tipo: "simples_mensal",
-      juros_percentual: 1,
-      juros_inicio: "ajuizamento",
-      multa_523: false,
-      multa_523_percentual: 0,
-      data_liquidacao: "2026-03-05",
-    });
+    // 13. Correção monetária
+    await supabase.from("pjecalc_correcao_config" as any).insert({ case_id: caseId, indice: "IPCA-E", epoca: "mensal", juros_tipo: "simples_mensal", juros_percentual: 1, juros_inicio: "ajuizamento", multa_523: false, multa_523_percentual: 0, data_liquidacao: "2026-03-05" });
 
-    // 15. Honorários
-    await supabase.from("pjecalc_honorarios" as any).insert({
-      case_id: caseId,
-      apurar_sucumbenciais: true,
-      percentual_sucumbenciais: 15,
-      base_sucumbenciais: "condenacao",
-    });
+    // 14. Honorários
+    await supabase.from("pjecalc_honorarios" as any).insert({ case_id: caseId, apurar_sucumbenciais: true, percentual_sucumbenciais: 15, base_sucumbenciais: "condenacao" });
 
-    // 16. Multas CLT
-    await supabase.from("pjecalc_multas_config" as any).insert({
-      case_id: caseId,
-      apurar_477: true,
-      apurar_467: false,
-    });
+    // 15. Multas CLT
+    await supabase.from("pjecalc_multas_config" as any).insert({ case_id: caseId, apurar_477: true, apurar_467: false });
 
-    // 17. Dados do processo
-    await supabase.from("pjecalc_dados_processo" as any).insert({
-      case_id: caseId,
-      numero_processo: "1001211-76.2025.5.02.0461",
-      vara: "1ª Vara do Trabalho de Santo André",
-      tribunal: "TRT 2ª Região",
-      reclamante_nome: "Maria Madalena Alves Ferreira",
-      reclamante_cpf: "123.456.789-00",
-      reclamada_nome: "Via Varejo SA",
-      reclamada_cnpj: "33.041.260/0652-90",
-      tipo_acao: "trabalhista",
-      rito: "ordinario",
-    });
+    // 16. Dados do processo
+    await supabase.from("pjecalc_dados_processo" as any).insert({ case_id: caseId, numero_processo: "1001211-76.2025.5.02.0461", vara: "1ª Vara do Trabalho de Santo André", tribunal: "TRT 2ª Região", reclamante_nome: "Maria Madalena Alves Ferreira", reclamante_cpf: "123.456.789-00", reclamada_nome: "Via Varejo SA", reclamada_cnpj: "33.041.260/0652-90", tipo_acao: "trabalhista", rito: "ordinario" });
 
     return caseId;
   } catch (err: any) {
