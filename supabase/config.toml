@@ -56,3 +56,6 @@ verify_jwt = false
 
 [functions.extract-and-fill]
 verify_jwt = false
+
+[functions.parse-sentenca-jornada]
+verify_jwt = false
