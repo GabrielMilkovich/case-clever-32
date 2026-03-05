@@ -436,13 +436,14 @@ export default function CasoDetalhe() {
         .eq("profile_id", selectedProfile);
 
       const calculatorsWithRules = (profileCalcs || [])
-        .map((row: any) => {
-          const cv = row.calculator_versions;
-          const calc = cv?.calculators;
+        .map((row: Record<string, unknown>) => {
+          const cv = row.calculator_versions as Record<string, unknown> | null;
+          const calc = cv?.calculators as Record<string, unknown> | null;
           if (!cv || !calc?.nome) return null;
+          const regrasObj = cv.regras as Record<string, unknown> | null;
           return {
             nome: String(calc.nome),
-            rules: { versao: cv.versao, vigencia_inicio: cv.vigencia_inicio, vigencia_fim: cv.vigencia_fim ?? undefined, regras: (cv.regras?.regras ?? cv.regras ?? {}) as any, formula: cv.regras?.formula ?? undefined } as CalculatorRules,
+            rules: { versao: cv.versao, vigencia_inicio: cv.vigencia_inicio, vigencia_fim: cv.vigencia_fim ?? undefined, regras: (regrasObj?.regras ?? regrasObj ?? {}) as Record<string, unknown>, formula: regrasObj?.formula ?? undefined } as CalculatorRules,
           };
         })
         .filter(Boolean) as { nome: string; rules: CalculatorRules }[];
@@ -474,8 +475,8 @@ export default function CasoDetalhe() {
         supabase.from("tax_tables").select("id, tipo, vigencia_inicio, vigencia_fim, faixas").order("vigencia_inicio"),
       ]);
 
-      const indices: IndexSeries[] = (indexRes.data || []).map((r: any) => ({ nome: r.nome, competencia: new Date(r.competencia), valor: Number(r.valor), fonte: r.fonte ?? undefined }));
-      const taxTables: TaxTable[] = (taxRes.data || []).map((t: any) => ({ id: t.id, tipo: t.tipo, vigencia_inicio: new Date(t.vigencia_inicio), vigencia_fim: t.vigencia_fim ? new Date(t.vigencia_fim) : undefined, faixas: Array.isArray(t.faixas) ? t.faixas : [] }));
+      const indices: IndexSeries[] = (indexRes.data || []).map((r: Record<string, unknown>) => ({ nome: r.nome as string, competencia: new Date(r.competencia as string), valor: Number(r.valor), fonte: (r.fonte as string) ?? undefined }));
+      const taxTables: TaxTable[] = (taxRes.data || []).map((t: Record<string, unknown>) => ({ id: t.id as string, tipo: t.tipo as "inss" | "irrf", vigencia_inicio: new Date(t.vigencia_inicio as string), vigencia_fim: t.vigencia_fim ? new Date(t.vigencia_fim as string) : undefined, faixas: Array.isArray(t.faixas) ? t.faixas : [] }));
 
       // ═══ VALIDAÇÃO CRUZADA DE FATOS ═══
       // Detecta inconsistências entre documentos (ex: código FGTS vs tipo_demissao do OCR)
@@ -522,11 +523,11 @@ export default function CasoDetalhe() {
             case_id: id,
             chave: correction.campo,
             valor: correction.valor_corrigido,
-            tipo: "texto",
-            origem: "ia_extracao",
+            tipo: "texto" as const,
+            origem: "ia_extracao" as const,
             confianca: correction.confianca,
             confirmado: false,
-          } as any);
+          });
           if (insertError) throw insertError;
         }));
         // Criar controvérsia para registro
@@ -540,14 +541,15 @@ export default function CasoDetalhe() {
             justificativa: alert.recomendacao,
             fundamentacao_legal: `Código FGTS/eSocial — Manual CEF`,
             prioridade: alert.severidade === 'critica' ? 'alta' : 'media',
-          } as any);
+          });
         }
         await queryClient.invalidateQueries({ queryKey: ["facts", id] });
         toast.info(`${crossValidation.corrections.length} fato(s) corrigido(s) pela validação cruzada documental.`);
       }
 
       // Execute engine with corrected facts
-      const engine = new CalculationEngine({ id: profile.id, nome: profile.nome, config: profile.config ?? {}, calculadoras_incluidas: profile.calculadoras_incluidas ?? [] } as any, indices, taxTables, correctedFactMap);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const engine = new CalculationEngine({ id: profile.id, nome: profile.nome, config: (profile.config ?? {}), calculadoras_incluidas: profile.calculadoras_incluidas ?? [] } as any, indices, taxTables, correctedFactMap);
       engine.loadCalculators(calculatorsWithRules);
       const result = engine.executeAll();
 
@@ -559,10 +561,12 @@ export default function CasoDetalhe() {
       const userId = session?.session?.user?.id ?? null;
 
       const { data: insertedRun } = await supabase.from("calculation_runs").insert({
-        case_id: id, profile_id: selectedProfile, executado_por: userId,
-        facts_snapshot: result.facts_snapshot as any, calculators_used: result.calculators_used as any,
-        resultado_bruto: result.resultado_bruto as any, resultado_liquido: result.resultado_liquido as any,
-        warnings: result.warnings as any,
+        case_id: id!, profile_id: selectedProfile, executado_por: userId,
+        facts_snapshot: JSON.parse(JSON.stringify(result.facts_snapshot)),
+        calculators_used: JSON.parse(JSON.stringify(result.calculators_used)),
+        resultado_bruto: JSON.parse(JSON.stringify(result.resultado_bruto)),
+        resultado_liquido: JSON.parse(JSON.stringify(result.resultado_liquido)),
+        warnings: JSON.parse(JSON.stringify(result.warnings)),
       }).select("id").single();
 
       if (!insertedRun?.id) throw new Error("Falha ao salvar cálculo");
@@ -576,22 +580,25 @@ export default function CasoDetalhe() {
       const nextVersion = (existingSnaps || 0) + 1;
 
       const { data: insertedSnapshot } = await supabase.from("calc_snapshots").insert({
-        case_id: id, profile_id: selectedProfile, created_by: userId, engine_version: "2.0.0",
+        case_id: id!, profile_id: selectedProfile, created_by: userId!, engine_version: "2.0.0",
         versao: nextVersion, status: "gerado" as const,
-        inputs_snapshot: result.facts_snapshot as any, resultado_bruto: result.resultado_bruto as any,
-        resultado_liquido: result.resultado_liquido as any, total_bruto: totalBruto, total_liquido: totalLiquido,
-        total_descontos: totalBruto - totalLiquido, warnings: result.warnings as any,
+        inputs_snapshot: JSON.parse(JSON.stringify(result.facts_snapshot)),
+        resultado_bruto: JSON.parse(JSON.stringify(result.resultado_bruto)),
+        resultado_liquido: JSON.parse(JSON.stringify(result.resultado_liquido)),
+        total_bruto: totalBruto, total_liquido: totalLiquido,
+        total_descontos: totalBruto - totalLiquido,
+        warnings: JSON.parse(JSON.stringify(result.warnings)),
       }).select("id").single();
 
       // Persist result items
       if (insertedSnapshot?.id && Array.isArray(result.auditLines) && result.auditLines.length > 0) {
-        const items = result.auditLines.filter((l: any) => l.valor_bruto != null).map((l: any, idx: number) => ({
+        const items = result.auditLines.filter(l => l.valor_bruto != null).map((l, idx) => ({
           snapshot_id: insertedSnapshot.id, rubrica_codigo: l.calculadora || "GERAL",
           rubrica_nome: l.descricao, competencia: l.competencia || null, ordem: idx + 1,
           valor_bruto: l.valor_bruto || 0, valor_liquido: l.valor_liquido || l.valor_bruto || 0,
-          memoria_detalhada: l.metadata || null,
+          memoria_detalhada: l.metadata ? JSON.parse(JSON.stringify(l.metadata)) : null,
         }));
-        if (items.length > 0) await supabase.from("calc_result_items").insert(items as any);
+        if (items.length > 0) await supabase.from("calc_result_items").insert(items);
       }
 
       // Persist audit lines
@@ -599,8 +606,9 @@ export default function CasoDetalhe() {
         await supabase.from("audit_lines").insert(result.auditLines.map((l) => ({
           run_id: insertedRun.id, linha: l.linha, calculadora: l.calculadora,
           competencia: l.competencia ?? null, descricao: l.descricao, formula: l.formula ?? null,
-          valor_bruto: l.valor_bruto ?? null, valor_liquido: l.valor_liquido ?? null, metadata: (l.metadata ?? null) as any,
-        })) as any);
+          valor_bruto: l.valor_bruto ?? null, valor_liquido: l.valor_liquido ?? null,
+          metadata: l.metadata ? JSON.parse(JSON.stringify(l.metadata)) : null,
+        })));
       }
 
       await Promise.all([
