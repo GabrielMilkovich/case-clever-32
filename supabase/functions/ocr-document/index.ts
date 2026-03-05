@@ -14,9 +14,9 @@ const corsHeaders = {
 
 // Modelos em ordem de prioridade (fallback automático)
 const AI_MODELS = [
-  "google/gemini-2.5-flash",
-  "google/gemini-2.5-pro",
   "openai/gpt-5-mini",
+  "openai/gpt-5",
+  "openai/gpt-5-nano",
 ];
 
 const MAX_RETRIES = 3;

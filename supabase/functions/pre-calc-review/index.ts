@@ -262,7 +262,7 @@ NÃO INVENTE dados. Se algo não está nos documentos, diga que não encontrou.`
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "openai/gpt-5-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Revise TODOS os dados abaixo e compare documentos com fatos cadastrados:\n\n${documentText}\n\n${factsText}\n${contractText}` },
