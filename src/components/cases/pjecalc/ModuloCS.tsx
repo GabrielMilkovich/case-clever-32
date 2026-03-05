@@ -37,7 +37,7 @@ export function ModuloCS({ caseId }: Props) {
 
   useEffect(() => {
     if (data) {
-      const d = data as Record<string, unknown>;
+      const d = data as unknown as Record<string, unknown>;
       const periodos = (d.periodos_simples as Array<{inicio: string; fim: string}>) || [];
       setForm({
         apurar_segurado: (d.apurar_segurado as boolean) ?? true, cobrar_reclamante: (d.cobrar_reclamante as boolean) ?? true,

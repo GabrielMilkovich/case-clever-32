@@ -45,7 +45,7 @@ export function ModuloCorrecao({ caseId }: Props) {
 
   useEffect(() => {
     if (data) {
-      const d = data as Record<string, unknown>;
+      const d = data as unknown as Record<string, unknown>;
       let combIndice: CombItem[] = [];
       let combJuros: CombItem[] = [];
       try { combIndice = d.combinacoes_indice ? JSON.parse(d.combinacoes_indice as string) : []; } catch {}

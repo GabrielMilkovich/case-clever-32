@@ -41,7 +41,7 @@ export function ModuloCustas({ caseId }: Props) {
 
   useEffect(() => {
     if (data) {
-      const d = data as Record<string, unknown>;
+      const d = data as unknown as Record<string, unknown>;
       setForm(prev => ({
         ...prev,
         base_custas: (d.base_custas as string) || 'bruto_mais_debitos',
