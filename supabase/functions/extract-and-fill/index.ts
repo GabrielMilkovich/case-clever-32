@@ -1,7 +1,7 @@
 // =====================================================
 // EDGE FUNCTION: EXTRACT-AND-FILL
-// OCR + Extração Estruturada + Auto-Preenchimento PJe-Calc
-// Usa Gemini 2.5 Pro para máxima precisão
+// OCR via Mistral API + Extração Estruturada via OpenAI (Lovable AI)
+// Auto-Preenchimento PJe-Calc
 // =====================================================
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
