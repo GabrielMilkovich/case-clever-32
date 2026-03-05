@@ -324,19 +324,17 @@ REGRAS:
 8. Para cartão de ponto: todos os registros diários
 9. NÃO retorne texto_ocr_completo - apenas dados estruturados`;
 
-async function callAI(
-  base64Data: string,
-  mimeType: string,
+async function callAIFromText(
+  ocrText: string,
   apiKey: string
 ): Promise<any> {
   let lastError: Error | null = null;
 
-  // Use Flash for speed and lower memory
   const models = ["google/gemini-2.5-flash", "google/gemini-2.5-pro"];
 
   for (const model of models) {
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      console.log(`[EXTRACT] Attempt ${attempt} with ${model}`);
+      console.log(`[EXTRACT] Attempt ${attempt} with ${model} (text-based)`);
 
       try {
         const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -351,16 +349,7 @@ async function callAI(
               { role: "system", content: SYSTEM_PROMPT },
               {
                 role: "user",
-                content: [
-                  {
-                    type: "text",
-                    text: "Analise este documento trabalhista e extraia TODOS os dados usando a função extrair_dados_documento."
-                  },
-                  {
-                    type: "image_url",
-                    image_url: { url: `data:${mimeType};base64,${base64Data}` },
-                  },
-                ],
+                content: `Analise o texto OCR abaixo de um documento trabalhista e extraia TODOS os dados usando a função extrair_dados_documento.\n\nTEXTO DO DOCUMENTO:\n${ocrText.slice(0, 80000)}`,
               },
             ],
             tools: EXTRACTION_TOOLS,
