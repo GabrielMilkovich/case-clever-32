@@ -7,6 +7,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { syncFromValidation } from "@/lib/pjecalc/sync-from-validation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -402,13 +403,27 @@ export function DocumentsManager({
     setIsBatchProcessing(false);
     setProcessingDocId(null);
 
+    // After all documents processed, run full sync to configure all modules
+    if (successCount > 0) {
+      toast.info("🔄 Sincronizando dados extraídos com módulos do cálculo...");
+      try {
+        const syncResult = await syncFromValidation(caseId);
+        console.log("[SYNC] Result:", syncResult);
+        queryClient.invalidateQueries({ queryKey: ['pjecalc_case_data'] });
+      } catch (e) {
+        console.error("[SYNC] Error:", e);
+      }
+    }
+
     if (errorCount === 0) {
-      toast.success(`Todos os ${successCount} documento(s) processados com sucesso!`);
+      toast.success(`✅ Todos os ${successCount} documento(s) processados e dados preenchidos!`);
     } else {
       toast.warning(`${successCount} processado(s), ${errorCount} com erro.`);
     }
+    queryClient.invalidateQueries({ queryKey: ['pjecalc_case_data'] });
+    queryClient.invalidateQueries({ queryKey: ['cases'] });
     onDocumentsChange();
-  }, [documents, caseId, onDocumentsChange]);
+  }, [documents, caseId, onDocumentsChange, queryClient]);
 
   const cancelBatchProcessing = useCallback(() => {
     batchAbortRef.current = true;
