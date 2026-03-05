@@ -132,6 +132,8 @@ const statusConfig: Record<string, { label: string; icon: typeof Loader2; color:
   failed: { label: "Erro", icon: XCircle, color: "text-destructive", bgColor: "bg-destructive/10" },
   retrying: { label: "Tentando novamente", icon: Loader2, color: "text-orange-600", bgColor: "bg-orange-100" },
   processing: { label: "Processando", icon: Loader2, color: "text-blue-600", bgColor: "bg-blue-100" },
+  extracting: { label: "Extraindo com IA", icon: Loader2, color: "text-purple-600", bgColor: "bg-purple-100" },
+  extracted: { label: "Extraído", icon: CheckCircle, color: "text-green-600", bgColor: "bg-green-100" },
   completed: { label: "Concluído", icon: CheckCircle, color: "text-green-600", bgColor: "bg-green-100" },
 };
 
@@ -699,9 +701,9 @@ export function DocumentsManager({
                 {isBatchProcessing ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <Cpu className="h-4 w-4" />
+                  <Sparkles className="h-4 w-4" />
                 )}
-                {isBatchProcessing ? "Processando..." : `Processar Todos (${stats.pending})`}
+                {isBatchProcessing ? "Extraindo..." : `Extrair Todos (${stats.pending})`}
               </Button>
             )}
           </div>
