@@ -234,14 +234,63 @@ function buildRelatorioCompletoHTML(
   const nProcesso = meta.processo || '—';
 
   // ──────────── PÁGINA 1: RESUMO DO CÁLCULO ────────────
-  const verbasRows = result.verbas.map(v => `
-    <tr>
-      <td class="left">${v.nome}</td>
-      <td class="num">${fmt(v.total_corrigido)}</td>
-      <td class="num">${fmt(v.total_juros)}</td>
-      <td class="num">${fmt(v.total_final)}</td>
-    </tr>
-  `).join('');
+  // Group verbas: principals first, then their reflexes indented (PJe-Calc layout)
+  const principals = result.verbas.filter(v => v.tipo === 'principal');
+  const reflexas = result.verbas.filter(v => v.tipo !== 'principal');
+
+  // Build hierarchical rows: principal → reflexes under it
+  let verbasRows = '';
+  for (const p of principals) {
+    // Principal row
+    verbasRows += `
+      <tr>
+        <td class="left" style="font-weight:600">${p.nome}</td>
+        <td class="num">${fmt(p.total_corrigido)}</td>
+        <td class="num">${fmt(p.total_juros)}</td>
+        <td class="num">${fmt(p.total_final)}</td>
+      </tr>`;
+    // Find reflexes that reference this principal
+    const childReflexas = reflexas.filter(r => {
+      // Match by verba_principal_id or by name convention
+      const verba = result.verbas.find(v => v.verba_id === r.verba_id);
+      if (!verba) return false;
+      // Check verba_principal_id via the engine result metadata
+      const nomeUp = r.nome.toUpperCase();
+      const pNomeUp = p.nome.toUpperCase();
+      return nomeUp.includes(pNomeUp) || nomeUp.endsWith('SOBRE ' + pNomeUp);
+    });
+    for (const ref of childReflexas) {
+      verbasRows += `
+        <tr>
+          <td class="left" style="padding-left:20px; font-size:7pt; color:#333">${ref.nome}</td>
+          <td class="num">${fmt(ref.total_corrigido)}</td>
+          <td class="num">${fmt(ref.total_juros)}</td>
+          <td class="num">${fmt(ref.total_final)}</td>
+        </tr>`;
+    }
+  }
+
+  // Add orphan reflexes (not matched to any principal)
+  const matchedReflexIds = new Set<string>();
+  for (const p of principals) {
+    const pNomeUp = p.nome.toUpperCase();
+    for (const r of reflexas) {
+      const nomeUp = r.nome.toUpperCase();
+      if (nomeUp.includes(pNomeUp) || nomeUp.endsWith('SOBRE ' + pNomeUp)) {
+        matchedReflexIds.add(r.verba_id);
+      }
+    }
+  }
+  const orphanReflexas = reflexas.filter(r => !matchedReflexIds.has(r.verba_id));
+  for (const ref of orphanReflexas) {
+    verbasRows += `
+      <tr>
+        <td class="left" style="padding-left:20px; font-size:7pt; color:#333">${ref.nome}</td>
+        <td class="num">${fmt(ref.total_corrigido)}</td>
+        <td class="num">${fmt(ref.total_juros)}</td>
+        <td class="num">${fmt(ref.total_final)}</td>
+      </tr>`;
+  }
 
   const totalCorrigido = result.verbas.reduce((s, v) => s + v.total_corrigido, 0);
   const totalJuros = result.verbas.reduce((s, v) => s + v.total_juros, 0);
@@ -250,13 +299,13 @@ function buildRelatorioCompletoHTML(
   // Add FGTS rows to resumo
   const fgtsRow = result.fgts.total_fgts > 0 ? `
     <tr>
-      <td class="left">FGTS 8%</td>
+      <td class="left" style="font-weight:600">FGTS 8%</td>
       <td class="num">${fmt(result.fgts.total_depositos)}</td>
       <td class="num">—</td>
       <td class="num">${fmt(result.fgts.total_depositos)}</td>
     </tr>
     <tr>
-      <td class="left">MULTA SOBRE FGTS 40%</td>
+      <td class="left" style="font-weight:600">MULTA SOBRE FGTS 40%</td>
       <td class="num">${fmt(result.fgts.multa_valor)}</td>
       <td class="num">—</td>
       <td class="num">${fmt(result.fgts.multa_valor)}</td>

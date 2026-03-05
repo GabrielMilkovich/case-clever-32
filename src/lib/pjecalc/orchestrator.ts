@@ -49,6 +49,7 @@ import type {
   PjecalcHonorariosRow,
   PjecalcCustasConfigRow,
 } from './types';
+import { gerarReflexosPadrao, type VerbaBase, type ReflexoGerado } from './reflexo-engine';
 
 // =====================================================
 // VERSION CONSTANTS
@@ -377,7 +378,82 @@ export async function executarLiquidacao(
       })),
   }));
 
-  const engineVerbas = toEngineVerbas(caseData.verbas);
+  let engineVerbas = toEngineVerbas(caseData.verbas);
+
+  // ── Auto-generate reflexes if not already present ──
+  // Only generate if there are principal verbas without any reflexes linked to them
+  const principalVerbas = engineVerbas.filter(v => v.tipo === 'principal');
+  const existingReflexas = engineVerbas.filter(v => v.tipo === 'reflexa');
+  
+  const principalsWithReflexas = new Set(existingReflexas.map(r => r.verba_principal_id).filter(Boolean));
+  const principalsSemReflexo = principalVerbas.filter(v => !principalsWithReflexas.has(v.id));
+
+  if (principalsSemReflexo.length > 0) {
+    // Build VerbaBase list for reflexo generation
+    const verbasBase: VerbaBase[] = principalsSemReflexo.map(v => ({
+      id: v.id,
+      nome: v.nome,
+      ordem: v.ordem,
+      incidencias: {
+        fgts: v.incidencias.fgts,
+        irpf: v.incidencias.irpf,
+        cs: v.incidencias.contribuicao_social,
+      },
+    }));
+
+    const reflexosGerados = gerarReflexosPadrao(verbasBase);
+
+    // Convert ReflexoGerado → PjeVerba and append
+    for (const rg of reflexosGerados) {
+      const principalVerba = engineVerbas.find(v => v.id === rg.verba_principal_id);
+      if (!principalVerba) continue;
+
+      const reflexaVerba: PjeVerba = {
+        id: `auto_${rg.verba_principal_id}_${rg.caracteristica}`,
+        nome: rg.nome,
+        tipo: 'reflexa',
+        valor: 'calculado',
+        caracteristica: rg.caracteristica as PjeVerba['caracteristica'],
+        ocorrencia_pagamento: rg.ocorrencia_pagamento as PjeVerba['ocorrencia_pagamento'],
+        compor_principal: true,
+        zerar_valor_negativo: false,
+        dobrar_valor_devido: false,
+        periodo_inicio: principalVerba.periodo_inicio,
+        periodo_fim: principalVerba.periodo_fim,
+        base_calculo: {
+          historicos: [],
+          verbas: [rg.verba_principal_id],
+          tabelas: [],
+          proporcionalizar: false,
+          integralizar: rg.integralizar_base || false,
+        },
+        tipo_divisor: rg.divisor_tipo as PjeVerba['tipo_divisor'],
+        divisor_informado: rg.divisor_valor,
+        multiplicador: rg.multiplicador,
+        tipo_quantidade: rg.tipo_quantidade as PjeVerba['tipo_quantidade'],
+        quantidade_informada: 1,
+        quantidade_proporcionalizar: false,
+        exclusoes: { faltas_justificadas: false, faltas_nao_justificadas: false, ferias_gozadas: false },
+        incidencias: {
+          fgts: rg.incidencias.fgts,
+          irpf: rg.incidencias.irpf,
+          contribuicao_social: rg.incidencias.cs,
+          previdencia_privada: false,
+          pensao_alimenticia: false,
+        },
+        juros_ajuizamento: 'ocorrencias_vencidas',
+        verba_principal_id: rg.verba_principal_id,
+        comportamento_reflexo: rg.comportamento_reflexo as PjeVerba['comportamento_reflexo'],
+        periodo_media_reflexo: rg.periodo_media_reflexo as PjeVerba['periodo_media_reflexo'],
+        gerar_verba_reflexa: rg.gerar_reflexo as PjeVerba['gerar_verba_reflexa'],
+        gerar_verba_principal: rg.gerar_principal as PjeVerba['gerar_verba_principal'],
+        fracao_mes_modo: rg.tratamento_fracao_mes as PjeVerba['fracao_mes_modo'],
+        ordem: rg.ordem,
+      };
+
+      engineVerbas.push(reflexaVerba);
+    }
+  }
   const engineFgts = toEngineFgtsConfig(caseData.fgtsConfig);
   const engineCs = toEngineCsConfig(caseData.csConfig);
   const engineIr = toEngineIrConfig(caseData.irConfig);
