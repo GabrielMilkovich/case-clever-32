@@ -3,22 +3,9 @@
  * Phase 4, Item 5: Rastreabilidade jurídica — fundamentação por verba
  */
 
-export type ModuleStatus = 'nao_iniciado' | 'incompleto' | 'preenchido' | 'alerta' | 'validado';
+import type { CompletionInput } from './types';
 
-interface CompletionInput {
-  params: any;
-  faltas: any[];
-  ferias: any[];
-  historicos: any[];
-  verbas: any[];
-  cartaoPonto?: any[];
-  resultado: any;
-  fgtsConfig?: any;
-  csConfig?: any;
-  irConfig?: any;
-  correcaoConfig?: any;
-  pensaoConfig?: any;
-}
+export type ModuleStatus = 'nao_iniciado' | 'incompleto' | 'preenchido' | 'alerta' | 'validado';
 
 export function calcularCompletude(input: CompletionInput): Record<string, ModuleStatus> {
   const { params, faltas, ferias, historicos, verbas, resultado } = input;
