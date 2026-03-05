@@ -563,18 +563,192 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
   );
 
   // ── HISTÓRICO SALARIAL ──
+  const [autoFilling, setAutoFilling] = useState(false);
+
+  const autoPreencherHistorico = async () => {
+    setAutoFilling(true);
+    try {
+      // Fetch all available sources in parallel
+      const [factsRes, contractRes, extractionsRes, extItemsRes] = await Promise.all([
+        supabase.from("facts").select("*").eq("case_id", caseId),
+        supabase.from("employment_contracts").select("*").eq("case_id", caseId).maybeSingle(),
+        supabase.from("extractions").select("*").eq("case_id", caseId).in("status", ["validado", "pendente"]),
+        supabase.from("extracao_item").select("*").eq("case_id", caseId).eq("target_table", "pjecalc_hist_salarial").in("status", ["AUTO", "APROVADO"]),
+      ]);
+
+      const facts = factsRes.data || [];
+      const contract = contractRes.data;
+      const extractions = extractionsRes.data || [];
+      const extItems = (extItemsRes.data || []) as any[];
+
+      // Build fact map
+      const factMap: Record<string, string> = {};
+      for (const f of facts) {
+        if (!factMap[f.chave] || f.confirmado) factMap[f.chave] = f.valor;
+      }
+      for (const e of extractions) {
+        const ext = e as any;
+        if (ext.valor_proposto && ext.campo && !factMap[ext.campo]) factMap[ext.campo] = ext.valor_proposto;
+      }
+
+      const periodoInicio = formParams.data_admissao || contract?.data_admissao || factMap.data_admissao || new Date().toISOString().slice(0, 10);
+      const periodoFim = formParams.data_demissao || contract?.data_demissao || factMap.data_demissao || new Date().toISOString().slice(0, 10);
+
+      // Collect bases to create
+      const basesToCreate: { nome: string; valor: number; tipo: string; fgts: boolean; cs: boolean; inicio?: string; fim?: string }[] = [];
+
+      // 1. Salário Base from facts/contract
+      const salStr = factMap.salario_base || factMap.salario_mensal || factMap.ultimo_salario;
+      const salContrato = contract?.salario_inicial;
+      const salVal = salStr ? parseFloat(salStr.replace(/[^\d.,]/g, '').replace(',', '.')) : salContrato;
+      if (salVal && salVal > 0) {
+        basesToCreate.push({ nome: 'Salário Base', valor: salVal, tipo: 'FIXO', fgts: true, cs: true });
+      }
+
+      // 2. From employment_contracts.historico_salarial JSON
+      if (contract?.historico_salarial && Array.isArray(contract.historico_salarial)) {
+        for (const entry of contract.historico_salarial as any[]) {
+          const val = parseFloat(String(entry.valor || entry.salario || 0).replace(/[^\d.,]/g, '').replace(',', '.'));
+          if (val > 0) {
+            basesToCreate.push({
+              nome: entry.nome || entry.descricao || `Salário ${entry.data_inicio || ''}`,
+              valor: val, tipo: 'FIXO', fgts: true, cs: true,
+              inicio: entry.data_inicio || entry.vigencia_inicio,
+              fim: entry.data_fim || entry.vigencia_fim,
+            });
+          }
+        }
+      }
+
+      // 3. Salary-related facts (comissão, adicional, gratificação, etc.)
+      const salaryFactKeys = ['comissao', 'adicional_noturno', 'adicional_periculosidade', 'adicional_insalubridade', 'gratificacao', 'premio', 'dsr', 'media_comissoes', 'media_variaveis'];
+      for (const key of salaryFactKeys) {
+        if (factMap[key]) {
+          const val = parseFloat(factMap[key].replace(/[^\d.,]/g, '').replace(',', '.'));
+          if (val > 0) {
+            const nomeMap: Record<string, string> = {
+              comissao: 'Comissões', adicional_noturno: 'Adicional Noturno',
+              adicional_periculosidade: 'Adicional Periculosidade', adicional_insalubridade: 'Adicional Insalubridade',
+              gratificacao: 'Gratificação', premio: 'Prêmio', dsr: 'DSR',
+              media_comissoes: 'Média Comissões', media_variaveis: 'Média Variáveis',
+            };
+            basesToCreate.push({ nome: nomeMap[key] || key, valor: val, tipo: 'VARIAVEL', fgts: true, cs: true });
+          }
+        }
+      }
+
+      // 4. From extraction items (pipeline-extracted rubrics grouped by target_field)
+      const rubricaMap = new Map<string, { valores: { comp: string; val: number }[]; evidence: string }>();
+      for (const item of extItems) {
+        const cat = item.target_field || 'outros';
+        const val = parseFloat(String(item.valor || '0').replace(/[^\d.,]/g, '').replace(',', '.'));
+        if (val <= 0) continue;
+        if (!rubricaMap.has(cat)) rubricaMap.set(cat, { valores: [], evidence: item.evidence_text || cat });
+        rubricaMap.get(cat)!.valores.push({ comp: item.competencia, val });
+      }
+      const catLabels: Record<string, string> = {
+        comissao: 'Comissões (Extraído)', dsr: 'DSR (Extraído)', premio: 'Prêmio (Extraído)',
+        adicional_noturno: 'Adic. Noturno (Extraído)', hora_extra: 'Hora Extra (Extraído)',
+        salario_base: 'Salário Base (Extraído)', outros: 'Outros (Extraído)',
+      };
+      for (const [cat, data] of rubricaMap.entries()) {
+        // Don't duplicate if we already have salario_base from facts
+        if (cat === 'salario_base' && basesToCreate.some(b => b.nome === 'Salário Base')) continue;
+        const avg = data.valores.reduce((s, v) => s + v.val, 0) / data.valores.length;
+        basesToCreate.push({ nome: catLabels[cat] || data.evidence, valor: Math.round(avg * 100) / 100, tipo: 'VARIAVEL', fgts: true, cs: true });
+      }
+
+      if (basesToCreate.length === 0) {
+        toast.warning("Nenhuma base salarial encontrada nas fontes disponíveis (fatos, contratos, extrações).");
+        setAutoFilling(false);
+        return;
+      }
+
+      // Deduplicate by name
+      const seen = new Set<string>();
+      const uniqueBases = basesToCreate.filter(b => {
+        const key = b.nome.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      // Also skip bases that already exist
+      const existingNames = new Set(historicos.map((h: any) => (h.nome || '').toLowerCase()));
+      const newBases = uniqueBases.filter(b => !existingNames.has(b.nome.toLowerCase()));
+
+      if (newBases.length === 0) {
+        toast.info("Todas as bases já estão cadastradas.");
+        setAutoFilling(false);
+        return;
+      }
+
+      // Insert all bases
+      let inserted = 0;
+      for (const base of newBases) {
+        const { error } = await supabase.from("pjecalc_historico_salarial" as any).insert({
+          case_id: caseId,
+          nome: base.nome,
+          periodo_inicio: base.inicio || periodoInicio,
+          periodo_fim: base.fim || periodoFim,
+          tipo_valor: base.tipo,
+          valor_informado: base.valor,
+          incidencia_fgts: base.fgts,
+          incidencia_cs: base.cs,
+        });
+        if (!error) inserted++;
+      }
+
+      // Also insert monthly occurrences for extraction-based rubrics
+      for (const [cat, data] of rubricaMap.entries()) {
+        if (cat === 'salario_base' && existingNames.has('salário base')) continue;
+        // Find the newly inserted historico by name
+        const nomeBusca = catLabels[cat] || data.evidence;
+        const { data: histData } = await supabase.from("pjecalc_historico_salarial" as any)
+          .select("id").eq("case_id", caseId).eq("nome", nomeBusca).maybeSingle();
+        if (histData?.id && data.valores.length > 0) {
+          const ocorrencias = data.valores.map(v => ({
+            historico_id: histData.id, case_id: caseId,
+            competencia: v.comp, valor: v.val, tipo: 'informado',
+          }));
+          await supabase.from("pjecalc_historico_ocorrencias" as any).insert(ocorrencias);
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["pjecalc_historico", caseId] });
+      toast.success(`${inserted} base(s) salarial(is) preenchida(s) automaticamente!`);
+    } catch (err) {
+      toast.error("Erro ao preencher: " + (err as Error).message);
+    } finally {
+      setAutoFilling(false);
+    }
+  };
+
   const renderHistorico = () => (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Histórico Salarial</h2>
-        <Button size="sm" onClick={async () => {
-          if (!formParams.data_admissao) { toast.error("Preencha a data de admissão."); return; }
-          await supabase.from("pjecalc_historico_salarial" as any).insert({ case_id: caseId, nome: `Salário Base ${historicos.length + 1}`, periodo_inicio: formParams.data_admissao, periodo_fim: formParams.data_demissao || new Date().toISOString().slice(0, 10), tipo_valor: 'informado', incidencia_fgts: true, incidencia_cs: true });
-          queryClient.invalidateQueries({ queryKey: ["pjecalc_historico", caseId] });
-        }}><Plus className="h-4 w-4 mr-1" /> Nova Base</Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={autoPreencherHistorico} disabled={autoFilling}>
+            {autoFilling ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Zap className="h-4 w-4 mr-1" />}
+            Auto-Preencher
+          </Button>
+          <Button size="sm" onClick={async () => {
+            if (!formParams.data_admissao) { toast.error("Preencha a data de admissão."); return; }
+            await supabase.from("pjecalc_historico_salarial" as any).insert({ case_id: caseId, nome: `Salário Base ${historicos.length + 1}`, periodo_inicio: formParams.data_admissao, periodo_fim: formParams.data_demissao || new Date().toISOString().slice(0, 10), tipo_valor: 'informado', incidencia_fgts: true, incidencia_cs: true });
+            queryClient.invalidateQueries({ queryKey: ["pjecalc_historico", caseId] });
+          }}><Plus className="h-4 w-4 mr-1" /> Nova Base</Button>
+        </div>
       </div>
+
       {historicos.length === 0 ? (
-        <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Nenhuma base cadastrada.</CardContent></Card>
+        <Card className="border-dashed">
+          <CardContent className="p-8 text-center space-y-3">
+            <DollarSign className="h-8 w-8 mx-auto text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Nenhuma base cadastrada.</p>
+            <p className="text-xs text-muted-foreground">Clique em <strong>"Auto-Preencher"</strong> para buscar automaticamente de fatos, contratos e fichas financeiras importadas.</p>
+          </CardContent>
+        </Card>
       ) : historicos.map((h: any) => (
         <Card key={h.id}>
           <CardHeader className="pb-2">
