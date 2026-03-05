@@ -262,7 +262,7 @@ export async function upsertResultado(payload: PjecalcLiquidacaoResultadoInsert)
 }
 
 // =====================================================
-// CARTÃO DE PONTO (read-only view aggregate)
+// CARTÃO DE PONTO
 // =====================================================
 
 export async function getCartaoPonto(caseId: string): Promise<PjecalcCartaoPontoRow[]> {
@@ -272,6 +272,27 @@ export async function getCartaoPonto(caseId: string): Promise<PjecalcCartaoPonto
     .order('competencia');
   if (error) throw error;
   return (data || []) as PjecalcCartaoPontoRow[];
+}
+
+export async function insertCartaoPontoBatch(rows: Record<string, unknown>[]): Promise<void> {
+  if (rows.length === 0) return;
+  const { error } = await fromView('pjecalc_cartao_ponto').insert(rows);
+  if (error) throw error;
+}
+
+export async function updateCartaoPonto(id: string, updates: Record<string, unknown>): Promise<void> {
+  const { error } = await fromView('pjecalc_cartao_ponto').update(updates).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteCartaoPonto(caseId: string): Promise<void> {
+  const { error } = await fromView('pjecalc_cartao_ponto').delete().eq('case_id', caseId);
+  if (error) throw error;
+}
+
+export async function deleteCartaoPontoById(id: string): Promise<void> {
+  const { error } = await fromView('pjecalc_cartao_ponto').delete().eq('id', id);
+  if (error) throw error;
 }
 
 // =====================================================
@@ -405,8 +426,8 @@ export async function getPensaoConfig(caseId: string): Promise<Record<string, un
 export async function upsertPensaoConfig(caseId: string, payload: Record<string, unknown>): Promise<void> {
   const existing = await getPensaoConfig(caseId);
   const full = { case_id: caseId, ...payload };
-  if (existing) {
-    await fromView('pjecalc_pensao_config').update(full).eq('id', (existing as any).id);
+  if (existing && existing.id) {
+    await fromView('pjecalc_pensao_config').update(full).eq('id', existing.id);
   } else {
     await fromView('pjecalc_pensao_config').insert(full);
   }
@@ -426,8 +447,8 @@ export async function getPrevPrivConfig(caseId: string): Promise<Record<string, 
 export async function upsertPrevPrivConfig(caseId: string, payload: Record<string, unknown>): Promise<void> {
   const existing = await getPrevPrivConfig(caseId);
   const full = { case_id: caseId, ...payload };
-  if (existing) {
-    await fromView('pjecalc_previdencia_privada_config').update(full).eq('id', (existing as any).id);
+  if (existing && existing.id) {
+    await fromView('pjecalc_previdencia_privada_config').update(full).eq('id', existing.id);
   } else {
     await fromView('pjecalc_previdencia_privada_config').insert(full);
   }
@@ -447,8 +468,8 @@ export async function getSalarioFamiliaConfig(caseId: string): Promise<Record<st
 export async function upsertSalarioFamiliaConfig(caseId: string, payload: Record<string, unknown>): Promise<void> {
   const existing = await getSalarioFamiliaConfig(caseId);
   const full = { case_id: caseId, ...payload };
-  if (existing) {
-    await fromView('pjecalc_salario_familia_config').update(full).eq('id', (existing as any).id);
+  if (existing && existing.id) {
+    await fromView('pjecalc_salario_familia_config').update(full).eq('id', existing.id);
   } else {
     await fromView('pjecalc_salario_familia_config').insert(full);
   }
@@ -468,8 +489,8 @@ export async function getSeguroConfig(caseId: string): Promise<Record<string, un
 export async function upsertSeguroConfig(caseId: string, payload: Record<string, unknown>): Promise<void> {
   const existing = await getSeguroConfig(caseId);
   const full = { case_id: caseId, ...payload };
-  if (existing) {
-    await fromView('pjecalc_seguro_config').update(full).eq('id', (existing as any).id);
+  if (existing && existing.id) {
+    await fromView('pjecalc_seguro_config').update(full).eq('id', existing.id);
   } else {
     await fromView('pjecalc_seguro_config').insert(full);
   }
