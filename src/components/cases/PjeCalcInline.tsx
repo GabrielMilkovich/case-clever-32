@@ -734,30 +734,29 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
         </CardContent>
       </Card>
 
-      <div className="flex gap-4" style={{ minHeight: '500px' }}>
-        {/* Module sidebar */}
-        <div className="w-52 flex-shrink-0">
-          <ScrollArea className="h-[650px]">
-            <div className="space-y-1 pr-3">
-              {MODULOS.map((mod) => {
-                const status = moduleStatus(mod.id);
-                return (
-                  <button
-                    key={mod.id}
-                    onClick={() => setActiveModule(mod.id)}
-                    className={cn(
-                      "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-all text-xs",
-                      status === 'active' && "bg-primary text-primary-foreground shadow-sm",
-                      status === 'done' && "bg-[hsl(var(--success))]/10 text-foreground hover:bg-[hsl(var(--success))]/20",
-                      status === 'pending' && "text-muted-foreground hover:bg-muted/50",
-                    )}
-                  >
-                    {status === 'done' ? <Check className="h-3.5 w-3.5 text-[hsl(var(--success))]" /> : <mod.icon className="h-3.5 w-3.5" />}
-                    <div className="min-w-0 flex-1">
-                      <div className="font-medium truncate">{mod.label}</div>
-                      <div className={cn("text-[10px] truncate", status === 'active' ? 'text-primary-foreground/70' : 'text-muted-foreground')}>{mod.desc}</div>
-                    </div>
-                  </button>
+      <div className="flex flex-col md:flex-row gap-6">
+        <aside className="w-full md:w-64 flex-shrink-0 space-y-1">
+          {MODULOS.map(m => (
+            <button
+              key={m.id}
+              onClick={() => setActiveModule(m.id)}
+              className={cn(
+                "w-full flex items-center gap-3 p-3 rounded-lg text-sm transition-all",
+                activeModule === m.id
+                  ? "bg-primary text-primary-foreground shadow-md"
+                  : "hover:bg-muted text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <m.icon className="h-4 w-4 flex-shrink-0" />
+              <span className="flex-1 text-left">{m.label}</span>
+              {/* Status Indicator */}
+              <div className={cn("w-2 h-2 rounded-full", getStatusColor(completude[m.id] || 'nao_iniciado'))} />
+            </button>
+          ))}
+        </aside>
+
+        {/* Main Content Area */}
+        <main className="flex-1 min-w-0">
                 );
               })}
             </div>

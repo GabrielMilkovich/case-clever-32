@@ -4,10 +4,15 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Play, Loader2, FileBarChart, Printer, FileCode, AlertTriangle, CheckCircle2, Info, XCircle, Lock, Unlock, Copy, MoreVertical, FileText, FileSpreadsheet } from "lucide-react";
+import { Play, Loader2, FileBarChart, Printer, FileCode, AlertTriangle, CheckCircle2, Info, XCircle, Lock, Unlock, Copy, MoreVertical, FileText, FileSpreadsheet, ClipboardCheck, GitCompareArrows } from "lucide-react";
+import { PainelRevisao } from "./PainelRevisao";
+import { MemoriaCalculoExpandida } from "./MemoriaCalculoExpandida";
+import { ComparacaoCenarios } from "./ComparacaoCenarios";
+import { calcularCompletude } from "@/lib/pjecalc/completude";
 import {
   PjeCalcEngine,
   type PjeParametros, type PjeHistoricoSalarial, type PjeFalta, type PjeFerias,
@@ -32,6 +37,7 @@ interface Props { caseId: string; }
 export function ModuloResumo({ caseId }: Props) {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<'resumo' | 'memoria' | 'revisao' | 'comparacao'>('resumo');
   const [liquidando, setLiquidando] = useState(false);
   const [validacao, setValidacao] = useState<PjeValidationResult | null>(null);
   const [operando, setOperando] = useState(false);
