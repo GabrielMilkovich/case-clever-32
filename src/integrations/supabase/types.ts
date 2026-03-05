@@ -2411,6 +2411,142 @@ export type Database = {
           },
         ]
       }
+      pjc_import_jobs: {
+        Row: {
+          arquivo_hash: string | null
+          arquivo_nome: string | null
+          calculo_id: string
+          case_id: string
+          completed_at: string | null
+          created_at: string | null
+          historicos_importados: number | null
+          id: string
+          reflexos_importados: number | null
+          resultado: Json | null
+          status: string | null
+          user_id: string
+          verbas_importadas: number | null
+          warnings: Json | null
+        }
+        Insert: {
+          arquivo_hash?: string | null
+          arquivo_nome?: string | null
+          calculo_id: string
+          case_id: string
+          completed_at?: string | null
+          created_at?: string | null
+          historicos_importados?: number | null
+          id?: string
+          reflexos_importados?: number | null
+          resultado?: Json | null
+          status?: string | null
+          user_id: string
+          verbas_importadas?: number | null
+          warnings?: Json | null
+        }
+        Update: {
+          arquivo_hash?: string | null
+          arquivo_nome?: string | null
+          calculo_id?: string
+          case_id?: string
+          completed_at?: string | null
+          created_at?: string | null
+          historicos_importados?: number | null
+          id?: string
+          reflexos_importados?: number | null
+          resultado?: Json | null
+          status?: string | null
+          user_id?: string
+          verbas_importadas?: number | null
+          warnings?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pjc_import_jobs_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_calculos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjc_import_jobs_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_correcao_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjc_import_jobs_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_cs_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjc_import_jobs_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_custas_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjc_import_jobs_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_dados_processo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjc_import_jobs_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_fgts_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjc_import_jobs_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_honorarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjc_import_jobs_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_ir_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjc_import_jobs_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_multas_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjc_import_jobs_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_parametros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjc_import_jobs_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "pjc_import_jobs_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pjecalc_apuracao_diaria: {
         Row: {
           calculo_id: string
@@ -2732,6 +2868,8 @@ export type Database = {
           aviso_previo_dias: number | null
           aviso_previo_tipo: string | null
           case_id: string
+          considera_feriado_estadual: boolean | null
+          considera_feriado_municipal: boolean | null
           created_at: string | null
           custas_limite: number | null
           custas_percentual: number | null
@@ -2741,23 +2879,31 @@ export type Database = {
           data_fim_calculo: string | null
           data_inicio_calculo: string | null
           data_liquidacao: string | null
+          dia_fechamento: number | null
           divisor_horas: number | null
+          duplicado_de: string | null
           hash_estado: string | null
           honorarios_percentual: number | null
           honorarios_sobre: string | null
           id: string
           jornada_contratual_horas: number | null
+          limitar_avos: boolean | null
           multa_467_habilitada: boolean | null
           multa_477_habilitada: boolean | null
           observacoes: string | null
           percentual_adicional_noturno: number | null
           percentual_he_100: number | null
           percentual_he_50: number | null
+          pjc_import_metadata: Json | null
+          prescricao_fgts: boolean | null
+          prescricao_quinquenal: boolean | null
           processo_cnj: string | null
+          projeta_aviso: boolean | null
           reclamado_cnpj: string | null
           reclamado_nome: string | null
           reclamante_cpf: string | null
           reclamante_nome: string | null
+          sabado_dia_util: boolean | null
           status: string | null
           tipo_demissao: string | null
           tribunal: string | null
@@ -2765,11 +2911,14 @@ export type Database = {
           user_id: string
           vara: string | null
           versao: number | null
+          zera_negativo: boolean | null
         }
         Insert: {
           aviso_previo_dias?: number | null
           aviso_previo_tipo?: string | null
           case_id: string
+          considera_feriado_estadual?: boolean | null
+          considera_feriado_municipal?: boolean | null
           created_at?: string | null
           custas_limite?: number | null
           custas_percentual?: number | null
@@ -2779,23 +2928,31 @@ export type Database = {
           data_fim_calculo?: string | null
           data_inicio_calculo?: string | null
           data_liquidacao?: string | null
+          dia_fechamento?: number | null
           divisor_horas?: number | null
+          duplicado_de?: string | null
           hash_estado?: string | null
           honorarios_percentual?: number | null
           honorarios_sobre?: string | null
           id?: string
           jornada_contratual_horas?: number | null
+          limitar_avos?: boolean | null
           multa_467_habilitada?: boolean | null
           multa_477_habilitada?: boolean | null
           observacoes?: string | null
           percentual_adicional_noturno?: number | null
           percentual_he_100?: number | null
           percentual_he_50?: number | null
+          pjc_import_metadata?: Json | null
+          prescricao_fgts?: boolean | null
+          prescricao_quinquenal?: boolean | null
           processo_cnj?: string | null
+          projeta_aviso?: boolean | null
           reclamado_cnpj?: string | null
           reclamado_nome?: string | null
           reclamante_cpf?: string | null
           reclamante_nome?: string | null
+          sabado_dia_util?: boolean | null
           status?: string | null
           tipo_demissao?: string | null
           tribunal?: string | null
@@ -2803,11 +2960,14 @@ export type Database = {
           user_id: string
           vara?: string | null
           versao?: number | null
+          zera_negativo?: boolean | null
         }
         Update: {
           aviso_previo_dias?: number | null
           aviso_previo_tipo?: string | null
           case_id?: string
+          considera_feriado_estadual?: boolean | null
+          considera_feriado_municipal?: boolean | null
           created_at?: string | null
           custas_limite?: number | null
           custas_percentual?: number | null
@@ -2817,23 +2977,31 @@ export type Database = {
           data_fim_calculo?: string | null
           data_inicio_calculo?: string | null
           data_liquidacao?: string | null
+          dia_fechamento?: number | null
           divisor_horas?: number | null
+          duplicado_de?: string | null
           hash_estado?: string | null
           honorarios_percentual?: number | null
           honorarios_sobre?: string | null
           id?: string
           jornada_contratual_horas?: number | null
+          limitar_avos?: boolean | null
           multa_467_habilitada?: boolean | null
           multa_477_habilitada?: boolean | null
           observacoes?: string | null
           percentual_adicional_noturno?: number | null
           percentual_he_100?: number | null
           percentual_he_50?: number | null
+          pjc_import_metadata?: Json | null
+          prescricao_fgts?: boolean | null
+          prescricao_quinquenal?: boolean | null
           processo_cnj?: string | null
+          projeta_aviso?: boolean | null
           reclamado_cnpj?: string | null
           reclamado_nome?: string | null
           reclamante_cpf?: string | null
           reclamante_nome?: string | null
+          sabado_dia_util?: boolean | null
           status?: string | null
           tipo_demissao?: string | null
           tribunal?: string | null
@@ -2841,6 +3009,7 @@ export type Database = {
           user_id?: string
           vara?: string | null
           versao?: number | null
+          zera_negativo?: boolean | null
         }
         Relationships: [
           {
@@ -2855,6 +3024,76 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_calculos_duplicado_de_fkey"
+            columns: ["duplicado_de"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_calculos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_calculos_duplicado_de_fkey"
+            columns: ["duplicado_de"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_correcao_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_calculos_duplicado_de_fkey"
+            columns: ["duplicado_de"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_cs_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_calculos_duplicado_de_fkey"
+            columns: ["duplicado_de"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_custas_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_calculos_duplicado_de_fkey"
+            columns: ["duplicado_de"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_dados_processo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_calculos_duplicado_de_fkey"
+            columns: ["duplicado_de"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_fgts_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_calculos_duplicado_de_fkey"
+            columns: ["duplicado_de"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_honorarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_calculos_duplicado_de_fkey"
+            columns: ["duplicado_de"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_ir_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_calculos_duplicado_de_fkey"
+            columns: ["duplicado_de"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_multas_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_calculos_duplicado_de_fkey"
+            columns: ["duplicado_de"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_parametros"
             referencedColumns: ["id"]
           },
         ]
@@ -3508,17 +3747,20 @@ export type Database = {
       pjecalc_ocorrencia_calculo: {
         Row: {
           ativa: boolean | null
+          base_integral: number | null
           base_valor: number | null
           calculo_id: string
           competencia: string
           correcao: number | null
           created_at: string | null
           devido: number | null
+          devido_integral: number | null
           diferenca: number | null
           divisor: number | null
           dobra: number | null
           fator_correcao: number | null
           id: string
+          indice_acumulado: number | null
           indice_usado: string | null
           juros: number | null
           juros_regime_usado: string | null
@@ -3526,7 +3768,10 @@ export type Database = {
           nome: string
           origem: string | null
           pago: number | null
+          pago_integral: number | null
+          parametros_snapshot: Json | null
           quantidade: number | null
+          quantidade_integral: number | null
           reflexo_id: string | null
           taxa_juros: number | null
           tipo: string
@@ -3536,17 +3781,20 @@ export type Database = {
         }
         Insert: {
           ativa?: boolean | null
+          base_integral?: number | null
           base_valor?: number | null
           calculo_id: string
           competencia: string
           correcao?: number | null
           created_at?: string | null
           devido?: number | null
+          devido_integral?: number | null
           diferenca?: number | null
           divisor?: number | null
           dobra?: number | null
           fator_correcao?: number | null
           id?: string
+          indice_acumulado?: number | null
           indice_usado?: string | null
           juros?: number | null
           juros_regime_usado?: string | null
@@ -3554,7 +3802,10 @@ export type Database = {
           nome: string
           origem?: string | null
           pago?: number | null
+          pago_integral?: number | null
+          parametros_snapshot?: Json | null
           quantidade?: number | null
+          quantidade_integral?: number | null
           reflexo_id?: string | null
           taxa_juros?: number | null
           tipo: string
@@ -3564,17 +3815,20 @@ export type Database = {
         }
         Update: {
           ativa?: boolean | null
+          base_integral?: number | null
           base_valor?: number | null
           calculo_id?: string
           competencia?: string
           correcao?: number | null
           created_at?: string | null
           devido?: number | null
+          devido_integral?: number | null
           diferenca?: number | null
           divisor?: number | null
           dobra?: number | null
           fator_correcao?: number | null
           id?: string
+          indice_acumulado?: number | null
           indice_usado?: string | null
           juros?: number | null
           juros_regime_usado?: string | null
@@ -3582,7 +3836,10 @@ export type Database = {
           nome?: string
           origem?: string | null
           pago?: number | null
+          pago_integral?: number | null
+          parametros_snapshot?: Json | null
           quantidade?: number | null
+          quantidade_integral?: number | null
           reflexo_id?: string | null
           taxa_juros?: number | null
           tipo?: string
@@ -3738,6 +3995,8 @@ export type Database = {
           codigo: string | null
           comportamento_reflexo: string | null
           created_at: string | null
+          divisor: number | null
+          divisor_tipo: string | null
           gerar_principal: boolean | null
           gerar_reflexo: boolean | null
           id: string
@@ -3746,12 +4005,15 @@ export type Database = {
           incide_ir: boolean | null
           media_meses: number | null
           media_tipo: string | null
+          multiplicador: number | null
           nome: string
           observacoes: string | null
           ordem: number | null
           periodo_fim: string | null
           periodo_inicio: string | null
           periodo_media_reflexo: string | null
+          pjc_id: string | null
+          quantidade_tipo: string | null
           tipo: string
           tratamento_fracao_mes: string | null
         }
@@ -3761,6 +4023,8 @@ export type Database = {
           codigo?: string | null
           comportamento_reflexo?: string | null
           created_at?: string | null
+          divisor?: number | null
+          divisor_tipo?: string | null
           gerar_principal?: boolean | null
           gerar_reflexo?: boolean | null
           id?: string
@@ -3769,12 +4033,15 @@ export type Database = {
           incide_ir?: boolean | null
           media_meses?: number | null
           media_tipo?: string | null
+          multiplicador?: number | null
           nome: string
           observacoes?: string | null
           ordem?: number | null
           periodo_fim?: string | null
           periodo_inicio?: string | null
           periodo_media_reflexo?: string | null
+          pjc_id?: string | null
+          quantidade_tipo?: string | null
           tipo: string
           tratamento_fracao_mes?: string | null
         }
@@ -3784,6 +4051,8 @@ export type Database = {
           codigo?: string | null
           comportamento_reflexo?: string | null
           created_at?: string | null
+          divisor?: number | null
+          divisor_tipo?: string | null
           gerar_principal?: boolean | null
           gerar_reflexo?: boolean | null
           id?: string
@@ -3792,12 +4061,15 @@ export type Database = {
           incide_ir?: boolean | null
           media_meses?: number | null
           media_tipo?: string | null
+          multiplicador?: number | null
           nome?: string
           observacoes?: string | null
           ordem?: number | null
           periodo_fim?: string | null
           periodo_inicio?: string | null
           periodo_media_reflexo?: string | null
+          pjc_id?: string | null
+          quantidade_tipo?: string | null
           tipo?: string
           tratamento_fracao_mes?: string | null
         }
@@ -4347,12 +4619,20 @@ export type Database = {
       pjecalc_verba_base: {
         Row: {
           ativa: boolean | null
+          base_tabelada: string | null
           calculo_id: string
           caracteristica: string | null
           codigo: string | null
+          compor_principal: boolean | null
           created_at: string | null
           divisor: number | null
+          divisor_tipo: string | null
+          excluir_falta_justificada: boolean | null
+          excluir_falta_nao_justificada: boolean | null
+          excluir_ferias_gozadas: boolean | null
           fonte: string | null
+          gerar_principal: string | null
+          gerar_reflexo: string | null
           hist_salarial_nome: string | null
           id: string
           incide_fgts: boolean | null
@@ -4365,17 +4645,28 @@ export type Database = {
           periodicidade: string | null
           periodo_fim: string | null
           periodo_inicio: string | null
+          pjc_id: string | null
+          quantidade_tipo: string | null
+          quantidade_valor: number | null
           tipo_variacao: string | null
           updated_at: string | null
         }
         Insert: {
           ativa?: boolean | null
+          base_tabelada?: string | null
           calculo_id: string
           caracteristica?: string | null
           codigo?: string | null
+          compor_principal?: boolean | null
           created_at?: string | null
           divisor?: number | null
+          divisor_tipo?: string | null
+          excluir_falta_justificada?: boolean | null
+          excluir_falta_nao_justificada?: boolean | null
+          excluir_ferias_gozadas?: boolean | null
           fonte?: string | null
+          gerar_principal?: string | null
+          gerar_reflexo?: string | null
           hist_salarial_nome?: string | null
           id?: string
           incide_fgts?: boolean | null
@@ -4388,17 +4679,28 @@ export type Database = {
           periodicidade?: string | null
           periodo_fim?: string | null
           periodo_inicio?: string | null
+          pjc_id?: string | null
+          quantidade_tipo?: string | null
+          quantidade_valor?: number | null
           tipo_variacao?: string | null
           updated_at?: string | null
         }
         Update: {
           ativa?: boolean | null
+          base_tabelada?: string | null
           calculo_id?: string
           caracteristica?: string | null
           codigo?: string | null
+          compor_principal?: boolean | null
           created_at?: string | null
           divisor?: number | null
+          divisor_tipo?: string | null
+          excluir_falta_justificada?: boolean | null
+          excluir_falta_nao_justificada?: boolean | null
+          excluir_ferias_gozadas?: boolean | null
           fonte?: string | null
+          gerar_principal?: string | null
+          gerar_reflexo?: string | null
           hist_salarial_nome?: string | null
           id?: string
           incide_fgts?: boolean | null
@@ -4411,6 +4713,9 @@ export type Database = {
           periodicidade?: string | null
           periodo_fim?: string | null
           periodo_inicio?: string | null
+          pjc_id?: string | null
+          quantidade_tipo?: string | null
+          quantidade_valor?: number | null
           tipo_variacao?: string | null
           updated_at?: string | null
         }
