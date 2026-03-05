@@ -960,7 +960,130 @@ async function autoConfigureModules(supabase: any, caseId: string, extracted: an
 }
 
 // =====================================================
-// MAIN HANDLER
+// BACKGROUND PROCESSING FUNCTION
+// =====================================================
+
+async function processDocumentInBackground(
+  document_id: string,
+  fileUrl: string,
+  doc: any,
+  LOVABLE_API_KEY: string,
+  supabase: any
+) {
+  try {
+    // Download file
+    let fileBuffer: ArrayBuffer | null = null;
+    for (let dl = 0; dl < 3; dl++) {
+      try {
+        const resp = await fetch(fileUrl);
+        if (!resp.ok) throw new Error(`Download ${resp.status}`);
+        fileBuffer = await resp.arrayBuffer();
+        break;
+      } catch (err) {
+        if (dl === 2) throw err;
+        await delay(1000);
+      }
+    }
+
+    if (!fileBuffer || fileBuffer.byteLength === 0) {
+      throw new Error("Empty file downloaded");
+    }
+
+    // Detect MIME type
+    let mimeType = doc.mime_type || "application/pdf";
+    if (!mimeType || mimeType === "application/octet-stream") {
+      const fn = (doc.file_name || "").toLowerCase();
+      if (fn.endsWith(".pdf")) mimeType = "application/pdf";
+      else if (fn.endsWith(".png")) mimeType = "image/png";
+      else if (fn.endsWith(".jpg") || fn.endsWith(".jpeg")) mimeType = "image/jpeg";
+      else mimeType = "application/pdf";
+    }
+
+    const base64Data = arrayBufferToBase64(fileBuffer);
+    console.log(`[EXTRACT] File: ${fileBuffer.byteLength} bytes, base64: ${base64Data.length} chars`);
+
+    // Free the buffer to reduce memory
+    fileBuffer = null;
+
+    // Call AI for structured extraction
+    const extracted = await callAI(base64Data, mimeType, LOVABLE_API_KEY);
+
+    // Auto-fill pjecalc tables
+    const fills = await autoFill(supabase, doc.case_id, extracted);
+
+    // Update document with results
+    const ocrText = extracted.texto_ocr_completo || "";
+    await supabase.from("documents").update({
+      status: "extracted",
+      tipo: extracted.tipo_documento || doc.tipo,
+      page_count: extracted.paginas_detectadas || 1,
+      ocr_confidence: extracted.confianca_geral || 0.9,
+      ocr_confianca: extracted.confianca_geral || 0.9,
+      processing_completed_at: new Date().toISOString(),
+      error_message: null,
+      metadata: {
+        ...(doc.metadata || {}),
+        extraction_completed_at: new Date().toISOString(),
+        text_length: ocrText.length,
+        extracted_text_preview: ocrText.substring(0, 500),
+        tipo_detectado: extracted.tipo_documento,
+        rubricas_extraidas: extracted.rubricas?.length || 0,
+        auto_fill_fields: fills,
+        has_contrato: !!extracted.contrato,
+        has_trct: !!extracted.trct,
+        has_cartao_ponto: !!extracted.cartao_ponto?.registros?.length,
+        has_ferias: !!extracted.ferias?.length,
+        has_sentenca: !!extracted.sentenca,
+      },
+    }).eq("id", document_id);
+
+    // Store extracted text as chunks for search
+    if (ocrText.length > 100) {
+      await supabase.from("document_chunks").delete().eq("document_id", document_id);
+      await supabase.from("doc_chunks").delete().eq("document_id", document_id);
+
+      const chunkSize = 1000;
+      const overlap = 200;
+      const chunks: any[] = [];
+      let start = 0;
+      let idx = 0;
+
+      while (start < ocrText.length) {
+        const end = Math.min(start + chunkSize, ocrText.length);
+        chunks.push({
+          case_id: doc.case_id,
+          document_id,
+          content: ocrText.substring(start, end),
+          page_number: 1,
+          chunk_index: idx,
+          doc_type: extracted.tipo_documento || doc.tipo || "outro",
+          metadata: { index: idx, char_count: end - start },
+        });
+        idx++;
+        start = end - overlap;
+        if (start >= ocrText.length) break;
+      }
+
+      if (chunks.length > 0) {
+        const { error: chunkErr } = await supabase.from("document_chunks").insert(chunks);
+        if (chunkErr) console.error("[EXTRACT] Chunk insert error:", chunkErr.message);
+      }
+    }
+
+    console.log(`[EXTRACT] COMPLETE: tipo=${extracted.tipo_documento}, fills=[${fills.join(", ")}]`);
+
+  } catch (extractError) {
+    console.error("[EXTRACT] FAILURE:", extractError);
+    await supabase.from("documents").update({
+      status: "failed",
+      error_message: extractError instanceof Error ? extractError.message : "Unknown error",
+      processing_completed_at: new Date().toISOString(),
+    }).eq("id", document_id);
+  }
+}
+
+// =====================================================
+// MAIN HANDLER — Returns immediately, processes in background
 // =====================================================
 
 serve(async (req) => {
@@ -1023,148 +1146,28 @@ serve(async (req) => {
 
     console.log(`[EXTRACT] Starting for document ${document_id}: ${doc.file_name}`);
 
-    // Update status
+    // Update status immediately
     await supabase.from("documents").update({
       status: "extracting",
       processing_started_at: new Date().toISOString(),
       error_message: null,
     }).eq("id", document_id);
 
-    try {
-      // Download file
-      let fileBuffer: ArrayBuffer | null = null;
-      for (let dl = 0; dl < 3; dl++) {
-        try {
-          const resp = await fetch(fileUrl);
-          if (!resp.ok) throw new Error(`Download ${resp.status}`);
-          fileBuffer = await resp.arrayBuffer();
-          break;
-        } catch (err) {
-          if (dl === 2) throw err;
-          await delay(1000);
-        }
-      }
+    // Start background processing — does NOT block the response
+    EdgeRuntime.waitUntil(
+      processDocumentInBackground(document_id, fileUrl, doc, LOVABLE_API_KEY, supabase)
+    );
 
-      if (!fileBuffer || fileBuffer.byteLength === 0) {
-        throw new Error("Empty file downloaded");
-      }
-
-      // Detect MIME type
-      let mimeType = doc.mime_type || "application/pdf";
-      if (!mimeType || mimeType === "application/octet-stream") {
-        const fn = (doc.file_name || "").toLowerCase();
-        if (fn.endsWith(".pdf")) mimeType = "application/pdf";
-        else if (fn.endsWith(".png")) mimeType = "image/png";
-        else if (fn.endsWith(".jpg") || fn.endsWith(".jpeg")) mimeType = "image/jpeg";
-        else mimeType = "application/pdf";
-      }
-
-      const base64Data = arrayBufferToBase64(fileBuffer);
-      console.log(`[EXTRACT] File: ${fileBuffer.byteLength} bytes, base64: ${base64Data.length} chars`);
-
-      // Call AI for structured extraction
-      const extracted = await callAI(base64Data, mimeType, LOVABLE_API_KEY);
-
-      // Auto-fill pjecalc tables
-      const fills = await autoFill(supabase, doc.case_id, extracted);
-
-      // Update document with results
-      const ocrText = extracted.texto_ocr_completo || "";
-      await supabase.from("documents").update({
-        status: "extracted",
-        tipo: extracted.tipo_documento || doc.tipo,
-        page_count: extracted.paginas_detectadas || 1,
-        ocr_confidence: extracted.confianca_geral || 0.9,
-        ocr_confianca: extracted.confianca_geral || 0.9,
-        processing_completed_at: new Date().toISOString(),
-        error_message: null,
-        metadata: {
-          ...(doc.metadata || {}),
-          extraction_completed_at: new Date().toISOString(),
-          text_length: ocrText.length,
-          extracted_text_preview: ocrText.substring(0, 500),
-          tipo_detectado: extracted.tipo_documento,
-          rubricas_extraidas: extracted.rubricas?.length || 0,
-          auto_fill_fields: fills,
-          has_contrato: !!extracted.contrato,
-          has_trct: !!extracted.trct,
-          has_cartao_ponto: !!extracted.cartao_ponto?.registros?.length,
-          has_ferias: !!extracted.ferias?.length,
-          has_sentenca: !!extracted.sentenca,
-        },
-      }).eq("id", document_id);
-
-      // Also store extracted text as chunks for search
-      if (ocrText.length > 100) {
-        // Delete old chunks
-        await supabase.from("document_chunks").delete().eq("document_id", document_id);
-        await supabase.from("doc_chunks").delete().eq("document_id", document_id);
-
-        // Create simple chunks (skip embeddings since model not available)
-        const chunkSize = 1000;
-        const overlap = 200;
-        const chunks: any[] = [];
-        let start = 0;
-        let idx = 0;
-
-        while (start < ocrText.length) {
-          const end = Math.min(start + chunkSize, ocrText.length);
-          chunks.push({
-            case_id: doc.case_id,
-            document_id,
-            content: ocrText.substring(start, end),
-            page_number: 1,
-            chunk_index: idx,
-            doc_type: extracted.tipo_documento || doc.tipo || "outro",
-            metadata: { index: idx, char_count: end - start },
-          });
-          idx++;
-          start = end - overlap;
-          if (start >= ocrText.length) break;
-        }
-
-        if (chunks.length > 0) {
-          const { error: chunkErr } = await supabase.from("document_chunks").insert(chunks);
-          if (chunkErr) console.error("[EXTRACT] Chunk insert error:", chunkErr.message);
-        }
-      }
-
-      console.log(`[EXTRACT] COMPLETE: tipo=${extracted.tipo_documento}, fills=[${fills.join(", ")}]`);
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          document_id,
-          tipo_documento: extracted.tipo_documento,
-          confianca: extracted.confianca_geral,
-          rubricas_extraidas: extracted.rubricas?.length || 0,
-          auto_fill: fills,
-          dados_extraidos: {
-            tem_processo: !!extracted.dados_processo,
-            tem_contrato: !!extracted.contrato,
-            tem_rubricas: (extracted.rubricas?.length || 0) > 0,
-            tem_trct: !!extracted.trct,
-            tem_cartao_ponto: (extracted.cartao_ponto?.registros?.length || 0) > 0,
-            tem_ferias: (extracted.ferias?.length || 0) > 0,
-            tem_fgts: !!extracted.fgts,
-            tem_sentenca: !!extracted.sentenca,
-          },
-          text_length: (extracted.texto_ocr_completo || "").length,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-
-    } catch (extractError) {
-      console.error("[EXTRACT] FAILURE:", extractError);
-
-      await supabase.from("documents").update({
-        status: "failed",
-        error_message: extractError instanceof Error ? extractError.message : "Unknown error",
-        processing_completed_at: new Date().toISOString(),
-      }).eq("id", document_id);
-
-      throw extractError;
-    }
+    // Return immediately
+    return new Response(
+      JSON.stringify({
+        success: true,
+        document_id,
+        status: "processing",
+        message: "Extração iniciada em background. Acompanhe pelo status do documento.",
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
 
   } catch (error) {
     console.error("[EXTRACT] Error:", error);
