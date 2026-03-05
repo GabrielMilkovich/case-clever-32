@@ -49,6 +49,7 @@ export default function Casos() {
   const [seedingTest, setSeedingTest] = useState(false);
 
   const [seedingMarcelo, setSeedingMarcelo] = useState(false);
+  const [seedingMaria, setSeedingMaria] = useState(false);
 
   const handleSeedTestCase = async () => {
     setSeedingTest(true);
@@ -77,6 +78,20 @@ export default function Casos() {
       toast.error("Erro ao criar caso: " + err.message);
     } finally {
       setSeedingMarcelo(false);
+    }
+  };
+
+  const handleSeedMaria = async () => {
+    setSeedingMaria(true);
+    try {
+      const caseId = await seedCasoMaria();
+      toast.success("Caso Maria Madalena (Via Varejo) criado! Pronto para liquidar.");
+      queryClient.invalidateQueries({ queryKey: ["cases-with-metrics"] });
+      navigate(`/casos/${caseId}`);
+    } catch (err: any) {
+      toast.error("Erro ao criar caso: " + err.message);
+    } finally {
+      setSeedingMaria(false);
     }
   };
 
