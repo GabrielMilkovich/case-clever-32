@@ -381,6 +381,216 @@ export async function getMultasConfig(caseId: string): Promise<PjecalcMultasConf
   return data as PjecalcMultasConfigRow | null;
 }
 
+export async function upsertMultasConfig(caseId: string, payload: Record<string, unknown>): Promise<void> {
+  const existing = await getMultasConfig(caseId);
+  const full = { case_id: caseId, ...payload };
+  if (existing) {
+    await fromView('pjecalc_multas_config').update(full).eq('id', existing.id);
+  } else {
+    await fromView('pjecalc_multas_config').insert(full);
+  }
+}
+
+// =====================================================
+// PENSÃO ALIMENTÍCIA
+// =====================================================
+
+export async function getPensaoConfig(caseId: string): Promise<Record<string, unknown> | null> {
+  const { data, error } = await fromView('pjecalc_pensao_config')
+    .select('*').eq('case_id', caseId).maybeSingle();
+  if (error) throw error;
+  return data as Record<string, unknown> | null;
+}
+
+export async function upsertPensaoConfig(caseId: string, payload: Record<string, unknown>): Promise<void> {
+  const existing = await getPensaoConfig(caseId);
+  const full = { case_id: caseId, ...payload };
+  if (existing) {
+    await fromView('pjecalc_pensao_config').update(full).eq('id', (existing as any).id);
+  } else {
+    await fromView('pjecalc_pensao_config').insert(full);
+  }
+}
+
+// =====================================================
+// PREVIDÊNCIA PRIVADA
+// =====================================================
+
+export async function getPrevPrivConfig(caseId: string): Promise<Record<string, unknown> | null> {
+  const { data, error } = await fromView('pjecalc_previdencia_privada_config')
+    .select('*').eq('case_id', caseId).maybeSingle();
+  if (error) throw error;
+  return data as Record<string, unknown> | null;
+}
+
+export async function upsertPrevPrivConfig(caseId: string, payload: Record<string, unknown>): Promise<void> {
+  const existing = await getPrevPrivConfig(caseId);
+  const full = { case_id: caseId, ...payload };
+  if (existing) {
+    await fromView('pjecalc_previdencia_privada_config').update(full).eq('id', (existing as any).id);
+  } else {
+    await fromView('pjecalc_previdencia_privada_config').insert(full);
+  }
+}
+
+// =====================================================
+// SALÁRIO-FAMÍLIA
+// =====================================================
+
+export async function getSalarioFamiliaConfig(caseId: string): Promise<Record<string, unknown> | null> {
+  const { data, error } = await fromView('pjecalc_salario_familia_config')
+    .select('*').eq('case_id', caseId).maybeSingle();
+  if (error) throw error;
+  return data as Record<string, unknown> | null;
+}
+
+export async function upsertSalarioFamiliaConfig(caseId: string, payload: Record<string, unknown>): Promise<void> {
+  const existing = await getSalarioFamiliaConfig(caseId);
+  const full = { case_id: caseId, ...payload };
+  if (existing) {
+    await fromView('pjecalc_salario_familia_config').update(full).eq('id', (existing as any).id);
+  } else {
+    await fromView('pjecalc_salario_familia_config').insert(full);
+  }
+}
+
+// =====================================================
+// SEGURO-DESEMPREGO
+// =====================================================
+
+export async function getSeguroConfig(caseId: string): Promise<Record<string, unknown> | null> {
+  const { data, error } = await fromView('pjecalc_seguro_config')
+    .select('*').eq('case_id', caseId).maybeSingle();
+  if (error) throw error;
+  return data as Record<string, unknown> | null;
+}
+
+export async function upsertSeguroConfig(caseId: string, payload: Record<string, unknown>): Promise<void> {
+  const existing = await getSeguroConfig(caseId);
+  const full = { case_id: caseId, ...payload };
+  if (existing) {
+    await fromView('pjecalc_seguro_config').update(full).eq('id', (existing as any).id);
+  } else {
+    await fromView('pjecalc_seguro_config').insert(full);
+  }
+}
+
+// =====================================================
+// OCORRÊNCIAS — operações para grades editáveis
+// =====================================================
+
+export async function getOcorrenciasByCalculo(calculoId: string, verbaId?: string): Promise<PjecalcOcorrenciaRow[]> {
+  let query = fromView('pjecalc_ocorrencias').select('*').eq('calculo_id', calculoId).order('competencia');
+  if (verbaId) query = query.eq('verba_id', verbaId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []) as PjecalcOcorrenciaRow[];
+}
+
+export async function updateOcorrencia(id: string, updates: Record<string, unknown>): Promise<void> {
+  const { error } = await fromView('pjecalc_ocorrencias').update(updates).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteOcorrenciaById(id: string): Promise<void> {
+  const { error } = await fromView('pjecalc_ocorrencias').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteOcorrenciasByCalculo(calculoId: string, verbaId: string, origem?: string): Promise<void> {
+  let query = fromView('pjecalc_ocorrencias').delete().eq('calculo_id', calculoId).eq('verba_id', verbaId);
+  if (origem) query = query.eq('origem', origem);
+  const { error } = await query;
+  if (error) throw error;
+}
+
+export async function insertOcorrenciasBatch(rows: Record<string, unknown>[]): Promise<void> {
+  if (rows.length === 0) return;
+  const { error } = await fromView('pjecalc_ocorrencias').insert(rows);
+  if (error) throw error;
+}
+
+// =====================================================
+// FGTS OCORRÊNCIAS
+// =====================================================
+
+export async function getFgtsOcorrencias(calculoId: string): Promise<Record<string, unknown>[]> {
+  const { data, error } = await fromView('pjecalc_fgts_ocorrencias').select('*').eq('calculo_id', calculoId).order('competencia');
+  if (error) throw error;
+  return (data || []) as Record<string, unknown>[];
+}
+
+export async function updateFgtsOcorrencia(id: string, updates: Record<string, unknown>): Promise<void> {
+  const { error } = await fromView('pjecalc_fgts_ocorrencias').update(updates).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteFgtsOcorrencias(calculoId: string, origem?: string): Promise<void> {
+  let query = fromView('pjecalc_fgts_ocorrencias').delete().eq('calculo_id', calculoId);
+  if (origem) query = query.eq('origem', origem);
+  const { error } = await query;
+  if (error) throw error;
+}
+
+export async function insertFgtsOcorrenciasBatch(rows: Record<string, unknown>[]): Promise<void> {
+  if (rows.length === 0) return;
+  const { error } = await fromView('pjecalc_fgts_ocorrencias').insert(rows);
+  if (error) throw error;
+}
+
+// =====================================================
+// CS OCORRÊNCIAS
+// =====================================================
+
+export async function getCsOcorrencias(calculoId: string, aba: string): Promise<Record<string, unknown>[]> {
+  const { data, error } = await fromView('pjecalc_cs_ocorrencias').select('*').eq('calculo_id', calculoId).eq('aba', aba).order('competencia');
+  if (error) throw error;
+  return (data || []) as Record<string, unknown>[];
+}
+
+export async function updateCsOcorrencia(id: string, updates: Record<string, unknown>): Promise<void> {
+  const { error } = await fromView('pjecalc_cs_ocorrencias').update(updates).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteCsOcorrencias(calculoId: string, aba: string, origem?: string): Promise<void> {
+  let query = fromView('pjecalc_cs_ocorrencias').delete().eq('calculo_id', calculoId).eq('aba', aba);
+  if (origem) query = query.eq('origem', origem);
+  const { error } = await query;
+  if (error) throw error;
+}
+
+export async function insertCsOcorrenciasBatch(rows: Record<string, unknown>[]): Promise<void> {
+  if (rows.length === 0) return;
+  const { error } = await fromView('pjecalc_cs_ocorrencias').insert(rows);
+  if (error) throw error;
+}
+
+// =====================================================
+// FGTS SALDOS/SAQUES
+// =====================================================
+
+export async function getFgtsSaldosSaques(caseId: string): Promise<Record<string, unknown>[]> {
+  const { data, error } = await fromView('pjecalc_fgts_saldos_saques').select('*').eq('case_id', caseId).order('data');
+  if (error) throw error;
+  return (data || []) as Record<string, unknown>[];
+}
+
+export async function insertFgtsSaldoSaque(payload: Record<string, unknown>): Promise<void> {
+  const { error } = await fromView('pjecalc_fgts_saldos_saques').insert(payload);
+  if (error) throw error;
+}
+
+export async function updateFgtsSaldoSaque(id: string, updates: Record<string, unknown>): Promise<void> {
+  const { error } = await fromView('pjecalc_fgts_saldos_saques').update(updates).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteFgtsSaldoSaque(id: string): Promise<void> {
+  const { error } = await fromView('pjecalc_fgts_saldos_saques').delete().eq('id', id);
+  if (error) throw error;
+}
+
 // =====================================================
 // BATCH: Carregar todos os dados de um caso
 // =====================================================
