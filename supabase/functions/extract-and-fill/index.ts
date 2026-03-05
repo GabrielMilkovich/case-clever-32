@@ -326,21 +326,86 @@ REGRAS:
 
 async function callAIFromText(
   ocrText: string,
-  apiKey: string
+  lovableApiKey: string
 ): Promise<any> {
   let lastError: Error | null = null;
 
+  // Try Mistral first (uses user's own API key, no Lovable credits needed)
+  const MISTRAL_API_KEY = Deno.env.get("MISTRAL_API_KEY");
+  if (MISTRAL_API_KEY) {
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      console.log(`[EXTRACT] Attempt ${attempt} with Mistral (text-based)`);
+      try {
+        const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${MISTRAL_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "mistral-large-latest",
+            messages: [
+              { role: "system", content: SYSTEM_PROMPT },
+              {
+                role: "user",
+                content: `Analise o texto OCR abaixo de um documento trabalhista e extraia TODOS os dados usando a função extrair_dados_documento.\n\nTEXTO DO DOCUMENTO:\n${ocrText.slice(0, 80000)}`,
+              },
+            ],
+            tools: EXTRACTION_TOOLS,
+            tool_choice: { type: "function", function: { name: "extrair_dados_documento" } },
+            temperature: 0.05,
+          }),
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          console.error(`[EXTRACT] Mistral API ${response.status}:`, errText.substring(0, 200));
+          if (response.status === 429) {
+            await delay(RETRY_DELAY_MS * attempt * 3);
+            continue;
+          }
+          lastError = new Error(`Mistral API ${response.status}`);
+          break;
+        }
+
+        const data = await response.json();
+        const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+
+        if (toolCall?.function?.arguments) {
+          const extracted = JSON.parse(toolCall.function.arguments);
+          console.log(`[EXTRACT] SUCCESS with Mistral: tipo=${extracted.tipo_documento}, rubricas=${extracted.rubricas?.length || 0}`);
+          return extracted;
+        }
+
+        const content = data.choices?.[0]?.message?.content || "";
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          return JSON.parse(jsonMatch[0]);
+        }
+
+        lastError = new Error("No structured data from Mistral");
+        continue;
+      } catch (err) {
+        console.error(`[EXTRACT] Mistral error:`, err);
+        lastError = err instanceof Error ? err : new Error(String(err));
+        await delay(RETRY_DELAY_MS * attempt);
+      }
+    }
+    console.warn(`[EXTRACT] Mistral exhausted, trying Lovable AI fallback...`);
+  }
+
+  // Fallback to Lovable AI gateway
   const models = ["google/gemini-2.5-flash", "google/gemini-2.5-pro"];
 
   for (const model of models) {
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      console.log(`[EXTRACT] Attempt ${attempt} with ${model} (text-based)`);
+      console.log(`[EXTRACT] Attempt ${attempt} with ${model} (Lovable AI fallback)`);
 
       try {
         const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${apiKey}`,
+            Authorization: `Bearer ${lovableApiKey}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -361,15 +426,8 @@ async function callAIFromText(
         if (!response.ok) {
           const errText = await response.text();
           console.error(`[EXTRACT] API ${response.status}:`, errText.substring(0, 200));
-
-          if (response.status === 429) {
-            await delay(RETRY_DELAY_MS * attempt * 3);
-            continue;
-          }
-          if (response.status >= 500) {
-            await delay(RETRY_DELAY_MS * attempt);
-            continue;
-          }
+          if (response.status === 429) { await delay(RETRY_DELAY_MS * attempt * 3); continue; }
+          if (response.status >= 500) { await delay(RETRY_DELAY_MS * attempt); continue; }
           lastError = new Error(`API ${response.status}`);
           break;
         }
@@ -385,19 +443,15 @@ async function callAIFromText(
 
         const content = data.choices?.[0]?.message?.content || "";
         const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]);
-        }
+        if (jsonMatch) { return JSON.parse(jsonMatch[0]); }
 
         lastError = new Error("No structured data returned");
         continue;
       } catch (err) {
-        console.error(`[EXTRACT] Error:`, err);
         lastError = err instanceof Error ? err : new Error(String(err));
         await delay(RETRY_DELAY_MS * attempt);
       }
     }
-    console.warn(`[EXTRACT] Model ${model} exhausted, trying next...`);
   }
 
   throw new Error(`Extraction failed: ${lastError?.message}`);
