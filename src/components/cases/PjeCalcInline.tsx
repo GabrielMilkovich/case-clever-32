@@ -1045,10 +1045,30 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
             <Zap className="h-4 w-4 text-primary" />
             <span className="text-xs font-medium">Sincronização Automática de Dados</span>
           </div>
-          <Button size="sm" variant="outline" onClick={syncFromOCR} disabled={syncing}>
-            {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Zap className="h-4 w-4 mr-1" />}
-            Sincronizar Dados
-          </Button>
+           <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={syncFromOCR} disabled={syncing}>
+              {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Zap className="h-4 w-4 mr-1" />}
+              Sincronizar Dados
+            </Button>
+            <Button size="sm" variant="default" onClick={async () => {
+              setSyncing(true);
+              try {
+                const { seedGoldenMariaMadalena } = await import("@/lib/pjecalc/seed-golden-maria-madalena");
+                const result = await seedGoldenMariaMadalena(caseId);
+                if (result.ok) {
+                  toast.success("Caso Maria Madalena reconfigurado com dados do Golden Snapshot!");
+                } else {
+                  toast.warning(`Seed parcial: ${result.errors.length} erros`, { description: result.errors.slice(0, 3).join('; ') });
+                }
+                queryClient.invalidateQueries();
+              } catch (e: any) {
+                toast.error(`Erro no seed: ${e.message}`);
+              } finally { setSyncing(false); }
+            }} disabled={syncing}>
+              {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Calculator className="h-4 w-4 mr-1" />}
+              Seed Golden (Maria Madalena)
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
