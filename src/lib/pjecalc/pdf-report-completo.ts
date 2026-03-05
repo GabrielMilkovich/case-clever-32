@@ -322,9 +322,10 @@ function buildRelatorioCompletoHTML(
   const nProcesso = meta.processo || '—';
   const verbasRows = buildFlatVerbasRows(result, meta.verbasLinkage);
 
-  const totalCorrigido = result.verbas.reduce((s, v) => s + v.total_corrigido, 0);
-  const totalJuros = result.verbas.reduce((s, v) => s + v.total_juros, 0);
-  const totalFinal = result.verbas.reduce((s, v) => s + v.total_final, 0);
+  // Use engine's resumo values for consistency (avoids floating-point accumulation bugs)
+  const totalCorrigido = result.resumo.principal_corrigido;
+  const totalJuros = result.resumo.juros_mora;
+  const totalFinal = totalCorrigido + totalJuros;
 
   // Grand total includes FGTS (matching PJe-Calc structure)
   const fgtsCorrigido = (result.fgts.total_depositos || 0) + (result.fgts.multa_valor || 0);
