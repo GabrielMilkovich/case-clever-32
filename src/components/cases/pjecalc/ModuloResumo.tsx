@@ -531,12 +531,21 @@ export function ModuloResumo({ caseId }: Props) {
         <div className="flex gap-2">
           {res && (
             <>
+              {/* Primary Export Button */}
+              <Button size="sm" onClick={() => gerarRelatorioCompleto(res, reportMetaCompleto)} className="bg-primary text-primary-foreground">
+                <FileBarChart className="h-4 w-4 mr-1" /> Exportar PDF
+              </Button>
+
               {/* Reports dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm"><Printer className="h-4 w-4 mr-1" /> Relatórios</Button>
+                  <Button variant="outline" size="sm"><Printer className="h-4 w-4 mr-1" /> Outros Relatórios</Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => gerarRelatorioCompleto(res, reportMetaCompleto)}>
+                    <FileBarChart className="h-4 w-4 mr-2" /> Relatório Completo (PDF)
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => gerarRelatorioPDF(res, reportMeta)}>
                     <FileBarChart className="h-4 w-4 mr-2" /> Resumo da Liquidação
                   </DropdownMenuItem>
