@@ -179,9 +179,10 @@ export function ImportadorFichaFinanceira({ caseId, onImported }: Props) {
 
     try {
       const rubricasSelecionadas = dados.rubricas.filter((_, i) => selectedRubricas.has(String(i)));
+      let importedCount = 0;
+      let errorCount = 0;
 
       if (importMode === "historico") {
-        // Create one historico_salarial entry per rubrica, with monthly occurrences
         for (const rub of rubricasSelecionadas) {
           if (rub.valores_mensais.length === 0) continue;
 
@@ -192,9 +193,10 @@ export function ImportadorFichaFinanceira({ caseId, onImported }: Props) {
           const lastDay = new Date(y, m, 0).getDate();
           const fim = `${lastComp}-${String(lastDay).padStart(2, "0")}`;
 
-          // Average value for the historico
+          // Average value for the historico header
           const avg = sorted.reduce((s, v) => s + v.valor, 0) / sorted.length;
 
+          // Insert into the view (triggers pjecalc_hist_ioi → pjecalc_hist_salarial)
           const { data: inserted, error } = await supabase
             .from("pjecalc_historico_salarial" as any)
             .insert({
@@ -202,7 +204,7 @@ export function ImportadorFichaFinanceira({ caseId, onImported }: Props) {
               nome: `${rub.denominacao} (${CATEGORIA_LABELS[rub.categoria] || rub.categoria})`,
               periodo_inicio: inicio,
               periodo_fim: fim,
-              tipo_valor: "informado",
+              tipo_valor: rub.categoria === 'salario_base' ? 'FIXO' : 'VARIAVEL',
               valor_informado: Math.round(avg * 100) / 100,
               incidencia_fgts: true,
               incidencia_cs: true,
@@ -212,10 +214,11 @@ export function ImportadorFichaFinanceira({ caseId, onImported }: Props) {
 
           if (error) {
             console.error("Insert historico error:", error);
+            errorCount++;
             continue;
           }
 
-          // Create monthly occurrences
+          // Insert monthly occurrences via view (triggers → pjecalc_hist_salarial_mes)
           if ((inserted as any)?.id) {
             const ocorrencias = sorted.map((v) => ({
               historico_id: (inserted as any).id,
@@ -225,16 +228,33 @@ export function ImportadorFichaFinanceira({ caseId, onImported }: Props) {
               tipo: "informado",
             }));
 
-            await supabase.from("pjecalc_historico_ocorrencias" as any).insert(ocorrencias);
+            const { error: ocorrErr } = await supabase
+              .from("pjecalc_historico_ocorrencias" as any)
+              .insert(ocorrencias);
+            
+            if (ocorrErr) {
+              console.error("Insert ocorrencias error:", ocorrErr);
+              errorCount++;
+            } else {
+              importedCount++;
+            }
           }
         }
       } else {
-        // Import as occurrences into existing verbas — for future use
         toast.info("Importação como ocorrências será implementada em breve.");
       }
 
-      qc.invalidateQueries({ queryKey: ["pjecalc_historico", caseId] });
-      toast.success(`${rubricasSelecionadas.length} rubrica(s) importada(s) com sucesso!`);
+      // Invalidate all related queries
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["pjecalc_historico", caseId] }),
+        qc.invalidateQueries({ queryKey: ["pjecalc_historico_ocorrencias"] }),
+      ]);
+
+      if (errorCount > 0) {
+        toast.warning(`${importedCount} rubrica(s) importada(s), ${errorCount} com erro. Verifique o console.`);
+      } else {
+        toast.success(`${importedCount} rubrica(s) importada(s) com sucesso! Dados disponíveis no Histórico Salarial e no motor de cálculo.`);
+      }
       onImported?.();
       setOpen(false);
       resetState();
