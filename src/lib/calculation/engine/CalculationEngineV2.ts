@@ -1,5 +1,8 @@
 // =====================================================
-// MOTOR DE CÁLCULO V2 - ORQUESTRADOR PRINCIPAL
+// ⚠️  DEPRECATED — MOTOR DE CÁLCULO V2
+// Este motor é LEGADO e será removido na próxima fase.
+// O motor canônico é PjeCalcEngine em src/lib/pjecalc/engine.ts
+// NÃO ADICIONE NOVAS FUNCIONALIDADES AQUI.
 // =====================================================
 
 import Decimal from 'decimal.js';

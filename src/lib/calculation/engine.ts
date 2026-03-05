@@ -1,5 +1,9 @@
 // =====================================================
-// MOTOR DE CÁLCULO - ENGINE PRINCIPAL
+// ⚠️  DEPRECATED — MOTOR DE CÁLCULO V1
+// Este motor é LEGADO e será removido na próxima fase.
+// O motor canônico é PjeCalcEngine em src/lib/pjecalc/engine.ts
+// Usado apenas por CasoDetalhe.tsx (fluxo genérico legado).
+// NÃO ADICIONE NOVAS FUNCIONALIDADES AQUI.
 // =====================================================
 
 import {
