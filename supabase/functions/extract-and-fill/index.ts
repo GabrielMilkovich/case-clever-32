@@ -1066,11 +1066,30 @@ async function processDocumentInBackground(
     // Stage 2: OpenAI structured extraction from OCR text
     const extracted = await extractStructured(ocrText, LOVABLE_API_KEY);
 
+    // Pre-create pjecalc_calculos with user_id to avoid NULL user_id errors from view triggers
+    let userId = doc.owner_user_id;
+    if (!userId) {
+      const { data: caseRow } = await supabase.from("cases").select("criado_por").eq("id", doc.case_id).maybeSingle();
+      userId = caseRow?.criado_por;
+    }
+    if (userId) {
+      const { data: existingCalc } = await supabase
+        .from("pjecalc_calculos")
+        .select("id")
+        .eq("case_id", doc.case_id)
+        .maybeSingle();
+      if (!existingCalc) {
+        await supabase.from("pjecalc_calculos").insert({
+          case_id: doc.case_id,
+          user_id: userId,
+        });
+        console.log(`[EXTRACT] Pre-created pjecalc_calculos for case ${doc.case_id}`);
+      }
+    }
+
     // Auto-fill pjecalc tables
     const fills = await autoFill(supabase, doc.case_id, extracted);
-
-    // Update document with results
-    const ocrText = extracted.texto_ocr_completo || "";
+    const extractedOcrText = extracted.texto_ocr_completo || "";
     await supabase.from("documents").update({
       status: "extracted",
       tipo: extracted.tipo_documento || doc.tipo,
@@ -1082,8 +1101,8 @@ async function processDocumentInBackground(
       metadata: {
         ...(doc.metadata || {}),
         extraction_completed_at: new Date().toISOString(),
-        text_length: ocrText.length,
-        extracted_text_preview: ocrText.substring(0, 500),
+        text_length: extractedOcrText.length,
+        extracted_text_preview: extractedOcrText.substring(0, 500),
         tipo_detectado: extracted.tipo_documento,
         rubricas_extraidas: extracted.rubricas?.length || 0,
         auto_fill_fields: fills,
@@ -1096,7 +1115,7 @@ async function processDocumentInBackground(
     }).eq("id", document_id);
 
     // Store extracted text as chunks for search
-    if (ocrText.length > 100) {
+    if (extractedOcrText.length > 100) {
       await supabase.from("document_chunks").delete().eq("document_id", document_id);
       await supabase.from("doc_chunks").delete().eq("document_id", document_id);
 
@@ -1106,12 +1125,12 @@ async function processDocumentInBackground(
       let start = 0;
       let idx = 0;
 
-      while (start < ocrText.length) {
-        const end = Math.min(start + chunkSize, ocrText.length);
+      while (start < extractedOcrText.length) {
+        const end = Math.min(start + chunkSize, extractedOcrText.length);
         chunks.push({
           case_id: doc.case_id,
           document_id,
-          content: ocrText.substring(start, end),
+          content: extractedOcrText.substring(start, end),
           page_number: 1,
           chunk_index: idx,
           doc_type: extracted.tipo_documento || doc.tipo || "outro",
@@ -1119,7 +1138,7 @@ async function processDocumentInBackground(
         });
         idx++;
         start = end - overlap;
-        if (start >= ocrText.length) break;
+        if (start >= extractedOcrText.length) break;
       }
 
       if (chunks.length > 0) {
