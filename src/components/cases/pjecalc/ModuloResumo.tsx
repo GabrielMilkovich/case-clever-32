@@ -303,7 +303,7 @@ export function ModuloResumo({ caseId }: Props) {
         honorariosConfig, custasConfigLocal, seguroConfig,
         indicesDB, faixasINSSDB, faixasIRDB,
         [], // excecoesCargas (TODO: load if table exists)
-        feriadosDB,
+        feriadosDB.map(f => ({ ...f, tipo: f.tipo as "estadual" | "facultativo" | "municipal" | "nacional" })),
         prevPrivadaConfig,
         pensaoConfig,
         salarioFamiliaConfig,
