@@ -32,7 +32,7 @@ export function ModuloFGTS({ caseId }: Props) {
 
   useEffect(() => {
     if (data) {
-      const d = data as Record<string, unknown>;
+      const d = data as unknown as Record<string, unknown>;
       setForm({
         apurar: (d.apurar as boolean) ?? true, destino: (d.destino as string) || 'pagar_reclamante',
         compor_principal: (d.compor_principal as boolean) ?? true, multa_apurar: (d.multa_apurar as boolean) ?? true,
