@@ -628,6 +628,16 @@ export async function deleteFgtsSaldoSaque(id: string): Promise<void> {
 // BATCH: Carregar todos os dados de um caso
 // =====================================================
 
+export interface PjecalcAtualizacaoConfigRow {
+  id: string;
+  calculo_id: string;
+  tipo: string; // 'correcao' | 'juros'
+  regime_padrao: string | null;
+  regimes: Record<string, unknown> | null;
+  combinacoes_indice: string | null; // JSON string
+  combinacoes_juros: string | null; // JSON string
+}
+
 export interface PjecalcCaseData {
   params: PjecalcParametrosRow | null;
   dadosProcesso: PjecalcDadosProcessoRow | null;
@@ -644,6 +654,20 @@ export interface PjecalcCaseData {
   honorarios: PjecalcHonorariosRow | null;
   custasConfig: PjecalcCustasConfigRow | null;
   multasConfig: PjecalcMultasConfigRow | null;
+  atualizacaoConfig: PjecalcAtualizacaoConfigRow[];
+}
+
+export async function getAtualizacaoConfig(caseId: string): Promise<PjecalcAtualizacaoConfigRow[]> {
+  try {
+    // Get calculo_id first
+    const calculoId = await getCalculoId(caseId);
+    if (!calculoId) return [];
+    const { data, error } = await fromView('pjecalc_atualizacao_config')
+      .select('*')
+      .eq('calculo_id', calculoId);
+    if (error) { console.warn('getAtualizacaoConfig:', error.message); return []; }
+    return (data || []) as PjecalcAtualizacaoConfigRow[];
+  } catch { return []; }
 }
 
 export async function loadCaseData(caseId: string): Promise<PjecalcCaseData> {
@@ -651,6 +675,7 @@ export async function loadCaseData(caseId: string): Promise<PjecalcCaseData> {
     params, dadosProcesso, faltas, ferias, historicos, verbas,
     cartaoPonto, resultado, fgtsConfig, csConfig, irConfig,
     correcaoConfig, honorarios, custasConfig, multasConfig,
+    atualizacaoConfig,
   ] = await Promise.all([
     getParametros(caseId),
     getDadosProcesso(caseId),
@@ -667,12 +692,14 @@ export async function loadCaseData(caseId: string): Promise<PjecalcCaseData> {
     getHonorarios(caseId),
     getCustasConfig(caseId),
     getMultasConfig(caseId),
+    getAtualizacaoConfig(caseId),
   ]);
 
   return {
     params, dadosProcesso, faltas, ferias, historicos, verbas,
     cartaoPonto, resultado, fgtsConfig, csConfig, irConfig,
     correcaoConfig, honorarios, custasConfig, multasConfig,
+    atualizacaoConfig,
   };
 }
 

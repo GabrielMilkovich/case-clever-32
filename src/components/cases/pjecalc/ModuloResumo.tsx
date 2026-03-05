@@ -63,6 +63,11 @@ export function ModuloResumo({ caseId }: Props) {
     queryFn: () => svc.getCorrecaoConfig(caseId),
   });
 
+  const { data: atualizacaoData = [] } = useQuery({
+    queryKey: ["pjecalc_atualizacao_config_report", caseId],
+    queryFn: () => svc.getAtualizacaoConfig(caseId),
+  });
+
   const { data: dadosProcessoData } = useQuery({
     queryKey: ["pjecalc_dados_processo_report", caseId],
     queryFn: () => svc.getDadosProcesso(caseId),
@@ -439,6 +444,23 @@ export function ModuloResumo({ caseId }: Props) {
     dataLiquidacao: resultado?.data_liquidacao,
     engineVersion: resultado?.engine_version,
   };
+  // Parse combination-by-date data for report criteria
+  const correcaoAtConfig = atualizacaoData.find((a: any) => a.tipo === 'correcao');
+  let correcaoCombinacoes: any[] | undefined;
+  let jurosCombinacoes: any[] | undefined;
+  if (correcaoAtConfig?.combinacoes_indice) {
+    try {
+      correcaoCombinacoes = typeof correcaoAtConfig.combinacoes_indice === 'string'
+        ? JSON.parse(correcaoAtConfig.combinacoes_indice) : correcaoAtConfig.combinacoes_indice;
+    } catch { /* ignore */ }
+  }
+  if (correcaoAtConfig?.combinacoes_juros) {
+    try {
+      jurosCombinacoes = typeof correcaoAtConfig.combinacoes_juros === 'string'
+        ? JSON.parse(correcaoAtConfig.combinacoes_juros) : correcaoAtConfig.combinacoes_juros;
+    } catch { /* ignore */ }
+  }
+
   const reportMetaCompleto = {
     ...reportMeta,
     reclamado: dadosProcessoData?.reclamado || '',
@@ -452,6 +474,8 @@ export function ModuloResumo({ caseId }: Props) {
     jurosTipo: correcaoData?.juros_tipo || 'simples_mensal',
     jurosPercentual: correcaoData?.juros_percentual ?? 1,
     jurosInicio: correcaoData?.juros_inicio || 'ajuizamento',
+    correcaoCombinacoes,
+    jurosCombinacoes,
   };
 
   const handleFechar = async () => {

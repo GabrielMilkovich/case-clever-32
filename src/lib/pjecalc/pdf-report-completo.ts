@@ -685,22 +685,70 @@ function buildDefaultCriterios(meta: RelatorioCompletoMeta, result: PjeLiquidaca
   const items: string[] = [];
   items.push('Prazo do aviso prévio apurado segundo a Lei nº 12.506/2011.');
   items.push('Avos de férias e/ou 13º salário apurados considerando a projeção do prazo do aviso prévio.');
-  
-  const indice = meta.indiceCorrecao || 'IPCA-E';
-  items.push(`Valores corrigidos pelo índice '${indice}', acumulados a partir do mês subsequente ao vencimento, conforme súmula nº 381 do TST.`);
-  
+
+  // Check if result has piecewise correction regimes
+  const hasCombinacao = result.verbas.some(v =>
+    v.ocorrencias.some(oc => (oc as any).regimes_aplicados?.length > 0)
+  );
+
+  // Build correction text from golden snapshot criteria if available
+  const correcaoMeta = (meta as any).correcaoCombinacoes as Array<{ indice: string; ate?: string; de?: string }> | undefined;
+  const jurosMeta = (meta as any).jurosCombinacoes as Array<{ tipo: string; ate?: string; de?: string }> | undefined;
+
+  if (correcaoMeta && correcaoMeta.length > 0) {
+    // Piecewise correction description
+    const fmtD = (d?: string) => {
+      if (!d) return '';
+      const [y, m, day] = d.split('-');
+      return `${day}/${m}/${y}`;
+    };
+    const indiceLabel: Record<string, string> = {
+      'IPCAE': 'IPCA-E', 'IPCA-E': 'IPCA-E', 'IPCA': 'IPCA',
+      'SEM_CORRECAO': 'Sem Correção', 'TR': 'TR', 'SELIC': 'SELIC',
+    };
+    const parts = correcaoMeta.map(f => {
+      const label = indiceLabel[f.indice] || f.indice;
+      if (f.ate && !f.de) return `pelo índice '${label}' até ${fmtD(f.ate)}`;
+      if (f.de && !f.ate) return `pelo índice '${label}' a partir de ${fmtD(f.de)}`;
+      if (f.de && f.ate) return `pelo índice '${label}' de ${fmtD(f.de)} até ${fmtD(f.ate)}`;
+      return `pelo índice '${label}'`;
+    });
+    items.push(`Valores corrigidos ${parts.join(', ')}, acumulados a partir do mês subsequente ao vencimento, conforme súmula nº 381 do TST.`);
+  } else {
+    const indice = meta.indiceCorrecao || 'IPCA-E';
+    items.push(`Valores corrigidos pelo índice '${indice}', acumulados a partir do mês subsequente ao vencimento, conforme súmula nº 381 do TST.`);
+  }
+
   items.push('Alíquota de contribuição social empresa fixada em 20% durante todo o período.');
   items.push('Contribuições sociais sobre salários devidos calculadas conforme os itens IV e V da Súmula nº 368 do TST.');
   items.push('Imposto de renda apurado através da \'tabela progressiva acumulada\' vigente no mês da liquidação (Art. 12-A da Lei nº 7.713/1988).');
-  
-  if (meta.jurosTipo === 'selic') {
+
+  if (jurosMeta && jurosMeta.length > 0) {
+    const fmtD = (d?: string) => {
+      if (!d) return '';
+      const [y, m, day] = d.split('-');
+      return `${day}/${m}/${y}`;
+    };
+    const tipoLabel: Record<string, string> = {
+      'TRD': 'TRD (simples)', 'TRD_SIMPLES': 'TRD (simples)',
+      'SELIC': 'SELIC (Receita Federal)', 'TAXA_LEGAL': 'Taxa Legal',
+    };
+    const parts = jurosMeta.map(f => {
+      const label = tipoLabel[f.tipo] || f.tipo;
+      if (f.ate && !f.de) return `juros ${label} até ${fmtD(f.ate)}`;
+      if (f.de && !f.ate) return `juros ${label} a partir de ${fmtD(f.de)}`;
+      if (f.de && f.ate) return `juros ${label} de ${fmtD(f.de)} até ${fmtD(f.ate)}`;
+      return `juros ${label}`;
+    });
+    items.push(`Juros apurados desde o vencimento das verbas vencidas, em fase pré-judicial, conforme decisão do STF na ADC 58; ${parts.join('; ')}.`);
+  } else if (meta.jurosTipo === 'selic') {
     items.push('Juros apurados pela taxa SELIC conforme decisão do STF na ADC 58.');
   } else {
     items.push(`Juros de mora de ${meta.jurosPercentual || 1}% a.m. desde ${meta.jurosInicio === 'citacao' ? 'a citação' : 'o ajuizamento'}.`);
   }
-  
+
   items.push('Juros de mora sobre verbas apurados após a dedução da contribuição social devida pelo reclamante.');
-  
+
   return items.map(i => `<li style="margin-bottom: 3px;">${i}</li>`).join('');
 }
 
