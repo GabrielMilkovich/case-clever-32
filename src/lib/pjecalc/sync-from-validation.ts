@@ -232,3 +232,5 @@ async function autoConfigureModules(caseId: string, params: any, factMap: Record
     multa_523_percentual: 0,
     data_liquidacao: new Date().toISOString().slice(0, 10),
     ...(dataCitacao ? { data_citacao: dataCitacao } : {}),
+  }, errors, "Correção Config");
+}
