@@ -394,6 +394,7 @@ export async function executarLiquidacao(
   const principalsSemReflexo = principalVerbas.filter(v => !principalsWithReflexas.has(v.id));
 
   if (principalsSemReflexo.length > 0) {
+    console.log(`[ORCHESTRATOR] Auto-generating reflexes for ${principalsSemReflexo.length} principals without reflexes`);
     // Build VerbaBase list for reflexo generation
     const verbasBase: VerbaBase[] = principalsSemReflexo.map(v => ({
       id: v.id,
