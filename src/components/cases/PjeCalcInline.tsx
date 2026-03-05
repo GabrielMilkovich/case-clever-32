@@ -67,6 +67,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
   const [activeModule, setActiveModule] = useState('dados_processo');
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [autoSyncDone, setAutoSyncDone] = useState(false);
 
   // DATA
   const { data: params } = useQuery({
@@ -172,6 +173,46 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
       }));
     }
   }, [params, contract]);
+
+  // ── AUTO-SYNC: preencher módulos automaticamente ao abrir ──
+  useEffect(() => {
+    if (autoSyncDone) return;
+    // Wait for queries to settle
+    if (params !== undefined || contract !== undefined) {
+      // If params already exist, skip auto-sync
+      if (params?.id) {
+        setAutoSyncDone(true);
+        return;
+      }
+      // Run auto-sync
+      (async () => {
+        setSyncing(true);
+        setAutoSyncDone(true);
+        try {
+          const { syncFromValidation } = await import('@/lib/pjecalc/sync-from-validation');
+          const result = await syncFromValidation(caseId);
+          if (result.syncedFields > 0) {
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: ["pjecalc_parametros", caseId] }),
+              queryClient.invalidateQueries({ queryKey: ["pjecalc_dados_processo", caseId] }),
+              queryClient.invalidateQueries({ queryKey: ["pjecalc_historico", caseId] }),
+              queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] }),
+              queryClient.invalidateQueries({ queryKey: ["employment_contract", caseId] }),
+            ]);
+            if (result.errors.length > 0) {
+              toast.warning(`Auto-sync: ${result.syncedFields} campos, ${result.errors.length} aviso(s)`);
+            } else {
+              toast.success(`${result.syncedFields} campos preenchidos automaticamente!`);
+            }
+          }
+        } catch (e) {
+          console.warn("Auto-sync falhou:", e);
+        } finally {
+          setSyncing(false);
+        }
+      })();
+    }
+  }, [params, contract, autoSyncDone, caseId, queryClient]);
 
   // ── SINCRONIZAR DADOS ──
   const syncFromOCR = async () => {

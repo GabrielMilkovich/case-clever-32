@@ -12,8 +12,8 @@ export interface SyncResult {
 export async function syncFromValidation(caseId: string): Promise<SyncResult> {
   const errors: string[] = [];
 
-  // Fetch facts, case, contract, existing params in parallel
-  const [factsRes, caseRes, contractRes, paramsRes, dpRes, existingHistRes, existingVerbasRes] = await Promise.all([
+  // Fetch facts, case, contract, existing params, extraction items in parallel
+  const [factsRes, caseRes, contractRes, paramsRes, dpRes, existingHistRes, existingVerbasRes, extractionItemsRes, extractionsRes] = await Promise.all([
     supabase.from("facts").select("*").eq("case_id", caseId),
     supabase.from("cases").select("*").eq("id", caseId).maybeSingle(),
     supabase.from("employment_contracts").select("*").eq("case_id", caseId).maybeSingle(),
@@ -21,6 +21,8 @@ export async function syncFromValidation(caseId: string): Promise<SyncResult> {
     supabase.from("pjecalc_dados_processo" as any).select("*").eq("case_id", caseId).maybeSingle(),
     supabase.from("pjecalc_historico_salarial" as any).select("id").eq("case_id", caseId),
     supabase.from("pjecalc_verbas" as any).select("id").eq("case_id", caseId),
+    supabase.from("extracao_item" as any).select("*").eq("case_id", caseId).in("status", ["AUTO", "APROVADO"]),
+    supabase.from("extractions").select("*").eq("case_id", caseId).in("status", ["validado", "pendente"]),
   ]);
 
   const facts = factsRes.data || [];
@@ -34,6 +36,28 @@ export async function syncFromValidation(caseId: string): Promise<SyncResult> {
   for (const f of facts) {
     if (!factMap[f.chave] || f.confirmado) {
       factMap[f.chave] = f.valor;
+    }
+  }
+
+  // Enrich from extractions table (validated OCR data)
+  const extractions = extractionsRes.data || [];
+  for (const ext of extractions) {
+    const e = ext as any;
+    if (e.valor_proposto && e.campo && !factMap[e.campo]) {
+      factMap[e.campo] = e.valor_proposto;
+    }
+  }
+
+  // Enrich from extracao_item (pipeline-extracted fields)
+  const extracaoItems = extractionItemsRes.data || [];
+  for (const item of extracaoItems) {
+    const ei = item as any;
+    if (ei.valor && ei.field_key && ei.target_field) {
+      // Map pipeline extraction fields to fact keys
+      const key = ei.target_field;
+      if (!factMap[key] && !key.startsWith('rubrica_')) {
+        factMap[key] = ei.valor;
+      }
     }
   }
 

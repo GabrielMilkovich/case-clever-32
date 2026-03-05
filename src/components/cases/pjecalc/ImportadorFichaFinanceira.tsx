@@ -244,16 +244,31 @@ export function ImportadorFichaFinanceira({ caseId, onImported }: Props) {
         toast.info("Importação como ocorrências será implementada em breve.");
       }
 
-      // Invalidate all related queries
+      // Invalidate all related queries and auto-sync remaining modules
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["pjecalc_historico", caseId] }),
         qc.invalidateQueries({ queryKey: ["pjecalc_historico_ocorrencias"] }),
       ]);
 
+      // Auto-sync: preencher parâmetros/dados processo/verbas a partir dos dados importados
+      try {
+        const { syncFromValidation } = await import('@/lib/pjecalc/sync-from-validation');
+        const syncResult = await syncFromValidation(caseId);
+        if (syncResult.syncedFields > 0) {
+          await Promise.all([
+            qc.invalidateQueries({ queryKey: ["pjecalc_parametros", caseId] }),
+            qc.invalidateQueries({ queryKey: ["pjecalc_dados_processo", caseId] }),
+            qc.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] }),
+          ]);
+        }
+      } catch (syncErr) {
+        console.warn("Auto-sync após importação falhou:", syncErr);
+      }
+
       if (errorCount > 0) {
         toast.warning(`${importedCount} rubrica(s) importada(s), ${errorCount} com erro. Verifique o console.`);
       } else {
-        toast.success(`${importedCount} rubrica(s) importada(s) com sucesso! Dados disponíveis no Histórico Salarial e no motor de cálculo.`);
+        toast.success(`${importedCount} rubrica(s) importada(s) e módulos preenchidos automaticamente!`);
       }
       onImported?.();
       setOpen(false);
