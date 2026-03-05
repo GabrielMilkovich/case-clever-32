@@ -6074,6 +6074,47 @@ export type Database = {
           },
         ]
       }
+      pjecalc_historico_ocorrencias: {
+        Row: {
+          case_id: string | null
+          competencia: string | null
+          created_at: string | null
+          historico_id: string | null
+          id: string | null
+          tipo: string | null
+          valor: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pjecalc_calculos_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "pjecalc_calculos_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_hist_salarial_mes_hist_salarial_id_fkey"
+            columns: ["historico_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_hist_salarial"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_hist_salarial_mes_hist_salarial_id_fkey"
+            columns: ["historico_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_historico_salarial"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pjecalc_historico_salarial: {
         Row: {
           calculo_id: string | null
