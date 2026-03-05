@@ -39,6 +39,28 @@ export async function syncFromValidation(caseId: string): Promise<SyncResult> {
     }
   }
 
+  // Enrich from extractions table (validated OCR data)
+  const extractions = extractionsRes.data || [];
+  for (const ext of extractions) {
+    const e = ext as any;
+    if (e.valor_proposto && e.campo && !factMap[e.campo]) {
+      factMap[e.campo] = e.valor_proposto;
+    }
+  }
+
+  // Enrich from extracao_item (pipeline-extracted fields)
+  const extracaoItems = extractionItemsRes.data || [];
+  for (const item of extracaoItems) {
+    const ei = item as any;
+    if (ei.valor && ei.field_key && ei.target_field) {
+      // Map pipeline extraction fields to fact keys
+      const key = ei.target_field;
+      if (!factMap[key] && !key.startsWith('rubrica_')) {
+        factMap[key] = ei.valor;
+      }
+    }
+  }
+
   // Enrich from case/contract tables
   if (!factMap.data_admissao && contractData?.data_admissao) factMap.data_admissao = contractData.data_admissao;
   if (!factMap.data_demissao && contractData?.data_demissao) factMap.data_demissao = contractData.data_demissao;
