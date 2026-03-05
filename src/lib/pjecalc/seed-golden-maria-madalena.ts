@@ -95,8 +95,6 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
       valor_informado: h.valor,
       incidencia_fgts: h.fgts,
       incidencia_cs: h.cs,
-      fgts_recolhido: false,
-      cs_recolhida: false,
     }).select('id').single();
     if (error) errors.push(`Hist ${h.nome}: ${error.message}`);
     if (data) insertedHistIds[h.nome] = (data as any).id;
