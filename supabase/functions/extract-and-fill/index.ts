@@ -1066,10 +1066,25 @@ async function processDocumentInBackground(
     // Stage 2: OpenAI structured extraction from OCR text
     const extracted = await extractStructured(ocrText, LOVABLE_API_KEY);
 
+    // Pre-create pjecalc_calculos with user_id to avoid NULL user_id errors from view triggers
+    const userId = doc.owner_user_id || doc.criado_por;
+    if (userId) {
+      const { data: existingCalc } = await supabase
+        .from("pjecalc_calculos")
+        .select("id")
+        .eq("case_id", doc.case_id)
+        .maybeSingle();
+      if (!existingCalc) {
+        await supabase.from("pjecalc_calculos").insert({
+          case_id: doc.case_id,
+          user_id: userId,
+        });
+        console.log(`[EXTRACT] Pre-created pjecalc_calculos for case ${doc.case_id}`);
+      }
+    }
+
     // Auto-fill pjecalc tables
     const fills = await autoFill(supabase, doc.case_id, extracted);
-
-    // Update document with results
     const extractedOcrText = extracted.texto_ocr_completo || "";
     await supabase.from("documents").update({
       status: "extracted",
