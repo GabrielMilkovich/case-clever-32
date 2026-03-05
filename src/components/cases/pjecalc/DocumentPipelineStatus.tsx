@@ -9,12 +9,27 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   FileText, CheckCircle2, Clock, AlertTriangle, Loader2, XCircle
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 interface Props {
   caseId: string;
 }
 
-const STATUS_MAP: Record<string, { icon: any; color: string; label: string }> = {
+interface PipelineRow {
+  id: string;
+  status: string;
+  pipeline_type: string;
+  template_detectado: string | null;
+  empresa_detectada: string | null;
+  documents: { file_name: string | null } | null;
+}
+
+interface ExtracaoRow {
+  pipeline_id: string;
+  status: string;
+}
+
+const STATUS_MAP: Record<string, { icon: LucideIcon; color: string; label: string }> = {
   detectado: { icon: Clock, color: "text-blue-500", label: "Detectado" },
   extraindo: { icon: Loader2, color: "text-amber-500", label: "Extraindo" },
   extraido: { icon: CheckCircle2, color: "text-emerald-500", label: "Extraído" },
@@ -36,10 +51,10 @@ export function DocumentPipelineStatus({ caseId }: Props) {
     queryFn: async () => {
       const { data } = await supabase
         .from("document_pipeline")
-        .select("*, documents!document_pipeline_document_id_fkey(file_name)")
+        .select("id, status, pipeline_type, template_detectado, empresa_detectada, documents!document_pipeline_document_id_fkey(file_name)")
         .eq("case_id", caseId)
         .order("created_at", { ascending: false });
-      return (data || []) as any[];
+      return (data || []) as unknown as PipelineRow[];
     },
   });
 
@@ -52,7 +67,7 @@ export function DocumentPipelineStatus({ caseId }: Props) {
         .eq("case_id", caseId);
       
       const counts: Record<string, { total: number; confirmed: number; pending: number }> = {};
-      for (const item of (data || []) as any[]) {
+      for (const item of (data || []) as ExtracaoRow[]) {
         if (!counts[item.pipeline_id]) counts[item.pipeline_id] = { total: 0, confirmed: 0, pending: 0 };
         counts[item.pipeline_id].total++;
         if (item.status === "CONFIRMADO") counts[item.pipeline_id].confirmed++;
@@ -75,7 +90,7 @@ export function DocumentPipelineStatus({ caseId }: Props) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-1.5">
-        {pipelines.map((p: any) => {
+        {pipelines.map((p) => {
           const st = STATUS_MAP[p.status] || STATUS_MAP.detectado;
           const Icon = st.icon;
           const counts = extractionCounts[p.id];
