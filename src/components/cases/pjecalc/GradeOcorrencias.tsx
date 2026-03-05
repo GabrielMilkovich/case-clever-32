@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import * as svc from "@/lib/pjecalc/service";
 import { toast } from "sonner";
 import { Calculator, Loader2, ArrowLeft, Trash2, RefreshCw, Edit3, Search, Filter, CheckSquare, Square } from "lucide-react";
 
@@ -61,12 +62,8 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
   const { data: ocorrencias = [], isLoading } = useQuery({
     queryKey,
     queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_ocorrencias" as any)
-        .select("*")
-        .eq("calculo_id", caseId)
-        .eq("verba_id", verbaId)
-        .order("competencia");
-      return (data || []) as unknown as Ocorrencia[];
+      const data = await svc.getOcorrenciasByCalculo(caseId, verbaId);
+      return data as unknown as Ocorrencia[];
     },
   });
 
@@ -75,15 +72,14 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
     setGenerating(true);
     try {
       if (strategy === 'SOBRESCREVER_TUDO') {
-        await supabase.from("pjecalc_ocorrencias" as any).delete().eq("calculo_id", caseId).eq("verba_id", verbaId);
+        await svc.deleteOcorrenciasByCalculo(caseId, verbaId);
       }
 
       const start = new Date(periodoInicio + "T00:00:00");
       const end = new Date(periodoFim + "T00:00:00");
-      const rows: any[] = [];
+      const rows: Record<string, unknown>[] = [];
       const cur = new Date(start.getFullYear(), start.getMonth(), 1);
 
-      // Get existing INFORMADA rows to preserve
       const existingInformadas = strategy === 'MANTER_ALTERACOES_MANUAIS'
         ? ocorrencias.filter(o => o.origem === 'INFORMADA').map(o => o.competencia)
         : [];
@@ -107,17 +103,10 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
       }
 
       if (strategy === 'MANTER_ALTERACOES_MANUAIS') {
-        // Delete only CALCULADA rows, then insert new ones
-        await supabase.from("pjecalc_ocorrencias" as any)
-          .delete()
-          .eq("calculo_id", caseId)
-          .eq("verba_id", verbaId)
-          .eq("origem", "CALCULADA");
+        await svc.deleteOcorrenciasByCalculo(caseId, verbaId, 'CALCULADA');
       }
 
-      if (rows.length > 0) {
-        await supabase.from("pjecalc_ocorrencias" as any).insert(rows);
-      }
+      await svc.insertOcorrenciasBatch(rows);
 
       qc.invalidateQueries({ queryKey });
       toast.success(`${rows.length} ocorrências geradas (${strategy === 'MANTER_ALTERACOES_MANUAIS' ? 'manuais preservadas' : 'todas sobrescritas'})`);
@@ -126,9 +115,8 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
   };
 
   const updateCell = useCallback(async (id: string, field: string, value: number | boolean) => {
-    const updates: any = { [field]: value, origem: 'INFORMADA', updated_at: new Date().toISOString() };
+    const updates: Record<string, unknown> = { [field]: value, origem: 'INFORMADA', updated_at: new Date().toISOString() };
 
-    // Recalculate devido/diferenca if a formula field changed
     const row = ocorrencias.find(o => o.id === id);
     if (row && typeof value === 'number') {
       const newRow = { ...row, [field]: value };
@@ -139,17 +127,17 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
       updates.total = Math.round((diferenca + newRow.correcao + newRow.juros) * 100) / 100;
     }
 
-    await supabase.from("pjecalc_ocorrencias" as any).update(updates).eq("id", id);
+    await svc.updateOcorrencia(id, updates);
     qc.invalidateQueries({ queryKey });
   }, [ocorrencias, caseId, verbaId, qc, queryKey]);
 
   const executeBatchEdit = async () => {
     setBatchLoading(true);
     try {
-      const filtro: any = { verba_ids: [verbaId] };
+      const filtro: Record<string, unknown> = { verba_ids: [verbaId] };
       if (batchCompInicio) filtro.competencia_inicio = batchCompInicio;
       if (batchCompFim) filtro.competencia_fim = batchCompFim;
-      const changes: any = {};
+      const changes: Record<string, unknown> = {};
       changes[batchField] = parseFloat(batchValue) || 0;
 
       const { data, error } = await supabase.rpc('pjecalc_batch_update_ocorrencias', {
@@ -194,7 +182,7 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
   const deleteSelected = async () => {
     if (selectedRows.size === 0) return;
     for (const id of selectedRows) {
-      await supabase.from("pjecalc_ocorrencias" as any).delete().eq("id", id);
+      await svc.deleteOcorrenciaById(id);
     }
     setSelectedRows(new Set());
     qc.invalidateQueries({ queryKey });
@@ -247,7 +235,7 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
               <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
               <Input placeholder="Buscar competência..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-8 h-7 text-xs" />
             </div>
-            <Select value={filterAtiva} onValueChange={(v: any) => setFilterAtiva(v)}>
+            <Select value={filterAtiva} onValueChange={(v) => setFilterAtiva(v as typeof filterAtiva)}>
               <SelectTrigger className="h-7 text-xs w-28"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas</SelectItem>
@@ -255,7 +243,7 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
                 <SelectItem value="inativa">Inativas</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={filterOrigem} onValueChange={(v: any) => setFilterOrigem(v)}>
+            <Select value={filterOrigem} onValueChange={(v) => setFilterOrigem(v as typeof filterOrigem)}>
               <SelectTrigger className="h-7 text-xs w-32"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas origens</SelectItem>
@@ -322,7 +310,7 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
                     <td className="p-2 text-right font-mono font-medium">{(o.diferenca || 0).toFixed(2)}</td>
                     <td className="p-1">
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={async () => {
-                        await supabase.from("pjecalc_ocorrencias").delete().eq("id", o.id);
+                        await svc.deleteOcorrenciaById(o.id);
                         qc.invalidateQueries({ queryKey });
                       }}><Trash2 className="h-3 w-3" /></Button>
                     </td>
@@ -371,25 +359,29 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
               <div><Label className="text-xs">Competência Fim</Label><Input type="month" value={batchCompFim} onChange={e => setBatchCompFim(e.target.value)} className="mt-1 h-8 text-xs" /></div>
             </div>
             <div>
-              <Label className="text-xs">Campo a Alterar</Label>
+              <Label className="text-xs">Campo</Label>
               <Select value={batchField} onValueChange={setBatchField}>
-                <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="base_valor">Base</SelectItem>
                   <SelectItem value="divisor_valor">Divisor</SelectItem>
                   <SelectItem value="multiplicador_valor">Multiplicador</SelectItem>
                   <SelectItem value="quantidade_valor">Quantidade</SelectItem>
-                  <SelectItem value="pago">Pago</SelectItem>
                   <SelectItem value="dobra">Dobra</SelectItem>
+                  <SelectItem value="pago">Pago</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div><Label className="text-xs">Novo Valor</Label><Input type="number" step="0.01" value={batchValue} onChange={e => setBatchValue(e.target.value)} className="mt-1 h-8 text-xs" /></div>
+            <div>
+              <Label className="text-xs">Novo Valor</Label>
+              <Input type="number" step="0.01" value={batchValue} onChange={e => setBatchValue(e.target.value)} className="mt-1 h-8 text-xs" />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowBatch(false)}>Cancelar</Button>
             <Button onClick={executeBatchEdit} disabled={batchLoading}>
-              {batchLoading && <Loader2 className="h-4 w-4 animate-spin mr-1" />} Aplicar
+              {batchLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Aplicar
             </Button>
           </DialogFooter>
         </DialogContent>
