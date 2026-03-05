@@ -222,14 +222,17 @@ function toEngineFgtsConfig(cfg: PjecalcFgtsConfigRow | null): PjeFGTSConfig {
 function toEngineCsConfig(cfg: PjecalcCsConfigRow | null): PjeCSConfig {
   return {
     apurar_segurado: cfg?.habilitado ?? true,
-    cobrar_reclamante: true,
-    cs_sobre_salarios_pagos: false,
+    cobrar_reclamante: cfg?.cobrar_reclamante ?? true,
+    cs_sobre_salarios_pagos: cfg?.cs_sobre_salarios_pagos ?? false,
     aliquota_segurado_tipo: 'empregado',
     limitar_teto: true,
     apurar_empresa: true,
     apurar_sat: true,
     apurar_terceiros: true,
-    aliquota_empregador_tipo: 'atividade',
+    aliquota_empregador_tipo: 'fixa',
+    aliquota_empresa_fixa: cfg?.aliquota_empresa ?? 20,
+    aliquota_sat_fixa: cfg?.aliquota_sat ?? 2,
+    aliquota_terceiros_fixa: cfg?.aliquota_terceiros ?? 5.8,
     periodos_simples: [],
   };
 }

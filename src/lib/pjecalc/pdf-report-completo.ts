@@ -586,9 +586,56 @@ function buildRelatorioCompletoHTML(
   ${pageFooter(meta)}
   `;
 
+  // ──────────── FGTS DETALHAMENTO ────────────
+  let fgtsPage = '';
+  if (result.fgts.total_fgts > 0) {
+    const fgtsDepRows = result.fgts.depositos
+      .sort((a, b) => a.competencia.localeCompare(b.competencia))
+      .map(d => `
+        <tr>
+          <td class="center">${d.competencia}</td>
+          <td class="num">${fmt(d.base)}</td>
+          <td class="num">${(d.aliquota * 100).toFixed(1)}%</td>
+          <td class="num">${fmt(d.valor)}</td>
+        </tr>
+      `).join('');
+
+    fgtsPage = `
+    <div class="page-break"></div>
+    ${pageHeader(meta, 'FGTS — MEMÓRIA DE CÁLCULO')}
+    
+    <h2>Depósitos de FGTS (8%)</h2>
+    <table>
+      <thead><tr><th>Competência</th><th>Base</th><th>Alíquota</th><th>FGTS Devido</th></tr></thead>
+      <tbody>
+        ${fgtsDepRows}
+        <tr class="grand-total">
+          <td colspan="3" class="left"><strong>Total Depósitos FGTS</strong></td>
+          <td class="num"><strong>${fmt(result.fgts.total_depositos)}</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Multa Rescisória sobre FGTS</h2>
+    <div class="info-grid">
+      <div class="info-row"><div class="info-label">Base da Multa (Depósitos FGTS)</div><div class="info-value">${fmt(result.fgts.total_depositos)}</div></div>
+      <div class="info-row"><div class="info-label">Percentual da Multa</div><div class="info-value">40%</div></div>
+      <div class="info-row"><div class="info-label">Valor da Multa</div><div class="info-value">${fmt(result.fgts.multa_valor)}</div></div>
+      ${result.fgts.lc110_10 > 0 ? `<div class="info-row"><div class="info-label">LC 110/01 — 10%</div><div class="info-value">${fmt(result.fgts.lc110_10)}</div></div>` : ''}
+      ${result.fgts.lc110_05 > 0 ? `<div class="info-row"><div class="info-label">LC 110/01 — 0,5%</div><div class="info-value">${fmt(result.fgts.lc110_05)}</div></div>` : ''}
+      ${result.fgts.saldo_deduzido > 0 ? `<div class="info-row"><div class="info-label">Saldo Deduzido</div><div class="info-value">(${fmt(result.fgts.saldo_deduzido)})</div></div>` : ''}
+      <div class="info-row" style="font-weight:700; background:#003366; color:#fff;">
+        <div class="info-label" style="background:#003366; color:#fff; border-color:#003366;">TOTAL FGTS + MULTA</div>
+        <div class="info-value" style="border-color:#003366; color:#fff; background:#003366;">${fmt(result.fgts.total_fgts)}</div>
+      </div>
+    </div>
+    ${pageFooter(meta)}
+    `;
+  }
+
   // ──────────── CS DETALHAMENTO ────────────
   let csPage = '';
-  if (result.contribuicao_social.total_segurado > 0) {
+  if (result.contribuicao_social.total_segurado > 0 || result.contribuicao_social.total_empregador > 0) {
     const csSegRows = result.contribuicao_social.segurado_devidos.map(s => `
       <tr>
         <td class="center">${s.competencia}</td>
@@ -614,9 +661,12 @@ function buildRelatorioCompletoHTML(
     <div class="page-break"></div>
     ${pageHeader(meta, 'CONTRIBUIÇÃO SOCIAL')}
     
-    <h2>Contribuição Social — Segurado</h2>
+    <h2>Contribuição Social — Segurado (Dedução do Reclamante)</h2>
+    <p style="font-size: 7pt; color: #555; margin-bottom: 6px; background: #fffde6; padding: 3px 6px; border-left: 3px solid #e6a800;">
+      Apuração progressiva conforme tabelas vigentes em cada competência. Valores deduzidos do crédito do reclamante antes do cálculo dos juros de mora.
+    </p>
     <table>
-      <thead><tr><th>Comp.</th><th>Base</th><th>Alíquota</th><th>Valor</th><th>Recolhido</th><th>Diferença</th></tr></thead>
+      <thead><tr><th>Comp.</th><th>Base</th><th>Alíquota Efetiva</th><th>Valor</th><th>Recolhido</th><th>Diferença</th></tr></thead>
       <tbody>
         ${csSegRows}
         <tr class="grand-total">
@@ -628,9 +678,12 @@ function buildRelatorioCompletoHTML(
     </table>
 
     ${csEmpRows ? `
-    <h2>Contribuição Social — Empregador</h2>
+    <h2>Contribuição Social — Empregador (sobre salários devidos)</h2>
+    <p style="font-size: 7pt; color: #555; margin-bottom: 6px;">
+      Alíquota empresa: 20% · SAT/RAT · Terceiros — conforme Súmula nº 368 do TST, itens IV e V.
+    </p>
     <table>
-      <thead><tr><th>Comp.</th><th>Empresa</th><th>SAT/RAT</th><th>Terceiros</th><th>Total</th></tr></thead>
+      <thead><tr><th>Comp.</th><th>Empresa (20%)</th><th>SAT/RAT</th><th>Terceiros</th><th>Total</th></tr></thead>
       <tbody>
         ${csEmpRows}
         <tr class="grand-total">
@@ -722,6 +775,7 @@ function buildRelatorioCompletoHTML(
   ${page2}
   ${cartaoPages}
   ${memoriaPage}
+  ${fgtsPage}
   ${csPage}
   ${irPage}
   ${assinaturaPage}
