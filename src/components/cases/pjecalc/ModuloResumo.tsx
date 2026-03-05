@@ -894,6 +894,26 @@ export function ModuloResumo({ caseId }: Props) {
             </Card>
           )}
 
+          {/* Comparador de Paridade */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Scale className="h-4 w-4 text-primary" />
+                  Comparador de Paridade
+                </CardTitle>
+                {parityData && (
+                  <Badge variant="outline" className="text-[10px]">
+                    {parityData.verbas.filter(v => v.status === 'ok').length}/{parityData.verbas.length} OK
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ComparadorParidade parityData={parityData} />
+            </CardContent>
+          </Card>
+
           <div className="text-[10px] text-muted-foreground text-right">
             Liquidação em {resultado?.data_liquidacao || '—'} • Engine v{resultado?.engine_version}
           </div>
