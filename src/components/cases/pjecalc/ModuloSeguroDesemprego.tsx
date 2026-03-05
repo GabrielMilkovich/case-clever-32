@@ -5,9 +5,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Save, Loader2 } from "lucide-react";
+import * as svc from "@/lib/pjecalc/service";
 
 interface Props { caseId: string; }
 
@@ -17,33 +17,26 @@ export function ModuloSeguroDesemprego({ caseId }: Props) {
 
   const { data } = useQuery({
     queryKey: ["pjecalc_seguro_config", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_seguro_config" as any).select("*").eq("case_id", caseId).maybeSingle();
-      return data as any;
-    },
+    queryFn: () => svc.getSeguroConfig(caseId),
   });
 
   const [form, setForm] = useState({ apurar: false, parcelas: 5, valor_parcela: '', recebeu: false, observacoes: '' });
 
   useEffect(() => {
-    if (data) setForm({
-      apurar: data.apurar ?? false, parcelas: data.parcelas ?? 5,
-      valor_parcela: data.valor_parcela?.toString() || '', recebeu: data.recebeu ?? false,
-      observacoes: data.observacoes || '',
-    });
+    if (data) {
+      const d = data as Record<string, unknown>;
+      setForm({
+        apurar: (d.apurar as boolean) ?? false, parcelas: (d.parcelas as number) ?? 5,
+        valor_parcela: d.valor_parcela?.toString() || '', recebeu: (d.recebeu as boolean) ?? false,
+        observacoes: (d.observacoes as string) || '',
+      });
+    }
   }, [data]);
 
   const save = async () => {
     setSaving(true);
     try {
-      const payload = { case_id: caseId, ...form, valor_parcela: form.valor_parcela ? parseFloat(form.valor_parcela) : null };
-      if (data?.id) {
-        const { error } = await supabase.from("pjecalc_seguro_config" as any).update(payload).eq("id", data.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("pjecalc_seguro_config" as any).insert(payload);
-        if (error) throw error;
-      }
+      await svc.upsertSeguroConfig(caseId, { ...form, valor_parcela: form.valor_parcela ? parseFloat(form.valor_parcela) : null });
       qc.invalidateQueries({ queryKey: ["pjecalc_seguro_config", caseId] });
       toast.success("Seguro-desemprego salvo!");
     } catch (e) { toast.error((e as Error).message); }
