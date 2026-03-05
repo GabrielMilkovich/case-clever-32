@@ -14,6 +14,7 @@ const corsHeaders = {
 
 const MAX_RETRIES = 2;
 const RETRY_DELAY_MS = 2000;
+const MISTRAL_OCR_URL = "https://api.mistral.ai/v1/ocr";
 
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -28,6 +29,93 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
     binary += String.fromCharCode(...chunk);
   }
   return btoa(binary);
+}
+
+// =====================================================
+// MISTRAL OCR — Extract text from document
+// =====================================================
+
+async function callMistralOCR(
+  fileUrl: string,
+  base64Data: string,
+  mimeType: string,
+  apiKey: string
+): Promise<{ text: string; pageCount: number }> {
+  const isPdf = mimeType === "application/pdf";
+
+  let document: any;
+
+  if (isPdf) {
+    // Upload PDF to Mistral files API first
+    const blob = new Blob([Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))], { type: mimeType });
+    const formData = new FormData();
+    formData.append("file", blob, "document.pdf");
+    formData.append("purpose", "ocr");
+
+    const uploadResp = await fetch("https://api.mistral.ai/v1/files", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}` },
+      body: formData,
+    });
+
+    if (!uploadResp.ok) {
+      const errText = await uploadResp.text();
+      console.error("[MISTRAL-OCR] Upload failed:", uploadResp.status, errText);
+      throw new Error(`Mistral upload failed: ${uploadResp.status}`);
+    }
+
+    const uploadData = await uploadResp.json();
+    console.log("[MISTRAL-OCR] File uploaded:", uploadData.id);
+    await delay(1000);
+
+    const signedResp = await fetch(`https://api.mistral.ai/v1/files/${uploadData.id}/url?expiry=300`, {
+      method: "GET",
+      headers: { "Authorization": `Bearer ${apiKey}` },
+    });
+
+    if (!signedResp.ok) {
+      throw new Error(`Mistral signed URL failed: ${signedResp.status}`);
+    }
+
+    const signedData = await signedResp.json();
+    document = { type: "document_url", document_url: signedData.url };
+  } else {
+    // Image: use data URL
+    document = { type: "image_url", image_url: `data:${mimeType};base64,${base64Data}` };
+  }
+
+  console.log("[MISTRAL-OCR] Calling OCR API...");
+
+  const response = await fetch(MISTRAL_OCR_URL, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "mistral-ocr-latest",
+      document,
+      include_image_base64: false,
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error("[MISTRAL-OCR] API error:", response.status, errText);
+    throw new Error(`Mistral OCR error ${response.status}: ${errText.substring(0, 200)}`);
+  }
+
+  const result = await response.json();
+  const pages = result.pages || [];
+  const pageCount = pages.length || 1;
+
+  const text = pages.map((page: any, idx: number) => {
+    const header = pages.length > 1 ? `--- PÁGINA ${idx + 1} ---\n` : "";
+    return header + (page.markdown || page.text || "");
+  }).join("\n\n");
+
+  console.log(`[MISTRAL-OCR] Extracted ${text.length} chars from ${pageCount} pages`);
+  return { text, pageCount };
 }
 
 // =====================================================
@@ -236,19 +324,17 @@ REGRAS:
 8. Para cartão de ponto: todos os registros diários
 9. NÃO retorne texto_ocr_completo - apenas dados estruturados`;
 
-async function callAI(
-  base64Data: string,
-  mimeType: string,
+async function callAIFromText(
+  ocrText: string,
   apiKey: string
 ): Promise<any> {
   let lastError: Error | null = null;
 
-  // Use Flash for speed and lower memory
   const models = ["google/gemini-2.5-flash", "google/gemini-2.5-pro"];
 
   for (const model of models) {
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      console.log(`[EXTRACT] Attempt ${attempt} with ${model}`);
+      console.log(`[EXTRACT] Attempt ${attempt} with ${model} (text-based)`);
 
       try {
         const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -263,16 +349,7 @@ async function callAI(
               { role: "system", content: SYSTEM_PROMPT },
               {
                 role: "user",
-                content: [
-                  {
-                    type: "text",
-                    text: "Analise este documento trabalhista e extraia TODOS os dados usando a função extrair_dados_documento."
-                  },
-                  {
-                    type: "image_url",
-                    image_url: { url: `data:${mimeType};base64,${base64Data}` },
-                  },
-                ],
+                content: `Analise o texto OCR abaixo de um documento trabalhista e extraia TODOS os dados usando a função extrair_dados_documento.\n\nTEXTO DO DOCUMENTO:\n${ocrText.slice(0, 80000)}`,
               },
             ],
             tools: EXTRACTION_TOOLS,
@@ -761,8 +838,39 @@ async function processDocumentInBackground(
     const base64Data = arrayBufferToBase64(fileBuffer);
     console.log(`[EXTRACT] File: ${fileBuffer.byteLength} bytes, base64: ${base64Data.length} chars`);
 
-    // Call AI
-    const extracted = await callAI(base64Data, mimeType, LOVABLE_API_KEY);
+    // Step 1: OCR via Mistral
+    const MISTRAL_API_KEY = Deno.env.get("MISTRAL_API_KEY");
+    let ocrText = "";
+    let ocrPageCount = 1;
+
+    if (MISTRAL_API_KEY) {
+      console.log("[EXTRACT] Using Mistral OCR for text extraction...");
+      try {
+        const ocrResult = await callMistralOCR(fileUrl, base64Data, mimeType, MISTRAL_API_KEY);
+        ocrText = ocrResult.text;
+        ocrPageCount = ocrResult.pageCount;
+        console.log(`[EXTRACT] Mistral OCR: ${ocrText.length} chars, ${ocrPageCount} pages`);
+      } catch (ocrErr: any) {
+        console.warn("[EXTRACT] Mistral OCR failed, will fallback to vision:", ocrErr?.message);
+      }
+    } else {
+      console.warn("[EXTRACT] MISTRAL_API_KEY not set, skipping Mistral OCR");
+    }
+
+    // Step 2: Structured extraction from text (or fallback to vision)
+    let extracted: any;
+    if (ocrText.length > 50) {
+      // Use text-based extraction (cheaper, no base64 image needed)
+      extracted = await callAIFromText(ocrText, LOVABLE_API_KEY);
+      if (!extracted.paginas_detectadas) extracted.paginas_detectadas = ocrPageCount;
+    } else {
+      // Fallback: send image directly to Lovable AI (original behavior)
+      console.log("[EXTRACT] Fallback to vision-based extraction...");
+      extracted = await callAIFromText(
+        `[OCR falhou. Documento: ${doc.file_name}, tipo: ${mimeType}, tamanho: ${fileBuffer.byteLength} bytes. Dados insuficientes para extração.]`,
+        LOVABLE_API_KEY
+      );
+    }
 
     // Auto-fill
     const fills = await autoFill(supabase, doc.case_id, extracted);
