@@ -2334,6 +2334,194 @@ export class PjeCalcEngine {
   }
 
   // =====================================================
+  // CORREÇÃO SOMENTE (sem juros) — para juros_apos_deducao_cs
+  // =====================================================
+
+  aplicarCorrecaoSomente(verbaResults: PjeVerbaResult[]): void {
+    if (this.correcaoConfig.combinacoes_indice?.length) {
+      // Use combination-by-date but skip interest
+      this.aplicarCorrecaoCombinacaoSomente(verbaResults);
+      return;
+    }
+
+    // Legacy single-index correction only
+    const dataLiq = new Date(this.correcaoConfig.data_liquidacao);
+    const compLiq = this.correcaoConfig.data_liquidacao.slice(0, 7);
+
+    for (const vr of verbaResults) {
+      let totalCorrigido = 0;
+      for (const oc of vr.ocorrencias) {
+        if (oc.diferenca === 0) continue;
+        const fatorDB = this.getIndiceCorrecaoDB(this.correcaoConfig.indice, oc.competencia, compLiq);
+        let indiceCorrecao = 1;
+        if (fatorDB !== null) {
+          indiceCorrecao = fatorDB;
+        } else {
+          const [ano, mes] = oc.competencia.split('-').map(Number);
+          const dataComp = new Date(ano, mes - 1, 1);
+          const meses = this.mesesEntre(dataComp, dataLiq);
+          const taxas: Record<string, number> = { 'IPCA-E': 1.0045, 'SELIC': 1.01, 'TR': 1.0001, 'IPCA': 1.004 };
+          indiceCorrecao = Math.pow(taxas[this.correcaoConfig.indice] || 1.004, meses);
+        }
+        const valorCorrigido = Number(new Decimal(oc.diferenca).times(indiceCorrecao).toDP(2));
+        oc.indice_correcao = Number(new Decimal(indiceCorrecao).toDP(6));
+        oc.valor_corrigido = valorCorrigido;
+        oc.juros = 0;
+        oc.valor_final = valorCorrigido;
+        totalCorrigido += valorCorrigido;
+      }
+      vr.total_corrigido = Number(new Decimal(totalCorrigido).toDP(2));
+      vr.total_juros = 0;
+      vr.total_final = Number(new Decimal(totalCorrigido).toDP(2));
+    }
+  }
+
+  private aplicarCorrecaoCombinacaoSomente(verbaResults: PjeVerbaResult[]): void {
+    const combinacoes_indice = this.correcaoConfig.combinacoes_indice!;
+    const dataLiq = this.correcaoConfig.data_liquidacao;
+
+    const normalizeIndice = (ind: string): string => {
+      const map: Record<string, string> = { 'IPCA-E': 'IPCA-E', 'IPCAE': 'IPCA-E', 'IPCA': 'IPCA', 'SELIC': 'SELIC', 'TR': 'TR', 'TRD': 'TR' };
+      return map[ind] || ind;
+    };
+
+    for (const vr of verbaResults) {
+      let totalCorrigido = 0;
+      for (const oc of vr.ocorrencias) {
+        if (oc.diferenca === 0) continue;
+        const compDate = oc.competencia.length === 7 ? oc.competencia + '-01' : oc.competencia;
+        const breakpoints = new Set<string>();
+        breakpoints.add(compDate);
+        breakpoints.add(dataLiq);
+        for (const ci of combinacoes_indice) {
+          if (ci.de && ci.de > compDate && ci.de <= dataLiq) breakpoints.add(ci.de);
+        }
+        const datas = Array.from(breakpoints).sort();
+        let fatorTotal = new Decimal(1);
+        for (let i = 0; i < datas.length - 1; i++) {
+          const segInicio = datas[i];
+          const segFim = datas[i + 1];
+          const regime = this.getRegimeParaData(combinacoes_indice, segInicio);
+          const indice = normalizeIndice(regime?.indice || 'SEM_CORRECAO');
+          if (indice === 'SEM_CORRECAO' || indice === 'NENHUM' || indice === 'Sem Correção') continue;
+          // For SELIC as correction index, still apply the correction factor (SELIC includes interest but in correction-only mode we apply the full factor)
+          const fatorDB = this.getIndiceCorrecaoDB(indice, segInicio.slice(0, 7), segFim.slice(0, 7));
+          if (fatorDB !== null && fatorDB > 0) {
+            fatorTotal = fatorTotal.times(fatorDB);
+          } else {
+            const taxas: Record<string, number> = { 'IPCA-E': 0.0045, 'IPCA': 0.004, 'SELIC': 0.01, 'TR': 0.0001, 'TAXA_LEGAL': 0.008 };
+            const taxa = taxas[indice] || 0.004;
+            const meses = this.mesesEntre(new Date(segInicio), new Date(segFim));
+            fatorTotal = fatorTotal.times(Math.pow(1 + taxa, meses));
+          }
+        }
+        const valorCorrigido = new Decimal(oc.diferenca).times(fatorTotal);
+        oc.indice_correcao = fatorTotal.toDP(6).toNumber();
+        oc.valor_corrigido = valorCorrigido.toDP(2).toNumber();
+        oc.juros = 0;
+        oc.valor_final = valorCorrigido.toDP(2).toNumber();
+        totalCorrigido += oc.valor_corrigido;
+      }
+      vr.total_corrigido = Number(new Decimal(totalCorrigido).toDP(2));
+      vr.total_juros = 0;
+      vr.total_final = Number(new Decimal(totalCorrigido).toDP(2));
+    }
+  }
+
+  // =====================================================
+  // JUROS APÓS DEDUÇÃO CS — PJe-Calc Criterion 8
+  // Interest is applied on (corrected_value - CS_share_pro_rata)
+  // =====================================================
+
+  aplicarJurosAposCS(verbaResults: PjeVerbaResult[], totalCSDescontado: number): void {
+    // Total corrected across all verbas (for pro-rata CS distribution)
+    const totalCorrigido = verbaResults.reduce((s, v) => s + v.total_corrigido, 0);
+    if (totalCorrigido <= 0) return;
+
+    const combinacoes_juros = this.correcaoConfig.combinacoes_juros || [];
+    const combinacoes_indice = this.correcaoConfig.combinacoes_indice || [];
+    const dataLiq = this.correcaoConfig.data_liquidacao;
+
+    const normalizeIndice = (ind: string): string => {
+      const map: Record<string, string> = { 'IPCA-E': 'IPCA-E', 'IPCAE': 'IPCA-E', 'IPCA': 'IPCA', 'SELIC': 'SELIC', 'TR': 'TR', 'TRD': 'TR' };
+      return map[ind] || ind;
+    };
+
+    for (const vr of verbaResults) {
+      let totalJuros = 0;
+      let totalFinal = 0;
+
+      for (const oc of vr.ocorrencias) {
+        if (oc.valor_corrigido === 0) { totalFinal += oc.valor_final; continue; }
+
+        // Pro-rata CS share for this occurrence
+        const csShare = totalCorrigido > 0
+          ? Number(new Decimal(totalCSDescontado).times(oc.valor_corrigido).div(totalCorrigido).toDP(2))
+          : 0;
+        
+        // Base for interest = corrected - CS share
+        const baseJuros = new Decimal(oc.valor_corrigido).minus(csShare);
+
+        if (combinacoes_juros.length > 0 && combinacoes_indice.length > 0) {
+          const compDate = oc.competencia.length === 7 ? oc.competencia + '-01' : oc.competencia;
+          const breakpoints = new Set<string>();
+          breakpoints.add(compDate);
+          breakpoints.add(dataLiq);
+          for (const cj of combinacoes_juros) {
+            if (cj.de && cj.de > compDate && cj.de <= dataLiq) breakpoints.add(cj.de);
+          }
+          for (const ci of combinacoes_indice) {
+            if (ci.de && ci.de > compDate && ci.de <= dataLiq) breakpoints.add(ci.de);
+          }
+          const datas = Array.from(breakpoints).sort();
+
+          let jurosAcc = new Decimal(0);
+          for (let i = 0; i < datas.length - 1; i++) {
+            const segInicio = datas[i];
+            const segFim = datas[i + 1];
+            const regimeI = this.getRegimeParaData(combinacoes_indice, segInicio);
+            const indiceNorm = normalizeIndice(regimeI?.indice || 'SEM_CORRECAO');
+            // SELIC as correction already includes interest
+            if (indiceNorm === 'SELIC') continue;
+            
+            const regimeJ = this.getRegimeParaData(combinacoes_juros, segInicio);
+            if (!regimeJ || regimeJ.tipo === 'NENHUM') continue;
+
+            const meses = this.mesesEntre(new Date(segInicio), new Date(segFim));
+            if (regimeJ.tipo === 'SELIC') {
+              const fatorS = this.getIndiceCorrecaoDB('SELIC', segInicio.slice(0, 7), segFim.slice(0, 7));
+              if (fatorS !== null) jurosAcc = jurosAcc.plus(baseJuros.times(fatorS - 1));
+              else jurosAcc = jurosAcc.plus(baseJuros.times(0.01).times(meses));
+            } else if (regimeJ.tipo === 'TAXA_LEGAL') {
+              const fatorTL = this.getIndiceCorrecaoDB('TAXA_LEGAL', segInicio.slice(0, 7), segFim.slice(0, 7));
+              if (fatorTL !== null) jurosAcc = jurosAcc.plus(baseJuros.times(fatorTL - 1));
+              else jurosAcc = jurosAcc.plus(baseJuros.times(0.008).times(meses));
+            } else {
+              const taxa = ((regimeJ as any).percentual || 1) / 100;
+              jurosAcc = jurosAcc.plus(baseJuros.times(taxa).times(meses));
+            }
+          }
+          oc.juros = jurosAcc.toDP(2).toNumber();
+        } else {
+          // Legacy single interest
+          const [ano, mes] = oc.competencia.split('-').map(Number);
+          const dataComp = new Date(ano, mes - 1, 1);
+          const dataLiqD = new Date(dataLiq);
+          const meses = this.mesesEntre(dataComp, dataLiqD);
+          const taxa = (this.correcaoConfig.juros_percentual || 1) / 100;
+          oc.juros = Number(baseJuros.times(taxa).times(meses).toDP(2));
+        }
+
+        oc.valor_final = Number(new Decimal(oc.valor_corrigido).plus(oc.juros).toDP(2));
+        totalJuros += oc.juros;
+        totalFinal += oc.valor_final;
+      }
+      vr.total_juros = Number(new Decimal(totalJuros).toDP(2));
+      vr.total_final = Number(new Decimal(totalFinal).toDP(2));
+    }
+  }
+
+  // =====================================================
   // LIQUIDAR - FLUXO PRINCIPAL
   // =====================================================
 
