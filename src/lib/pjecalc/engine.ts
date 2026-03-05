@@ -2631,15 +2631,15 @@ export class PjeCalcEngine {
     const salarioFamilia = this.calcularSalarioFamilia(verbaResults);
 
     // ── 9. Composição do Resumo ──
-    const principalBruto = verbaResults
+    const principalBruto = Number(verbaResults
       .filter(v => { const verba = this.verbas.find(vb => vb.id === v.verba_id); return verba?.compor_principal !== false; })
-      .reduce((s, v) => s + v.total_diferenca, 0);
-    const principalCorrigido = verbaResults
+      .reduce((s, v) => s.plus(v.total_diferenca), new Decimal(0)).toDP(2));
+    const principalCorrigido = Number(verbaResults
       .filter(v => { const verba = this.verbas.find(vb => vb.id === v.verba_id); return verba?.compor_principal !== false; })
-      .reduce((s, v) => s + v.total_corrigido, 0);
-    const jurosMora = verbaResults
+      .reduce((s, v) => s.plus(v.total_corrigido), new Decimal(0)).toDP(2));
+    const jurosMora = Number(verbaResults
       .filter(v => { const verba = this.verbas.find(vb => vb.id === v.verba_id); return verba?.compor_principal !== false; })
-      .reduce((s, v) => s + v.total_juros, 0);
+      .reduce((s, v) => s.plus(v.total_juros), new Decimal(0)).toDP(2));
 
     const honorarios = this.calcularHonorarios(principalCorrigido, jurosMora, fgts.total_fgts);
     const valorCondenacao = principalCorrigido + jurosMora + fgts.total_fgts;
