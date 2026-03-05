@@ -33,10 +33,10 @@ export interface RelatorioCompletoMeta {
   jurosInicio?: string;
 }
 
-export function gerarRelatorioCompleto(
+function buildRelatorioCompletoHTML(
   result: PjeLiquidacaoResult,
   meta: RelatorioCompletoMeta
-) {
+): string {
   const hoje = new Date().toLocaleDateString("pt-BR");
   const horaGeracao = new Date().toLocaleString("pt-BR");
   const nProcesso = meta.processo || '—';
