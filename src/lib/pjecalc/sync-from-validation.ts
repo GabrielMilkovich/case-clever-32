@@ -150,11 +150,25 @@ export async function syncFromValidation(caseId: string): Promise<SyncResult> {
       inicio: autoParams.data_admissao,
       fim: autoParams.data_demissao || new Date().toISOString().slice(0, 10),
     };
+
+    // Fetch existing historico IDs for base_calculo linkage
+    const { data: histRows } = await supabase.from("pjecalc_historico_salarial" as any)
+      .select("id").eq("case_id", caseId);
+    const histIds = (histRows || []).map((h: any) => h.id);
+
+    const baseCalculoPrincipal = {
+      historicos: histIds,
+      verbas: [],
+      tabelas: histIds.length ? [] : ['ultima_remuneracao'],
+      proporcionalizar: false,
+      integralizar: false,
+    };
+
     const { data: principalData, error: principalError } = await supabase.from("pjecalc_verbas" as any).insert({
       case_id: caseId, nome: 'Horas Extras 50%', caracteristica: 'comum', ocorrencia_pagamento: 'mensal',
       tipo: 'principal', multiplicador: 1.5, divisor_informado: autoParams.carga_horaria_padrao || 220,
       periodo_inicio: periodo.inicio, periodo_fim: periodo.fim, ordem: 0,
-      base_calculo: { historicos: [], verbas: [], tabelas: ['ultima_remuneracao'], proporcionalizar: false, integralizar: false },
+      base_calculo: baseCalculoPrincipal,
       incidencias: { fgts: true, irpf: true, contribuicao_social: true, previdencia_privada: false, pensao_alimenticia: false },
     }).select("id").single();
     if (principalError) errors.push(`Verba HE: ${principalError.message}`);
