@@ -1083,24 +1083,6 @@ async function processDocumentInBackground(
   supabase: any
 ) {
   try {
-    // Download file
-    let fileBuffer: ArrayBuffer | null = null;
-    for (let dl = 0; dl < 3; dl++) {
-      try {
-        const resp = await fetch(fileUrl);
-        if (!resp.ok) throw new Error(`Download ${resp.status}`);
-        fileBuffer = await resp.arrayBuffer();
-        break;
-      } catch (err) {
-        if (dl === 2) throw err;
-        await delay(1000);
-      }
-    }
-
-    if (!fileBuffer || fileBuffer.byteLength === 0) {
-      throw new Error("Empty file downloaded");
-    }
-
     // Detect MIME type
     let mimeType = doc.mime_type || "application/pdf";
     if (!mimeType || mimeType === "application/octet-stream") {
@@ -1111,14 +1093,36 @@ async function processDocumentInBackground(
       else mimeType = "application/pdf";
     }
 
-    const base64Data = arrayBufferToBase64(fileBuffer);
-    console.log(`[EXTRACT] File: ${fileBuffer.byteLength} bytes, base64: ${base64Data.length} chars`);
+    const isPdf = mimeType === "application/pdf";
+    let ocrText: string;
 
-    // Free the buffer to reduce memory
-    fileBuffer = null;
-
-    // Stage 1: Mistral OCR — extract raw text
-    const ocrText = await mistralOCR(base64Data, mimeType, MISTRAL_API_KEY);
+    if (isPdf) {
+      // PDFs: use Mistral OCR API (/v1/ocr) with the signed URL directly — no download needed
+      console.log(`[EXTRACT] Using Mistral OCR API for PDF: ${doc.file_name}`);
+      ocrText = await mistralOcrPdf(fileUrl, MISTRAL_API_KEY);
+    } else {
+      // Images: download and use chat API with base64
+      console.log(`[EXTRACT] Using Mistral chat API for image: ${doc.file_name}`);
+      let fileBuffer: ArrayBuffer | null = null;
+      for (let dl = 0; dl < 3; dl++) {
+        try {
+          const resp = await fetch(fileUrl);
+          if (!resp.ok) throw new Error(`Download ${resp.status}`);
+          fileBuffer = await resp.arrayBuffer();
+          break;
+        } catch (err) {
+          if (dl === 2) throw err;
+          await delay(1000);
+        }
+      }
+      if (!fileBuffer || fileBuffer.byteLength === 0) {
+        throw new Error("Empty file downloaded");
+      }
+      const base64Data = arrayBufferToBase64(fileBuffer);
+      console.log(`[EXTRACT] File: ${fileBuffer.byteLength} bytes, base64: ${base64Data.length} chars`);
+      fileBuffer = null;
+      ocrText = await mistralOcrImage(base64Data, mimeType, MISTRAL_API_KEY);
+    }
     console.log(`[EXTRACT] OCR complete: ${ocrText.length} chars`);
 
     // Stage 2: OpenAI structured extraction from OCR text
