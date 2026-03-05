@@ -85,6 +85,20 @@ export function ModuloResumo({ caseId }: Props) {
     queryFn: () => svc.getVerbas(caseId),
   });
 
+  // Load faltas, férias and histórico for report sections
+  const { data: faltasForReport = [] } = useQuery({
+    queryKey: ["pjecalc_faltas_report", caseId],
+    queryFn: () => svc.getFaltas(caseId),
+  });
+  const { data: feriasForReport = [] } = useQuery({
+    queryKey: ["pjecalc_ferias_report", caseId],
+    queryFn: () => svc.getFerias(caseId),
+  });
+  const { data: histForReport = [] } = useQuery({
+    queryKey: ["pjecalc_hist_report", caseId],
+    queryFn: () => svc.getHistoricoSalarial(caseId),
+  });
+
   // Load PJC ground truth for parity comparator
   const { data: pjcGroundTruth } = useQuery({
     queryKey: ["pjc_ground_truth", caseId],
@@ -574,7 +588,7 @@ export function ModuloResumo({ caseId }: Props) {
     verbasLinkage: Object.fromEntries(
       verbasDB.filter(v => v.verba_principal_id).map(v => [v.id, v.verba_principal_id!])
     ),
-    honorariosNome: dadosProcessoData?.advogado_nome || '',
+    honorariosNome: '',
   };
 
   const handleFechar = async () => {
