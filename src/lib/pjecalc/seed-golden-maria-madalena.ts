@@ -10,73 +10,15 @@
  * Reflexos usam verba_principal_id para derivar automaticamente do principal.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { nukeCaseData } from "./service";
 import { MARIA_MADALENA_SNAPSHOT } from "@/lib/golden/maria-madalena-snapshot";
 
 export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boolean; errors: string[] }> {
   const errors: string[] = [];
   const snap = MARIA_MADALENA_SNAPSHOT;
 
-  // ── 0. NUKE: Apagar TUDO do caso (tabelas base, ordem reversa de FK) ──
-  const baseTablesToNuke = [
-    'pjecalc_audit_log',
-    'pjecalc_resultado',
-    'pjecalc_ocorrencia_calculo',
-    'pjecalc_reflexo_base_verba',
-    'pjecalc_reflexo',
-    'pjecalc_verba_base',
-    'pjecalc_hist_salarial_mes',
-    'pjecalc_hist_salarial',
-    'pjecalc_evento_intervalo',
-    'pjecalc_apuracao_diaria',
-    'pjecalc_atualizacao_config',
-  ];
-
-  // Get calculo_id first
-  const { data: calcData } = await supabase
-    .from('pjecalc_calculos' as any)
-    .select('id')
-    .eq('case_id', caseId);
-
-  const calculoIds = (calcData || []).map((c: any) => c.id);
-
-  // Delete from base tables using calculo_id
-  for (const table of baseTablesToNuke) {
-    if (calculoIds.length > 0) {
-      for (const cid of calculoIds) {
-        await supabase.from(table as any).delete().eq('calculo_id', cid);
-      }
-    }
-    // Also try case_id for tables that have it
-    await supabase.from(table as any).delete().eq('case_id', caseId);
-  }
-
-  // Delete the calculo itself and recreate
-  if (calculoIds.length > 0) {
-    await supabase.from('pjecalc_calculos' as any).delete().eq('case_id', caseId);
-  }
-
-  // Also clear views that might have orphan data
-  const viewsToClear = [
-    'pjecalc_liquidacao_resultado',
-    'pjecalc_ocorrencias',
-    'pjecalc_verbas',
-    'pjecalc_historico_ocorrencias',
-    'pjecalc_historico_salarial',
-    'pjecalc_faltas',
-    'pjecalc_ferias',
-    'pjecalc_cartao_ponto',
-    'pjecalc_correcao_config',
-    'pjecalc_honorarios',
-    'pjecalc_custas_config',
-    'pjecalc_cs_config',
-    'pjecalc_ir_config',
-    'pjecalc_fgts_config',
-    'pjecalc_dados_processo',
-    'pjecalc_parametros',
-  ];
-  for (const v of viewsToClear) {
-    await supabase.from(v as any).delete().eq('case_id', caseId);
-  }
+  // ── 0. NUKE: Apagar TUDO do caso via service layer ──
+  await nukeCaseData(caseId);
 
   // ── 1. Parâmetros (view: pjecalc_parametros) ──
   {
