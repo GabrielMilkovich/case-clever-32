@@ -4616,6 +4616,113 @@ export type Database = {
           },
         ]
       }
+      pjecalc_seguro_desemprego_config: {
+        Row: {
+          apurar: boolean
+          calculo_id: string
+          created_at: string
+          id: string
+          observacoes: string | null
+          parcelas: number
+          recebeu: boolean
+          updated_at: string
+          valor_parcela: number | null
+        }
+        Insert: {
+          apurar?: boolean
+          calculo_id: string
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          parcelas?: number
+          recebeu?: boolean
+          updated_at?: string
+          valor_parcela?: number | null
+        }
+        Update: {
+          apurar?: boolean
+          calculo_id?: string
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          parcelas?: number
+          recebeu?: boolean
+          updated_at?: string
+          valor_parcela?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pjecalc_seguro_desemprego_config_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: true
+            referencedRelation: "pjecalc_calculos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_seguro_desemprego_config_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: true
+            referencedRelation: "pjecalc_correcao_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_seguro_desemprego_config_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: true
+            referencedRelation: "pjecalc_cs_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_seguro_desemprego_config_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: true
+            referencedRelation: "pjecalc_custas_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_seguro_desemprego_config_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: true
+            referencedRelation: "pjecalc_dados_processo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_seguro_desemprego_config_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: true
+            referencedRelation: "pjecalc_fgts_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_seguro_desemprego_config_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: true
+            referencedRelation: "pjecalc_honorarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_seguro_desemprego_config_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: true
+            referencedRelation: "pjecalc_ir_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_seguro_desemprego_config_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: true
+            referencedRelation: "pjecalc_multas_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_seguro_desemprego_config_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: true
+            referencedRelation: "pjecalc_parametros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pjecalc_verba_base: {
         Row: {
           ativa: boolean | null
@@ -6694,6 +6801,106 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pjecalc_seguro_config: {
+        Row: {
+          apurar: boolean | null
+          calculo_id: string | null
+          case_id: string | null
+          created_at: string | null
+          id: string | null
+          observacoes: string | null
+          parcelas: number | null
+          recebeu: boolean | null
+          updated_at: string | null
+          valor_parcela: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pjecalc_calculos_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "pjecalc_calculos_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_seguro_desemprego_config_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: true
+            referencedRelation: "pjecalc_calculos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_seguro_desemprego_config_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: true
+            referencedRelation: "pjecalc_correcao_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_seguro_desemprego_config_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: true
+            referencedRelation: "pjecalc_cs_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_seguro_desemprego_config_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: true
+            referencedRelation: "pjecalc_custas_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_seguro_desemprego_config_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: true
+            referencedRelation: "pjecalc_dados_processo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_seguro_desemprego_config_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: true
+            referencedRelation: "pjecalc_fgts_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_seguro_desemprego_config_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: true
+            referencedRelation: "pjecalc_honorarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_seguro_desemprego_config_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: true
+            referencedRelation: "pjecalc_ir_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_seguro_desemprego_config_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: true
+            referencedRelation: "pjecalc_multas_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_seguro_desemprego_config_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: true
+            referencedRelation: "pjecalc_parametros"
             referencedColumns: ["id"]
           },
         ]
