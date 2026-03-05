@@ -436,6 +436,7 @@ export function gerarRelatorioCompleto(
     <tr><th>Base de Cálculo</th><td>${fmt(result.imposto_renda.base_calculo)}</td></tr>
     <tr><th>Deduções</th><td>${fmt(result.imposto_renda.deducoes)}</td></tr>
     <tr><th>Meses RRA</th><td>${result.imposto_renda.meses_rra}</td></tr>
+    <tr class="grand-total"><th style="text-align:left">IRRF DEVIDO</th><td>${fmt(result.imposto_renda.imposto_devido)}</td></tr>
   </table>
   <div class="nota">Rendimentos Recebidos Acumuladamente (RRA): a base é dividida pelo nº de meses, aplicando-se a tabela progressiva proporcional. Fundamento: Art. 12-A, Lei 7.713/88.</div>
   ` : ''}
