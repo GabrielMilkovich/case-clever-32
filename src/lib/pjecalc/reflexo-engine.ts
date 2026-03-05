@@ -8,8 +8,8 @@ export interface ReflexoTemplate {
   sufixo: string;
   caracteristica: string;
   ocorrencia_pagamento: string;
-  comportamento_reflexo: 'valor_mensal' | 'media_valor_absoluto' | 'media_valor_corrigido' | 'media_quantidade';
-  periodo_media_reflexo?: string;
+  comportamento_reflexo: 'valor_mensal' | 'media_valor_absoluto' | 'media_valor_corrigido' | 'media_quantidade' | 'media_pela_quantidade';
+  periodo_media_reflexo?: 'ano_civil' | 'periodo_aquisitivo' | 'global';
   tratamento_fracao_mes: 'manter_fracao' | 'integralizar' | 'desprezar' | 'desprezar_menor_15';
   multiplicador: number;
   divisor_tipo: string;
@@ -19,6 +19,8 @@ export interface ReflexoTemplate {
   gerar_reflexo: 'devido' | 'diferenca';
   incidencias: { fgts: boolean; irpf: boolean; cs: boolean };
   ordem_offset: number;
+  /** Whether to integralize base values before calculating the reflexo */
+  integralizar_base?: boolean;
 }
 
 // Templates padrão de reflexos do PJe-Calc
@@ -28,6 +30,7 @@ export const REFLEXO_TEMPLATES: ReflexoTemplate[] = [
     caracteristica: '13_salario',
     ocorrencia_pagamento: 'dezembro',
     comportamento_reflexo: 'media_valor_absoluto',
+    periodo_media_reflexo: 'ano_civil',
     tratamento_fracao_mes: 'desprezar_menor_15',
     multiplicador: 1,
     divisor_tipo: 'informado',
@@ -43,6 +46,7 @@ export const REFLEXO_TEMPLATES: ReflexoTemplate[] = [
     caracteristica: 'ferias',
     ocorrencia_pagamento: 'periodo_aquisitivo',
     comportamento_reflexo: 'media_valor_absoluto',
+    periodo_media_reflexo: 'periodo_aquisitivo',
     tratamento_fracao_mes: 'desprezar_menor_15',
     multiplicador: 1.3333,
     divisor_tipo: 'informado',
@@ -115,6 +119,7 @@ export interface ReflexoGerado {
   caracteristica: string;
   ocorrencia_pagamento: string;
   comportamento_reflexo: string;
+  periodo_media_reflexo?: string;
   tratamento_fracao_mes: string;
   multiplicador: number;
   divisor_tipo: string;
@@ -125,6 +130,7 @@ export interface ReflexoGerado {
   incidencias: { fgts: boolean; irpf: boolean; cs: boolean };
   ordem: number;
   base_verbas: string[]; // IDs das verbas base
+  integralizar_base?: boolean;
 }
 
 /**
@@ -170,6 +176,7 @@ export function gerarReflexosPadrao(
         caracteristica: tmpl.caracteristica,
         ocorrencia_pagamento: tmpl.ocorrencia_pagamento,
         comportamento_reflexo: tmpl.comportamento_reflexo,
+        periodo_media_reflexo: tmpl.periodo_media_reflexo,
         tratamento_fracao_mes: tmpl.tratamento_fracao_mes,
         multiplicador: tmpl.multiplicador,
         divisor_tipo: tmpl.divisor_tipo,
@@ -180,6 +187,7 @@ export function gerarReflexosPadrao(
         incidencias: { ...tmpl.incidencias },
         ordem: vb.ordem + tmpl.ordem_offset,
         base_verbas: [vb.id],
+        integralizar_base: tmpl.integralizar_base,
       });
     }
   }
