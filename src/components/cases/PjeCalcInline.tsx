@@ -684,7 +684,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
       }
 
       if (basesToCreate.length === 0) {
-        toast.warning("Nenhuma base salarial encontrada nas fontes disponíveis (fatos, contratos, extrações).");
+        toast.warning("Nenhuma base salarial monetária encontrada. Importe uma Ficha Financeira ou Contracheque primeiro para preencher automaticamente os valores mensais.");
         setAutoFilling(false);
         return;
       }
