@@ -7,6 +7,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { syncFromValidation } from "@/lib/pjecalc/sync-from-validation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -307,7 +308,7 @@ export function DocumentsManager({
   // Extrair dados e preencher automaticamente os campos do cálculo
   const extractAndFill = useCallback(async (documentId: string) => {
     setProcessingDocId(documentId);
-    toast.info("🤖 Extraindo dados com IA e preenchendo campos do cálculo...");
+    toast.info("🤖 Extraindo dados com IA e preenchendo TODOS os campos do cálculo...");
 
     try {
       const { data, error } = await supabase.functions.invoke("extract-and-fill", {
@@ -319,14 +320,26 @@ export function DocumentsManager({
       const fills = data.auto_fill || [];
       const rubricas = data.rubricas_extraidas || 0;
       const tipo = data.tipo_documento || "documento";
+      const dados = data.dados_extraidos || {};
+
+      const detalhes = [
+        dados.tem_contrato && "contrato",
+        dados.tem_rubricas && `${rubricas} rubricas`,
+        dados.tem_trct && "TRCT",
+        dados.tem_cartao_ponto && "cartão de ponto",
+        dados.tem_ferias && "férias",
+        dados.tem_fgts && "FGTS",
+        dados.tem_sentenca && "sentença",
+      ].filter(Boolean).join(", ");
 
       toast.success(
-        `✅ ${tipo} extraído! ${rubricas} rubricas encontradas. Campos preenchidos: ${fills.join(", ") || "nenhum"}`,
-        { duration: 8000 }
+        `✅ ${tipo} processado! Dados extraídos: ${detalhes || "nenhum"}. Campos preenchidos: ${fills.length}`,
+        { duration: 10000 }
       );
       
-      // Invalidate pjecalc data to refresh the calculation page
+      // Invalidate ALL queries to refresh everything
       queryClient.invalidateQueries({ queryKey: ['pjecalc_case_data'] });
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
       onDocumentsChange();
     } catch (err) {
       console.error("Extract and fill error:", err);
@@ -390,13 +403,27 @@ export function DocumentsManager({
     setIsBatchProcessing(false);
     setProcessingDocId(null);
 
+    // After all documents processed, run full sync to configure all modules
+    if (successCount > 0) {
+      toast.info("🔄 Sincronizando dados extraídos com módulos do cálculo...");
+      try {
+        const syncResult = await syncFromValidation(caseId);
+        console.log("[SYNC] Result:", syncResult);
+        queryClient.invalidateQueries({ queryKey: ['pjecalc_case_data'] });
+      } catch (e) {
+        console.error("[SYNC] Error:", e);
+      }
+    }
+
     if (errorCount === 0) {
-      toast.success(`Todos os ${successCount} documento(s) processados com sucesso!`);
+      toast.success(`✅ Todos os ${successCount} documento(s) processados e dados preenchidos!`);
     } else {
       toast.warning(`${successCount} processado(s), ${errorCount} com erro.`);
     }
+    queryClient.invalidateQueries({ queryKey: ['pjecalc_case_data'] });
+    queryClient.invalidateQueries({ queryKey: ['cases'] });
     onDocumentsChange();
-  }, [documents, caseId, onDocumentsChange]);
+  }, [documents, caseId, onDocumentsChange, queryClient]);
 
   const cancelBatchProcessing = useCallback(() => {
     batchAbortRef.current = true;

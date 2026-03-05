@@ -404,68 +404,144 @@ async function callAI(
 async function autoFill(supabase: any, caseId: string, extracted: any) {
   const fills: string[] = [];
 
+  // Helper: await and log
+  async function safeInsert(label: string, fn: () => Promise<any>) {
+    try {
+      const result = await fn();
+      if (result?.error) {
+        console.error(`[FILL] ${label}:`, result.error.message);
+      } else {
+        fills.push(label);
+      }
+    } catch (err) {
+      console.error(`[FILL] ${label}:`, err);
+    }
+  }
+
   try {
-    // 1. DADOS DO PROCESSO
+    // =====================================================
+    // 1. DADOS DO PROCESSO (reclamante, reclamada, nº processo, vara)
+    // =====================================================
     if (extracted.dados_processo || extracted.reclamante || extracted.reclamada) {
       const dp = extracted.dados_processo || {};
       const rec = extracted.reclamante || {};
       const rda = extracted.reclamada || {};
 
-      await supabase.from("pjecalc_dados_processo").upsert({
-        case_id: caseId,
-        numero_processo: dp.numero_processo || null,
-        vara: dp.vara || null,
-        reclamante_nome: rec.nome || null,
-        reclamante_cpf: rec.cpf || null,
-        reclamada_nome: rda.nome || rda.razao_social || null,
-        reclamada_cnpj: rda.cnpj || null,
-      }, { onConflict: 'case_id' }).then(({ error }: any) => {
-        if (error) console.error("[FILL] dados_processo:", error.message);
-        else fills.push("dados_processo");
-      });
+      await safeInsert("dados_processo", () =>
+        supabase.from("pjecalc_dados_processo").upsert({
+          case_id: caseId,
+          numero_processo: dp.numero_processo || null,
+          vara: dp.vara || null,
+          reclamante_nome: rec.nome || null,
+          reclamante_cpf: rec.cpf || null,
+          reclamada_nome: rda.nome || rda.razao_social || null,
+          reclamada_cnpj: rda.cnpj || null,
+        }, { onConflict: 'case_id' })
+      );
+
+      // Also update the cases table for display
+      if (rec.nome || dp.numero_processo) {
+        await supabase.from("cases").update({
+          cliente: rec.nome || undefined,
+          numero_processo: dp.numero_processo || undefined,
+          tribunal: dp.tribunal || dp.vara || undefined,
+        }).eq("id", caseId);
+      }
     }
 
-    // 2. PARÂMETROS (contrato)
+    // =====================================================
+    // 2. PARÂMETROS DO CONTRATO (admissão, demissão, salário, jornada)
+    // =====================================================
     if (extracted.contrato) {
       const c = extracted.contrato;
-      await supabase.from("pjecalc_parametros").upsert({
-        case_id: caseId,
-        data_admissao: c.data_admissao || null,
-        data_demissao: c.data_demissao || null,
-        data_ajuizamento: extracted.dados_processo?.data_ajuizamento || null,
-        carga_horaria_padrao: c.carga_horaria_mensal || 220,
-      }, { onConflict: 'case_id' }).then(({ error }: any) => {
-        if (error) console.error("[FILL] parametros:", error.message);
-        else fills.push("parametros");
-      });
+      const dp = extracted.dados_processo || {};
+
+      await safeInsert("parametros", () =>
+        supabase.from("pjecalc_parametros").upsert({
+          case_id: caseId,
+          data_admissao: c.data_admissao || null,
+          data_demissao: c.data_demissao || null,
+          data_ajuizamento: dp.data_ajuizamento || null,
+          carga_horaria_padrao: c.carga_horaria_mensal || 220,
+          ultima_remuneracao: c.salario_base || null,
+          maior_remuneracao: c.salario_base || null,
+        }, { onConflict: 'case_id' })
+      );
+
+      // Also create employment_contracts record
+      if (c.data_admissao) {
+        await safeInsert("contrato_emprego", () =>
+          supabase.from("employment_contracts").upsert({
+            case_id: caseId,
+            data_admissao: c.data_admissao,
+            data_demissao: c.data_demissao || null,
+            funcao: c.cargo_funcao || null,
+            salario_inicial: c.salario_base || null,
+            tipo_demissao: c.tipo_demissao || null,
+            jornada_contratual: c.jornada ? { descricao: c.jornada, carga_mensal: c.carga_horaria_mensal || 220 } : null,
+          }, { onConflict: 'case_id' })
+        );
+      }
     }
 
-    // 3. HISTÓRICO SALARIAL (from rubricas)
+    // =====================================================
+    // 3. HISTÓRICO SALARIAL + VALORES MENSAIS (rubricas de vencimento)
+    // =====================================================
     if (extracted.rubricas?.length > 0) {
       const vencimentos = extracted.rubricas.filter((r: any) => r.tipo === "vencimento");
 
       for (const rub of vencimentos) {
-        if (!rub.valores_mensais?.length) continue;
+        if (!rub.valores_mensais?.length && !rub.denominacao) continue;
 
-        // Create hist_salarial entry
-        const { error: histErr } = await supabase.from("pjecalc_historico_salarial").upsert({
-          case_id: caseId,
-          nome: rub.denominacao,
-          tipo_valor: rub.categoria === "salario_base" ? "FIXO" : "VARIAVEL",
-          valor_informado: rub.valores_mensais[0]?.valor || 0,
-          incidencia_fgts: !["vale_transporte", "vale_refeicao"].includes(rub.categoria),
-          incidencia_cs: true,
-          observacoes: rub.codigo ? `Código: ${rub.codigo}` : null,
-        }, { onConflict: 'case_id,nome' });
+        // Get or create the hist_salarial entry
+        const tipoVar = ["salario_base"].includes(rub.categoria) ? "FIXO" : "VARIAVEL";
+        const firstVal = rub.valores_mensais?.[0]?.valor || 0;
+
+        const { data: histData, error: histErr } = await supabase
+          .from("pjecalc_historico_salarial")
+          .upsert({
+            case_id: caseId,
+            nome: rub.denominacao,
+            tipo_valor: tipoVar,
+            valor_informado: firstVal,
+            incidencia_fgts: !["vale_transporte", "vale_refeicao"].includes(rub.categoria),
+            incidencia_cs: true,
+            observacoes: rub.codigo ? `Código: ${rub.codigo}` : null,
+          }, { onConflict: 'case_id,nome' })
+          .select('id')
+          .single();
 
         if (histErr) {
           console.error("[FILL] historico_salarial:", histErr.message);
+          continue;
+        }
+
+        const histId = histData?.id;
+
+        // Insert monthly values (pjecalc_historico_ocorrencias view → pjecalc_hist_salarial_mes)
+        if (histId && rub.valores_mensais?.length > 0) {
+          for (const vm of rub.valores_mensais) {
+            if (!vm.competencia || vm.valor === undefined || vm.valor === null) continue;
+
+            await supabase.from("pjecalc_historico_ocorrencias").upsert({
+              historico_id: histId,
+              competencia: vm.competencia.length === 7 ? vm.competencia + "-01" : vm.competencia,
+              valor: vm.valor,
+              tipo: "informado",
+            }, { onConflict: 'historico_id,competencia' }).then(({ error }: any) => {
+              if (error) console.error(`[FILL] hist_mes ${vm.competencia}:`, error.message);
+            });
+          }
         }
       }
-      fills.push(`historico_salarial (${vencimentos.length} rubricas)`);
+
+      const totalMensais = vencimentos.reduce((sum: number, r: any) => sum + (r.valores_mensais?.length || 0), 0);
+      fills.push(`historico_salarial (${vencimentos.length} rubricas, ${totalMensais} valores mensais)`);
     }
 
-    // 4. VERBAS (from rubricas with period info)
+    // =====================================================
+    // 4. VERBAS DO CÁLCULO (pedidos)
+    // =====================================================
     if (extracted.rubricas?.length > 0) {
       const vencimentos = extracted.rubricas.filter((r: any) => r.tipo === "vencimento");
 
@@ -499,27 +575,31 @@ async function autoFill(supabase: any, caseId: string, extracted: any) {
       fills.push(`verbas (${vencimentos.length})`);
     }
 
-    // 5. FÉRIAS
+    // =====================================================
+    // 5. FÉRIAS (períodos aquisitivos, gozo, situação)
+    // =====================================================
     if (extracted.ferias?.length > 0) {
       for (const f of extracted.ferias) {
-        await supabase.from("pjecalc_ferias").insert({
-          case_id: caseId,
-          periodo_aquisitivo_inicio: f.periodo_aquisitivo_inicio,
-          periodo_aquisitivo_fim: f.periodo_aquisitivo_fim,
-          gozo_inicio: f.gozo_inicio || null,
-          gozo_fim: f.gozo_fim || null,
-          dias: f.dias || 30,
-          abono: f.abono_pecuniario || false,
-          dias_abono: f.dias_abono || 0,
-          situacao: f.situacao || "GOZADAS",
-        }).then(({ error }: any) => {
-          if (error) console.error("[FILL] ferias:", error.message);
-        });
+        await safeInsert(`ferias_${f.periodo_aquisitivo_inicio}`, () =>
+          supabase.from("pjecalc_ferias").insert({
+            case_id: caseId,
+            periodo_aquisitivo_inicio: f.periodo_aquisitivo_inicio,
+            periodo_aquisitivo_fim: f.periodo_aquisitivo_fim,
+            gozo_inicio: f.gozo_inicio || null,
+            gozo_fim: f.gozo_fim || null,
+            dias: f.dias || 30,
+            abono: f.abono_pecuniario || false,
+            dias_abono: f.dias_abono || 0,
+            situacao: f.situacao || "GOZADAS",
+          })
+        );
       }
       fills.push(`ferias (${extracted.ferias.length})`);
     }
 
-    // 6. CARTÃO DE PONTO
+    // =====================================================
+    // 6. CARTÃO DE PONTO (registros diários)
+    // =====================================================
     if (extracted.cartao_ponto?.registros?.length > 0) {
       const registros = extracted.cartao_ponto.registros;
       // Insert in batches of 50
@@ -547,57 +627,336 @@ async function autoFill(supabase: any, caseId: string, extracted: any) {
       fills.push(`cartao_ponto (${registros.length} dias)`);
     }
 
-    // 7. FGTS
-    if (extracted.fgts?.depositos?.length > 0) {
-      await supabase.from("pjecalc_fgts_config").upsert({
-        case_id: caseId,
-        apurar_fgts: true,
-        apurar_multa_40: true,
-      }, { onConflict: 'case_id' }).then(({ error }: any) => {
-        if (error) console.error("[FILL] fgts_config:", error.message);
-      });
-      fills.push("fgts_config");
+    // =====================================================
+    // 7. TRCT — Verbas rescisórias (what was PAID by employer)
+    // =====================================================
+    if (extracted.trct) {
+      const trct = extracted.trct;
+      
+      // Update contract with TRCT info
+      if (trct.aviso_previo_tipo || trct.data_aviso_previo) {
+        await supabase.from("pjecalc_parametros").upsert({
+          case_id: caseId,
+          ...(trct.data_aviso_previo ? { data_demissao: trct.data_aviso_previo } : {}),
+        }, { onConflict: 'case_id' });
+      }
+
+      // Insert TRCT verbas as "pago" entries in ocorrencias
+      if (trct.verbas_rescisorias?.length > 0) {
+        for (const verba of trct.verbas_rescisorias) {
+          await supabase.from("pjecalc_ocorrencias").insert({
+            case_id: caseId,
+            verba_nome: verba.descricao,
+            competencia: extracted.contrato?.data_demissao || new Date().toISOString().slice(0, 10),
+            base_valor: verba.valor || 0,
+            multiplicador_valor: 1,
+            divisor_valor: 1,
+            quantidade_valor: 1,
+            dobra: 1,
+            devido: verba.tipo === "vencimento" ? verba.valor : 0,
+            pago: verba.tipo === "vencimento" ? verba.valor : 0,
+            diferenca: 0,
+            correcao: 0,
+            juros: 0,
+            total: 0,
+            origem: "TRCT",
+            ativa: true,
+          }).then(({ error }: any) => {
+            if (error) console.error(`[FILL] trct_verba ${verba.descricao}:`, error.message);
+          });
+        }
+        fills.push(`trct_verbas (${trct.verbas_rescisorias.length})`);
+      }
+
+      // Store TRCT totals as facts for reference
+      const trctFacts: Array<{chave: string; valor: string}> = [];
+      if (trct.total_bruto) trctFacts.push({ chave: "trct_total_bruto", valor: String(trct.total_bruto) });
+      if (trct.total_liquido) trctFacts.push({ chave: "trct_total_liquido", valor: String(trct.total_liquido) });
+      if (trct.total_descontos) trctFacts.push({ chave: "trct_total_descontos", valor: String(trct.total_descontos) });
+      if (trct.fgts_multa_40) trctFacts.push({ chave: "trct_fgts_multa_40", valor: String(trct.fgts_multa_40) });
+      if (trct.aviso_previo_tipo) trctFacts.push({ chave: "aviso_previo_tipo", valor: trct.aviso_previo_tipo });
+      if (trct.aviso_previo_dias) trctFacts.push({ chave: "aviso_previo_dias", valor: String(trct.aviso_previo_dias) });
+      if (trct.saldo_salario_valor) trctFacts.push({ chave: "saldo_salario", valor: String(trct.saldo_salario_valor) });
+      if (trct.decimo_terceiro_proporcional) trctFacts.push({ chave: "13_proporcional_trct", valor: String(trct.decimo_terceiro_proporcional) });
+      if (trct.ferias_proporcionais) trctFacts.push({ chave: "ferias_proporcionais_trct", valor: String(trct.ferias_proporcionais) });
+
+      for (const fact of trctFacts) {
+        await supabase.from("facts").upsert({
+          case_id: caseId,
+          chave: fact.chave,
+          valor: fact.valor,
+          tipo: "monetario",
+          origem: "extracao",
+          confianca: extracted.confianca_geral || 0.9,
+        }, { onConflict: 'case_id,chave' }).then(({ error }: any) => {
+          if (error) console.error(`[FILL] fact ${fact.chave}:`, error.message);
+        });
+      }
+      if (trctFacts.length > 0) fills.push(`trct_fatos (${trctFacts.length})`);
     }
 
-    // 8. SENTENÇA — parâmetros de liquidação
-    if (extracted.sentenca?.parametros_liquidacao) {
-      const pl = extracted.sentenca.parametros_liquidacao;
-
-      if (pl.indice_correcao) {
-        await supabase.from("pjecalc_correcao_config").upsert({
+    // =====================================================
+    // 8. FGTS — depósitos e configuração
+    // =====================================================
+    if (extracted.fgts) {
+      await safeInsert("fgts_config", () =>
+        supabase.from("pjecalc_fgts_config").upsert({
           case_id: caseId,
-          indice: pl.indice_correcao,
-        }, { onConflict: 'case_id' }).then(({ error }: any) => {
-          if (error) console.error("[FILL] correcao_config:", error.message);
-        });
-      }
+          apurar_fgts: true,
+          apurar_multa_40: true,
+          percentual_multa: 40,
+        }, { onConflict: 'case_id' })
+      );
 
-      if (pl.honorarios_percentual) {
-        await supabase.from("pjecalc_honorarios").upsert({
+      // Store FGTS deposits as facts
+      if (extracted.fgts.depositos?.length > 0) {
+        for (const dep of extracted.fgts.depositos) {
+          await supabase.from("facts").upsert({
+            case_id: caseId,
+            chave: `fgts_deposito_${dep.competencia}`,
+            valor: String(dep.valor_deposito),
+            tipo: "monetario",
+            origem: "extracao",
+            confianca: extracted.confianca_geral || 0.9,
+          }, { onConflict: 'case_id,chave' });
+        }
+        fills.push(`fgts_depositos (${extracted.fgts.depositos.length})`);
+      }
+      if (extracted.fgts.saldo_total) {
+        await supabase.from("facts").upsert({
           case_id: caseId,
-          tipo: "percentual",
-          percentual: pl.honorarios_percentual,
-        }, { onConflict: 'case_id' }).then(({ error }: any) => {
-          if (error) console.error("[FILL] honorarios:", error.message);
-        });
+          chave: "fgts_saldo_total",
+          valor: String(extracted.fgts.saldo_total),
+          tipo: "monetario",
+          origem: "extracao",
+        }, { onConflict: 'case_id,chave' });
       }
-
-      if (pl.custas_processuais) {
-        await supabase.from("pjecalc_custas_config").upsert({
-          case_id: caseId,
-          valor: pl.custas_processuais,
-        }, { onConflict: 'case_id' }).then(({ error }: any) => {
-          if (error) console.error("[FILL] custas:", error.message);
-        });
-      }
-
-      fills.push("sentenca_parametros");
     }
+
+    // =====================================================
+    // 9. SENTENÇA — pedidos deferidos → verbas + parâmetros liquidação
+    // =====================================================
+    if (extracted.sentenca) {
+      const sent = extracted.sentenca;
+
+      // Create verbas from deferidos
+      if (sent.pedidos_deferidos?.length > 0) {
+        for (let i = 0; i < sent.pedidos_deferidos.length; i++) {
+          const pedido = sent.pedidos_deferidos[i];
+          await supabase.from("pjecalc_verbas").upsert({
+            case_id: caseId,
+            nome: pedido,
+            caracteristica: "COMUM",
+            ocorrencia_pagamento: "MENSAL",
+            multiplicador: 1,
+            divisor_informado: 1,
+            ordem: i,
+            ativa: true,
+            valor: "calculado",
+            observacoes: "Deferido em sentença",
+          }, { onConflict: 'case_id,nome' }).then(({ error }: any) => {
+            if (error) console.error(`[FILL] verba_sentenca ${pedido}:`, error.message);
+          });
+        }
+        fills.push(`sentenca_pedidos (${sent.pedidos_deferidos.length} deferidos)`);
+      }
+
+      // Store indeferidos as facts
+      if (sent.pedidos_indeferidos?.length > 0) {
+        await supabase.from("facts").upsert({
+          case_id: caseId,
+          chave: "pedidos_indeferidos",
+          valor: sent.pedidos_indeferidos.join("; "),
+          tipo: "texto",
+          origem: "extracao",
+        }, { onConflict: 'case_id,chave' });
+      }
+
+      // Parâmetros de liquidação
+      if (sent.parametros_liquidacao) {
+        const pl = sent.parametros_liquidacao;
+
+        if (pl.honorarios_percentual) {
+          await safeInsert("honorarios_sentenca", () =>
+            supabase.from("pjecalc_honorarios").upsert({
+              case_id: caseId,
+              tipo: "percentual",
+              percentual: pl.honorarios_percentual,
+            }, { onConflict: 'case_id' })
+          );
+        }
+
+        if (pl.custas_processuais) {
+          await safeInsert("custas_sentenca", () =>
+            supabase.from("pjecalc_custas_config").upsert({
+              case_id: caseId,
+              valor: pl.custas_processuais,
+            }, { onConflict: 'case_id' })
+          );
+        }
+
+        // Store correction/juros info as facts for syncFromValidation
+        if (pl.indice_correcao) {
+          await supabase.from("facts").upsert({
+            case_id: caseId, chave: "indice_correcao", valor: pl.indice_correcao, tipo: "texto", origem: "extracao",
+          }, { onConflict: 'case_id,chave' });
+        }
+        if (pl.juros) {
+          await supabase.from("facts").upsert({
+            case_id: caseId, chave: "juros_mora", valor: pl.juros, tipo: "texto", origem: "extracao",
+          }, { onConflict: 'case_id,chave' });
+        }
+        if (pl.data_inicio_juros) {
+          await supabase.from("facts").upsert({
+            case_id: caseId, chave: "data_inicio_juros", valor: pl.data_inicio_juros, tipo: "data", origem: "extracao",
+          }, { onConflict: 'case_id,chave' });
+        }
+
+        fills.push("sentenca_parametros");
+      }
+    }
+
+    // =====================================================
+    // 10. FALTAS (from cartão de ponto observations)
+    // =====================================================
+    if (extracted.cartao_ponto?.registros?.length > 0) {
+      const faltas = extracted.cartao_ponto.registros.filter(
+        (r: any) => r.observacao && /falta|ausencia|ausência/i.test(r.observacao) && !r.entrada1
+      );
+      for (const falta of faltas) {
+        await supabase.from("pjecalc_faltas").insert({
+          case_id: caseId,
+          data_inicial: falta.data,
+          data_final: falta.data,
+          tipo_falta: "FALTA",
+          justificada: /atestado|justificad/i.test(falta.observacao || ""),
+          motivo: falta.observacao,
+        }).then(({ error }: any) => {
+          if (error) console.error(`[FILL] falta ${falta.data}:`, error.message);
+        });
+      }
+      if (faltas.length > 0) fills.push(`faltas (${faltas.length})`);
+    }
+
+    // =====================================================
+    // 11. STORE ALL EXTRACTED FACTS for syncFromValidation
+    // =====================================================
+    const allFacts: Array<{chave: string; valor: string; tipo: string}> = [];
+    
+    const rec = extracted.reclamante || {};
+    const rda = extracted.reclamada || {};
+    const cont = extracted.contrato || {};
+    const dp = extracted.dados_processo || {};
+    
+    if (rec.nome) allFacts.push({ chave: "reclamante", valor: rec.nome, tipo: "texto" });
+    if (rec.cpf) allFacts.push({ chave: "cpf_reclamante", valor: rec.cpf, tipo: "texto" });
+    if (rec.pis_pasep) allFacts.push({ chave: "pis_pasep", valor: rec.pis_pasep, tipo: "texto" });
+    if (rec.ctps_numero) allFacts.push({ chave: "ctps_numero", valor: rec.ctps_numero, tipo: "texto" });
+    if (rec.ctps_serie) allFacts.push({ chave: "ctps_serie", valor: rec.ctps_serie, tipo: "texto" });
+    if (rda.nome || rda.razao_social) allFacts.push({ chave: "reclamada", valor: rda.nome || rda.razao_social, tipo: "texto" });
+    if (rda.cnpj) allFacts.push({ chave: "cnpj_reclamada", valor: rda.cnpj, tipo: "texto" });
+    if (cont.data_admissao) allFacts.push({ chave: "data_admissao", valor: cont.data_admissao, tipo: "data" });
+    if (cont.data_demissao) allFacts.push({ chave: "data_demissao", valor: cont.data_demissao, tipo: "data" });
+    if (cont.cargo_funcao) allFacts.push({ chave: "cargo", valor: cont.cargo_funcao, tipo: "texto" });
+    if (cont.salario_base) allFacts.push({ chave: "salario_base", valor: String(cont.salario_base), tipo: "monetario" });
+    if (cont.jornada) allFacts.push({ chave: "jornada_contratual", valor: cont.jornada, tipo: "texto" });
+    if (cont.carga_horaria_mensal) allFacts.push({ chave: "carga_horaria", valor: String(cont.carga_horaria_mensal), tipo: "numerico" });
+    if (cont.tipo_demissao) allFacts.push({ chave: "tipo_demissao", valor: cont.tipo_demissao, tipo: "texto" });
+    if (dp.numero_processo) allFacts.push({ chave: "numero_processo", valor: dp.numero_processo, tipo: "texto" });
+    if (dp.vara) allFacts.push({ chave: "vara", valor: dp.vara, tipo: "texto" });
+    if (dp.tribunal) allFacts.push({ chave: "tribunal", valor: dp.tribunal, tipo: "texto" });
+    if (dp.data_ajuizamento) allFacts.push({ chave: "data_ajuizamento", valor: dp.data_ajuizamento, tipo: "data" });
+    if (dp.data_sentenca) allFacts.push({ chave: "data_sentenca", valor: dp.data_sentenca, tipo: "data" });
+
+    if (allFacts.length > 0) {
+      for (const fact of allFacts) {
+        await supabase.from("facts").upsert({
+          case_id: caseId,
+          chave: fact.chave,
+          valor: fact.valor,
+          tipo: fact.tipo as any,
+          origem: "extracao",
+          confianca: extracted.confianca_geral || 0.9,
+          confirmado: true,
+        }, { onConflict: 'case_id,chave' }).then(({ error }: any) => {
+          if (error) console.error(`[FILL] fact ${fact.chave}:`, error.message);
+        });
+      }
+      fills.push(`facts (${allFacts.length})`);
+    }
+
+    // =====================================================
+    // 12. AUTO-CONFIGURE MODULES (FGTS, CS, IR, Honorários, Custas, Multas)
+    // =====================================================
+    await autoConfigureModules(supabase, caseId, extracted, fills);
+
   } catch (err) {
     console.error("[FILL] Global error:", err);
   }
 
   return fills;
+}
+
+/**
+ * Auto-configura todos os módulos do cálculo com defaults sensatos
+ */
+async function autoConfigureModules(supabase: any, caseId: string, extracted: any, fills: string[]) {
+  // Wait for pjecalc_calculos to be created by trigger
+  await new Promise(r => setTimeout(r, 500));
+
+  const { data: calculoRow } = await supabase
+    .from("pjecalc_calculos")
+    .select("id")
+    .eq("case_id", caseId)
+    .maybeSingle();
+
+  if (!calculoRow) return;
+  const calcId = calculoRow.id;
+
+  // Configure calculos defaults
+  const { error: calcErr } = await supabase.from("pjecalc_calculos").update({
+    honorarios_percentual: extracted.sentenca?.parametros_liquidacao?.honorarios_percentual || 15,
+    honorarios_sobre: 'condenacao',
+    custas_percentual: 2,
+    custas_limite: 10.64,
+    multa_477_habilitada: true,
+    multa_467_habilitada: false,
+    data_liquidacao: new Date().toISOString().slice(0, 10),
+  }).eq("id", calcId);
+  if (calcErr) console.error("[FILL] calculos config:", calcErr.message);
+  else fills.push("modulos_config");
+
+  // Correcao monetaria config
+  const { data: existCorrecao } = await supabase
+    .from("pjecalc_atualizacao_config")
+    .select("id, regime_padrao")
+    .eq("calculo_id", calcId)
+    .eq("tipo", "correcao")
+    .maybeSingle();
+
+  if (!existCorrecao) {
+    await supabase.from("pjecalc_atualizacao_config").insert({
+      calculo_id: calcId,
+      tipo: "correcao",
+      regime_padrao: "IPCA-E",
+    });
+  }
+
+  // Juros config
+  const { data: existJuros } = await supabase
+    .from("pjecalc_atualizacao_config")
+    .select("id")
+    .eq("calculo_id", calcId)
+    .eq("tipo", "juros")
+    .maybeSingle();
+
+  if (!existJuros) {
+    await supabase.from("pjecalc_atualizacao_config").insert({
+      calculo_id: calcId,
+      tipo: "juros",
+      regime_padrao: "simples_mensal",
+    });
+  }
 }
 
 // =====================================================
