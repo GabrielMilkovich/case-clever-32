@@ -199,47 +199,29 @@ async function autoConfigureModules(caseId: string, params: any, factMap: Record
   const dataAjuizamento = params.data_ajuizamento || factMap.data_ajuizamento || new Date().toISOString().slice(0, 10);
   const dataCitacao = factMap.data_citacao || factMap.data_notificacao || '';
 
-  // All upserts in parallel
+  // All upserts in parallel — use ACTUAL view column names
   await Promise.all([
-    // FGTS
+    // FGTS: habilitado, percentual_deposito, percentual_multa
     upsertConfig("pjecalc_fgts_config", caseId, {
-      apurar: true,
-      multa_apurar: true,
-      multa_percentual: 40,
-      multa_tipo: "sobre_depositos",
-      deduzir_saldo: false,
+      habilitado: true,
+      percentual_deposito: 8,
+      percentual_multa: 40,
     }, errors, "FGTS Config"),
 
-    // Contribuição Social (INSS)
+    // Contribuição Social: habilitado, regime
     upsertConfig("pjecalc_cs_config", caseId, {
-      apurar_segurado: true,
-      cobrar_reclamante: true,
-      cs_sobre_salarios_pagos: false,
-      aliquota_segurado_tipo: "empregado",
-      limitar_teto: true,
-      apurar_empresa: true,
-      apurar_sat: true,
-      apurar_terceiros: true,
-      aliquota_sat_fixa: 2,
-      aliquota_terceiros_fixa: 5.8,
+      habilitado: true,
+      regime: "CLT",
     }, errors, "CS Config"),
 
-    // Imposto de Renda
+    // Imposto de Renda: habilitado, metodo, dependentes
     upsertConfig("pjecalc_ir_config", caseId, {
-      apurar: true,
-      incidir_sobre_juros: false,
-      cobrar_reclamado: false,
-      tributacao_exclusiva_13: true,
-      tributacao_separada_ferias: true,
-      deduzir_cs: true,
-      deduzir_prev_privada: false,
-      deduzir_pensao: false,
-      deduzir_honorarios: false,
-      aposentado_65: false,
+      habilitado: true,
+      metodo: "progressivo",
       dependentes: 0,
     }, errors, "IR Config"),
 
-    // Correção Monetária
+    // Correção Monetária: indice, epoca, juros_tipo, juros_percentual, juros_inicio, multa_523, data_liquidacao, data_citacao
     upsertConfig("pjecalc_correcao_config", caseId, {
       indice: "IPCA-E",
       epoca: "mensal",
@@ -252,35 +234,22 @@ async function autoConfigureModules(caseId: string, params: any, factMap: Record
       ...(dataCitacao ? { data_citacao: dataCitacao } : {}),
     }, errors, "Correção Config"),
 
-    // Honorários
+    // Honorários: percentual, sobre
     upsertConfig("pjecalc_honorarios", caseId, {
-      apurar_sucumbenciais: true,
-      percentual_sucumbenciais: 15,
-      base_sucumbenciais: "condenacao",
-      apurar_contratuais: false,
-      percentual_contratuais: 20,
+      percentual: 15,
+      sobre: "condenacao",
     }, errors, "Honorários"),
 
-    // Custas
+    // Custas: percentual, limite
     upsertConfig("pjecalc_custas_config", caseId, {
-      apurar: true,
       percentual: 2,
-      valor_minimo: 10.64,
-      isento: false,
-      assistencia_judiciaria: false,
+      limite: 10.64,
     }, errors, "Custas"),
 
-    // Multas CLT
+    // Multas CLT: multa_477, multa_467
     upsertConfig("pjecalc_multas_config", caseId, {
-      apurar_477: true,
-      apurar_467: false,
+      multa_477: true,
+      multa_467: false,
     }, errors, "Multas CLT"),
-
-    // Seguro Desemprego (default: não apurar)
-    upsertConfig("pjecalc_seguro_config", caseId, {
-      apurar: false,
-      parcelas: 5,
-      recebeu: false,
-    }, errors, "Seguro Desemprego"),
   ]);
 }
