@@ -67,6 +67,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
   const [activeModule, setActiveModule] = useState('dados_processo');
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [autoSyncDone, setAutoSyncDone] = useState(false);
 
   // DATA
   const { data: params } = useQuery({
