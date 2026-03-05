@@ -378,33 +378,55 @@ export function ModuloResumo({ caseId }: Props) {
 
       const result = engine.liquidar();
 
-      // Persist resultado
-      await supabase.from("pjecalc_liquidacao_resultado" as any).insert({
-        case_id: caseId,
-        resultado: result as any,
-        engine_version: '2.1.0',
-        data_liquidacao: correcaoConfig.data_liquidacao,
-        total_bruto: result.resumo.principal_bruto,
-        total_liquido: result.resumo.liquido_reclamante,
-        total_reclamante: result.resumo.liquido_reclamante,
-        total_reclamada: result.resumo.total_reclamada,
-      });
+      // Get calculo_id from pjecalc_calculos (real table)
+      const { data: calculoRow } = await supabase
+        .from("pjecalc_calculos")
+        .select("id")
+        .eq("case_id", caseId)
+        .maybeSingle();
+      
+      if (!calculoRow) throw new Error("Cálculo não encontrado. Execute 'Sincronizar Dados' primeiro.");
+      const calculoId = (calculoRow as any).id;
 
-      // ── Persistir ocorrências calculadas nas tabelas de persistência ──
-      // 1. Ocorrências de verbas → pjecalc_ocorrencias
+      // Delete previous resultado if exists
+      await supabase.from("pjecalc_resultado" as any).delete().eq("calculo_id", calculoId);
+
+      // Persist resultado to REAL table (pjecalc_resultado)
+      const { error: resError } = await supabase.from("pjecalc_resultado" as any).insert({
+        calculo_id: calculoId,
+        total_bruto: result.resumo.principal_bruto,
+        total_diferenca: result.resumo.principal_bruto,
+        total_correcao: result.resumo.principal_corrigido - result.resumo.principal_bruto,
+        total_juros: result.resumo.juros_mora,
+        total_liquido_antes_descontos: result.resumo.principal_corrigido + result.resumo.juros_mora,
+        desconto_inss_reclamante: result.contribuicao_social.total_segurado,
+        desconto_ir: result.imposto_renda.total_ir,
+        desconto_inss_reclamado: result.contribuicao_social.total_empregador,
+        honorarios: result.honorarios.total_sucumbenciais + result.honorarios.total_contratuais,
+        custas: result.custas.total,
+        fgts_depositar: result.fgts.total_depositos,
+        fgts_multa_40: result.fgts.multa_valor,
+        total_reclamante: result.resumo.liquido_reclamante,
+        total_reclamado: result.resumo.total_reclamada,
+        engine_version: '2.1.0',
+        resumo_verbas: result as any,
+      });
+      if (resError) console.error("Erro ao persistir resultado:", resError);
+
+      // ── Persistir ocorrências calculadas na tabela REAL (pjecalc_ocorrencia_calculo) ──
       const ocRows: any[] = [];
       for (const vr of result.verbas) {
         for (const oc of vr.ocorrencias) {
           ocRows.push({
-            calculo_id: caseId,
-            verba_id: vr.verba_id,
-            competencia: oc.competencia,
-            ativa: true,
-            origem: 'CALCULADA',
+            calculo_id: calculoId,
+            verba_base_id: vr.verba_id,
+            tipo: vr.tipo || 'principal',
+            nome: vr.nome,
+            competencia: oc.competencia + '-01', // date format
             base_valor: oc.base,
-            divisor_valor: oc.divisor,
-            multiplicador_valor: oc.multiplicador,
-            quantidade_valor: oc.quantidade,
+            divisor: oc.divisor,
+            multiplicador: oc.multiplicador,
+            quantidade: oc.quantidade,
             dobra: oc.dobra,
             devido: oc.devido,
             pago: oc.pago,
@@ -412,64 +434,22 @@ export function ModuloResumo({ caseId }: Props) {
             correcao: oc.valor_corrigido - oc.diferenca,
             juros: oc.juros,
             total: oc.valor_final,
+            origem: 'CALCULADA',
+            ativa: true,
           });
         }
       }
       if (ocRows.length > 0) {
-        // Delete existing CALCULADA rows, preserve INFORMADA
-        await supabase.from("pjecalc_ocorrencias")
+        // Delete existing CALCULADA rows
+        await supabase.from("pjecalc_ocorrencia_calculo" as any)
           .delete()
-          .eq("calculo_id", caseId)
+          .eq("calculo_id", calculoId)
           .eq("origem", "CALCULADA");
         // Insert in batches of 500
         for (let i = 0; i < ocRows.length; i += 500) {
-          await supabase.from("pjecalc_ocorrencias" as any).insert(ocRows.slice(i, i + 500));
+          const { error: ocErr } = await supabase.from("pjecalc_ocorrencia_calculo" as any).insert(ocRows.slice(i, i + 500));
+          if (ocErr) console.error("Erro ao persistir ocorrências:", ocErr);
         }
-      }
-
-      // 2. FGTS ocorrências → pjecalc_fgts_ocorrencias
-      if (result.fgts.depositos.length > 0) {
-        await supabase.from("pjecalc_fgts_ocorrencias" as any)
-          .delete().eq("calculo_id", caseId);
-        const fgtsRows = result.fgts.depositos.map(d => ({
-          calculo_id: caseId,
-          competencia: d.competencia,
-          base: d.base,
-          aliquota: d.aliquota,
-          valor_devido: d.valor,
-          valor_recolhido: 0,
-        }));
-        await supabase.from("pjecalc_fgts_ocorrencias" as any).insert(fgtsRows);
-      }
-
-      // 3. CS ocorrências → pjecalc_cs_ocorrencias
-      if (result.contribuicao_social.segurado_devidos.length > 0) {
-        await supabase.from("pjecalc_cs_ocorrencias" as any)
-          .delete().eq("calculo_id", caseId);
-        const csRows = result.contribuicao_social.segurado_devidos.map(s => ({
-          calculo_id: caseId,
-          competencia: s.competencia,
-          tipo: 'segurado_devido',
-          base: s.base,
-          aliquota: s.aliquota,
-          valor: s.valor,
-          recolhido: s.recolhido,
-          diferenca: s.diferenca,
-        }));
-        // Add empregador rows
-        for (const e of result.contribuicao_social.empregador) {
-          csRows.push({
-            calculo_id: caseId,
-            competencia: e.competencia,
-            tipo: 'empregador',
-            base: 0,
-            aliquota: 0,
-            valor: e.empresa + e.sat + e.terceiros,
-            recolhido: 0,
-            diferenca: e.empresa + e.sat + e.terceiros,
-          });
-        }
-        await supabase.from("pjecalc_cs_ocorrencias" as any).insert(csRows);
       }
 
       qc.invalidateQueries({ queryKey: ["pjecalc_liquidacao", caseId] });
