@@ -1020,6 +1020,7 @@ async function processDocumentInBackground(
   document_id: string,
   fileUrl: string,
   doc: any,
+  MISTRAL_API_KEY: string,
   LOVABLE_API_KEY: string,
   supabase: any
 ) {
@@ -1058,8 +1059,12 @@ async function processDocumentInBackground(
     // Free the buffer to reduce memory
     fileBuffer = null;
 
-    // Call AI for structured extraction
-    const extracted = await callAI(base64Data, mimeType, LOVABLE_API_KEY);
+    // Stage 1: Mistral OCR — extract raw text
+    const ocrText = await mistralOCR(base64Data, mimeType, MISTRAL_API_KEY);
+    console.log(`[EXTRACT] OCR complete: ${ocrText.length} chars`);
+
+    // Stage 2: OpenAI structured extraction from OCR text
+    const extracted = await extractStructured(ocrText, LOVABLE_API_KEY);
 
     // Auto-fill pjecalc tables
     const fills = await autoFill(supabase, doc.case_id, extracted);
