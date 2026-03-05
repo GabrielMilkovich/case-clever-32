@@ -1795,7 +1795,7 @@ export class PjeCalcEngine {
   // CALCULAR CONTRIBUIÇÃO SOCIAL (Tabelas Versionadas por Competência)
   // =====================================================
 
-  calcularCS(verbaResults: PjeVerbaResult[]): PjeCSResult {
+  calcularCS(verbaResults: PjeVerbaResult[], useCorrigido: boolean = false): PjeCSResult {
     const segurado_devidos: PjeCSResult['segurado_devidos'] = [];
     const segurado_pagos: PjeCSResult['segurado_pagos'] = [];
     const empregador: PjeCSResult['empregador'] = [];
@@ -1804,15 +1804,17 @@ export class PjeCalcEngine {
       return { segurado_devidos: [], segurado_pagos: [], empregador, total_segurado_devidos: 0, total_segurado_pagos: 0, total_segurado: 0, total_empregador: 0 };
     }
 
-    // ═══ Track 1: CS sobre salários DEVIDOS (diferenças) ═══
+    // ═══ Track 1: CS sobre salários DEVIDOS ═══
+    // When useCorrigido=true (juros_apos_deducao_cs flow), CS is on corrected values
     const basesDevidos: Record<string, number> = {};
     for (const vr of verbaResults) {
       const verba = this.verbas.find(v => v.id === vr.verba_id);
       if (!verba?.incidencias.contribuicao_social) continue;
       if (verba.caracteristica === 'ferias') continue;
       for (const oc of vr.ocorrencias) {
-        if (oc.diferenca <= 0) continue;
-        basesDevidos[oc.competencia] = (basesDevidos[oc.competencia] || 0) + oc.diferenca;
+        const val = useCorrigido ? oc.valor_corrigido : oc.diferenca;
+        if (val <= 0) continue;
+        basesDevidos[oc.competencia] = (basesDevidos[oc.competencia] || 0) + val;
       }
     }
 
@@ -2589,7 +2591,7 @@ export class PjeCalcEngine {
       this.aplicarCorrecaoSomente(verbaResults);
       
       // Step B: CS on corrected values (uses valor_corrigido which is now set)
-      const csPreJuros = this.calcularCS(verbaResults);
+      const csPreJuros = this.calcularCS(verbaResults, true);
       const csDescontadoPreJuros = this.csConfig.cobrar_reclamante ? csPreJuros.total_segurado : 0;
       
       // Step C+D: Apply interest on (corrected - CS_share_pro_rata)
