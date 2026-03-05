@@ -150,11 +150,25 @@ export async function syncFromValidation(caseId: string): Promise<SyncResult> {
       inicio: autoParams.data_admissao,
       fim: autoParams.data_demissao || new Date().toISOString().slice(0, 10),
     };
+
+    // Fetch existing historico IDs for base_calculo linkage
+    const { data: histRows } = await supabase.from("pjecalc_historico_salarial" as any)
+      .select("id").eq("case_id", caseId);
+    const histIds = (histRows || []).map((h: any) => h.id);
+
+    const baseCalculoPrincipal = {
+      historicos: histIds,
+      verbas: [],
+      tabelas: histIds.length ? [] : ['ultima_remuneracao'],
+      proporcionalizar: false,
+      integralizar: false,
+    };
+
     const { data: principalData, error: principalError } = await supabase.from("pjecalc_verbas" as any).insert({
       case_id: caseId, nome: 'Horas Extras 50%', caracteristica: 'comum', ocorrencia_pagamento: 'mensal',
       tipo: 'principal', multiplicador: 1.5, divisor_informado: autoParams.carga_horaria_padrao || 220,
       periodo_inicio: periodo.inicio, periodo_fim: periodo.fim, ordem: 0,
-      base_calculo: { historicos: [], verbas: [], tabelas: ['ultima_remuneracao'], proporcionalizar: false, integralizar: false },
+      base_calculo: baseCalculoPrincipal,
       incidencias: { fgts: true, irpf: true, contribuicao_social: true, previdencia_privada: false, pensao_alimenticia: false },
     }).select("id").single();
     if (principalError) errors.push(`Verba HE: ${principalError.message}`);
@@ -194,93 +208,82 @@ async function upsertConfig(table: string, caseId: string, payload: any, errors:
   }
 }
 
-/** Auto-configura FGTS, CS, IR, Correção, Honorários, Custas, Multas, Seguro */
+/** Auto-configura módulos de config via pjecalc_calculos e pjecalc_correcao_config */
 async function autoConfigureModules(caseId: string, params: any, factMap: Record<string, string>, errors: string[]) {
-  const dataAjuizamento = params.data_ajuizamento || factMap.data_ajuizamento || new Date().toISOString().slice(0, 10);
   const dataCitacao = factMap.data_citacao || factMap.data_notificacao || '';
 
-  // All upserts in parallel
-  await Promise.all([
-    // FGTS
-    upsertConfig("pjecalc_fgts_config", caseId, {
-      apurar: true,
-      multa_apurar: true,
-      multa_percentual: 40,
-      multa_tipo: "sobre_depositos",
-      deduzir_saldo: false,
-    }, errors, "FGTS Config"),
+  // Wait for pjecalc_calculos to exist (created by trigger on parametros insert)
+  await new Promise(r => setTimeout(r, 300));
 
-    // Contribuição Social (INSS)
-    upsertConfig("pjecalc_cs_config", caseId, {
-      apurar_segurado: true,
-      cobrar_reclamante: true,
-      cs_sobre_salarios_pagos: false,
-      aliquota_segurado_tipo: "empregado",
-      limitar_teto: true,
-      apurar_empresa: true,
-      apurar_sat: true,
-      apurar_terceiros: true,
-      aliquota_sat_fixa: 2,
-      aliquota_terceiros_fixa: 5.8,
-    }, errors, "CS Config"),
+  // Get calculo_id
+  const { data: calculoRow } = await supabase
+    .from("pjecalc_calculos")
+    .select("id")
+    .eq("case_id", caseId)
+    .maybeSingle();
 
-    // Imposto de Renda
-    upsertConfig("pjecalc_ir_config", caseId, {
-      apurar: true,
-      incidir_sobre_juros: false,
-      cobrar_reclamado: false,
-      tributacao_exclusiva_13: true,
-      tributacao_separada_ferias: true,
-      deduzir_cs: true,
-      deduzir_prev_privada: false,
-      deduzir_pensao: false,
-      deduzir_honorarios: false,
-      aposentado_65: false,
-      dependentes: 0,
-    }, errors, "IR Config"),
+  if (calculoRow) {
+    // Update writable columns directly on pjecalc_calculos
+    const { error } = await supabase.from("pjecalc_calculos").update({
+      honorarios_percentual: 15,
+      honorarios_sobre: 'condenacao',
+      custas_percentual: 2,
+      custas_limite: 10.64,
+      multa_477_habilitada: true,
+      multa_467_habilitada: false,
+    }).eq("id", (calculoRow as any).id);
+    if (error) errors.push(`Config Calculos: ${error.message}`);
+  }
 
-    // Correção Monetária
-    upsertConfig("pjecalc_correcao_config", caseId, {
-      indice: "IPCA-E",
-      epoca: "mensal",
-      juros_tipo: "simples_mensal",
-      juros_percentual: 1,
-      juros_inicio: "ajuizamento",
-      multa_523: false,
-      multa_523_percentual: 0,
+  // Correção config — write directly to pjecalc_atualizacao_config + pjecalc_calculos
+  if (calculoRow) {
+    const calcId = (calculoRow as any).id;
+    
+    // Set data_liquidacao on calculos
+    await supabase.from("pjecalc_calculos").update({
       data_liquidacao: new Date().toISOString().slice(0, 10),
-      ...(dataCitacao ? { data_citacao: dataCitacao } : {}),
-    }, errors, "Correção Config"),
+    }).eq("id", calcId);
 
-    // Honorários
-    upsertConfig("pjecalc_honorarios", caseId, {
-      apurar_sucumbenciais: true,
-      percentual_sucumbenciais: 15,
-      base_sucumbenciais: "condenacao",
-      apurar_contratuais: false,
-      percentual_contratuais: 20,
-    }, errors, "Honorários"),
+    // Upsert correcao config
+    const { data: existCorrecao } = await supabase
+      .from("pjecalc_atualizacao_config" as any)
+      .select("id")
+      .eq("calculo_id", calcId)
+      .eq("tipo", "correcao")
+      .maybeSingle();
 
-    // Custas
-    upsertConfig("pjecalc_custas_config", caseId, {
-      apurar: true,
-      percentual: 2,
-      valor_minimo: 10.64,
-      isento: false,
-      assistencia_judiciaria: false,
-    }, errors, "Custas"),
+    if (existCorrecao) {
+      await supabase.from("pjecalc_atualizacao_config" as any).update({
+        regime_padrao: "IPCA-E",
+      }).eq("id", (existCorrecao as any).id);
+    } else {
+      const { error } = await supabase.from("pjecalc_atualizacao_config" as any).insert({
+        calculo_id: calcId,
+        tipo: "correcao",
+        regime_padrao: "IPCA-E",
+      });
+      if (error) errors.push(`Correção Config: ${error.message}`);
+    }
 
-    // Multas CLT
-    upsertConfig("pjecalc_multas_config", caseId, {
-      apurar_477: true,
-      apurar_467: false,
-    }, errors, "Multas CLT"),
+    // Upsert juros config
+    const { data: existJuros } = await supabase
+      .from("pjecalc_atualizacao_config" as any)
+      .select("id")
+      .eq("calculo_id", calcId)
+      .eq("tipo", "juros")
+      .maybeSingle();
 
-    // Seguro Desemprego (default: não apurar)
-    upsertConfig("pjecalc_seguro_config", caseId, {
-      apurar: false,
-      parcelas: 5,
-      recebeu: false,
-    }, errors, "Seguro Desemprego"),
-  ]);
+    if (existJuros) {
+      await supabase.from("pjecalc_atualizacao_config" as any).update({
+        regime_padrao: "simples_mensal",
+      }).eq("id", (existJuros as any).id);
+    } else {
+      const { error } = await supabase.from("pjecalc_atualizacao_config" as any).insert({
+        calculo_id: calcId,
+        tipo: "juros",
+        regime_padrao: "simples_mensal",
+      });
+      if (error) errors.push(`Juros Config: ${error.message}`);
+    }
+  }
 }
