@@ -164,7 +164,9 @@ export interface PjeVerba {
   juros_ajuizamento: 'ocorrencias_vencidas' | 'ocorrencias_vencidas_vincendas';
   
   verba_principal_id?: string;
-  comportamento_reflexo?: 'valor_mensal' | 'media_valor_absoluto' | 'media_valor_corrigido' | 'media_quantidade';
+  comportamento_reflexo?: 'valor_mensal' | 'media_valor_absoluto' | 'media_valor_corrigido' | 'media_quantidade' | 'media_pela_quantidade';
+  /** Período de agrupamento para reflexos: ANO_CIVIL (13º), PERIODO_AQUISITIVO (férias) */
+  periodo_media_reflexo?: 'ano_civil' | 'periodo_aquisitivo' | 'global';
   gerar_verba_reflexa: 'devido' | 'diferenca';
   gerar_verba_principal: 'devido' | 'diferenca';
   
@@ -414,6 +416,10 @@ export interface PjeOcorrenciaResult {
   juros: number;
   valor_final: number;
   formula: string;
+  /** Valores integrais (mês cheio) para integralização em reflexos */
+  base_integral?: number;
+  quantidade_integral?: number;
+  devido_integral?: number;
 }
 
 export interface PjeFGTSResult {
