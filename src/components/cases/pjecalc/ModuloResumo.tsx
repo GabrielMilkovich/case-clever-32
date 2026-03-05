@@ -12,7 +12,7 @@ import { Play, Loader2, FileBarChart, Printer, FileCode, AlertTriangle, CheckCir
 import { PainelRevisao } from "./PainelRevisao";
 import { MemoriaCalculoExpandida } from "./MemoriaCalculoExpandida";
 import { ComparacaoCenarios } from "./ComparacaoCenarios";
-import { ComparadorParidade, buildParityData } from "./ComparadorParidade";
+import { ComparadorParidade, buildParityData, buildParityDataFromGolden } from "./ComparadorParidade";
 import { calcularCompletude } from "@/lib/pjecalc/completude";
 import * as svc from "@/lib/pjecalc/service";
 import {
@@ -297,6 +297,7 @@ export function ModuloResumo({ caseId }: Props) {
         data_liquidacao: correcaoDataLocal.data_liquidacao || new Date().toISOString().slice(0, 10),
         combinacoes_indice: combinacoesIndice,
         combinacoes_juros: combinacoesJuros,
+        juros_apos_deducao_cs: true, // PJe-Calc Criterion 8: juros após dedução CS
       } as PjeCorrecaoConfig;
 
       const honorariosConfig = {
@@ -471,35 +472,10 @@ export function ModuloResumo({ caseId }: Props) {
   const res = (resultado?.resultado as unknown as PjeLiquidacaoResult) || null;
   const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
 
-  // Build parity data when we have engine results + ground truth
+  // Build parity data using Golden Snapshot as ground truth
   const parityData = useMemo(() => {
-    if (!res) return null;
-    const mrdResults = new Map<string, number>();
-    for (const v of res.verbas) {
-      mrdResults.set(v.nome, v.total_diferenca);
-    }
-    if (pjcGroundTruth && typeof pjcGroundTruth === 'object' && 'verbas' in (pjcGroundTruth as any)) {
-      try {
-        const gt = pjcGroundTruth as any;
-        const pjcAnalysis = {
-          verbas: (gt.verbas || []).map((v: any) => ({
-            nome: v.nome, tipo: v.tipo,
-            total_devido: v.total_devido || 0, total_pago: v.total_pago || 0,
-            total_diferenca: v.total_diferenca || 0,
-          })),
-          resultado: {
-            liquido_exequente: gt.resumo?.liquido_reclamante || 0,
-            inss_reclamante: gt.resumo?.cs_segurado || 0,
-            inss_reclamado: gt.resumo?.cs_empregador || 0,
-            imposto_renda: gt.resumo?.ir_retido || 0,
-            honorarios: [{ valor: (gt.resumo?.honorarios_sucumbenciais || 0) + (gt.resumo?.honorarios_contratuais || 0) }],
-          },
-        };
-        return buildParityData(pjcAnalysis as any, mrdResults);
-      } catch { /* fallback */ }
-    }
-    return null;
-  }, [res, pjcGroundTruth]);
+    return buildParityDataFromGolden(res);
+  }, [res]);
   const isFechado = resultado?.status === 'fechado';
   const reportMeta = {
     cliente: caseData?.cliente,
