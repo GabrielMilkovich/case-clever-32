@@ -168,28 +168,11 @@ function guessMimeTypeFromUrl(fileUrl: string): string {
   return "application/octet-stream";
 }
 
-// Função para gerar embeddings
-async function generateEmbedding(text: string, apiKey: string): Promise<number[]> {
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "text-embedding-3-small",
-      input: text.substring(0, 8000), // Limitar para não exceder contexto
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("Embedding API error:", errorText);
-    throw new Error(`Embedding API error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  return data.data?.[0]?.embedding || [];
+// Embedding generation skipped - Lovable AI Gateway does not support embedding models
+// Chunks are stored without embeddings for text-based search
+async function generateEmbedding(_text: string, _apiKey: string): Promise<number[]> {
+  // Return empty array - embeddings not available via Lovable AI Gateway
+  return [];
 }
 
 serve(async (req) => {

@@ -54,6 +54,7 @@ import {
   FolderUp,
   Clock,
   Percent,
+  Sparkles,
 } from "lucide-react";
 import {
   Tooltip,
@@ -131,6 +132,8 @@ const statusConfig: Record<string, { label: string; icon: typeof Loader2; color:
   failed: { label: "Erro", icon: XCircle, color: "text-destructive", bgColor: "bg-destructive/10" },
   retrying: { label: "Tentando novamente", icon: Loader2, color: "text-orange-600", bgColor: "bg-orange-100" },
   processing: { label: "Processando", icon: Loader2, color: "text-blue-600", bgColor: "bg-blue-100" },
+  extracting: { label: "Extraindo com IA", icon: Loader2, color: "text-purple-600", bgColor: "bg-purple-100" },
+  extracted: { label: "Extraído", icon: CheckCircle, color: "text-green-600", bgColor: "bg-green-100" },
   completed: { label: "Concluído", icon: CheckCircle, color: "text-green-600", bgColor: "bg-green-100" },
 };
 
@@ -279,13 +282,12 @@ export function DocumentsManager({
     }
   }, [caseId, selectedType, onDocumentsChange]);
 
-  // Processar documento (pipeline completo)
+  // Processar documento (pipeline básico - OCR + chunks)
   const processDocument = useCallback(async (documentId: string) => {
     setProcessingDocId(documentId);
-    toast.info("Iniciando processamento: OCR → Chunking → Embeddings...");
+    toast.info("Iniciando processamento: OCR → Chunking...");
 
     try {
-      // Chamar edge function process-document
       const { data, error } = await supabase.functions.invoke("process-document", {
         body: { document_id: documentId },
       });
@@ -301,6 +303,38 @@ export function DocumentsManager({
       setProcessingDocId(null);
     }
   }, [onDocumentsChange]);
+
+  // Extrair dados e preencher automaticamente os campos do cálculo
+  const extractAndFill = useCallback(async (documentId: string) => {
+    setProcessingDocId(documentId);
+    toast.info("🤖 Extraindo dados com IA e preenchendo campos do cálculo...");
+
+    try {
+      const { data, error } = await supabase.functions.invoke("extract-and-fill", {
+        body: { document_id: documentId },
+      });
+
+      if (error) throw error;
+
+      const fills = data.auto_fill || [];
+      const rubricas = data.rubricas_extraidas || 0;
+      const tipo = data.tipo_documento || "documento";
+
+      toast.success(
+        `✅ ${tipo} extraído! ${rubricas} rubricas encontradas. Campos preenchidos: ${fills.join(", ") || "nenhum"}`,
+        { duration: 8000 }
+      );
+      
+      // Invalidate pjecalc data to refresh the calculation page
+      queryClient.invalidateQueries({ queryKey: ['pjecalc_case_data'] });
+      onDocumentsChange();
+    } catch (err) {
+      console.error("Extract and fill error:", err);
+      toast.error("Erro na extração: " + (err as Error).message);
+    } finally {
+      setProcessingDocId(null);
+    }
+  }, [onDocumentsChange, queryClient]);
 
   // Processar todos os pendentes — sequencial com progresso visual
   const processAllPending = useCallback(async () => {
@@ -335,7 +369,7 @@ export function DocumentsManager({
       setProcessingDocId(docId);
 
       try {
-        const { data, error } = await supabase.functions.invoke("process-document", {
+        const { data, error } = await supabase.functions.invoke("extract-and-fill", {
           body: { document_id: docId },
         });
 
@@ -667,9 +701,9 @@ export function DocumentsManager({
                 {isBatchProcessing ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <Cpu className="h-4 w-4" />
+                  <Sparkles className="h-4 w-4" />
                 )}
-                {isBatchProcessing ? "Processando..." : `Processar Todos (${stats.pending})`}
+                {isBatchProcessing ? "Extraindo..." : `Extrair Todos (${stats.pending})`}
               </Button>
             )}
           </div>
@@ -806,35 +840,35 @@ export function DocumentsManager({
                                 <Button 
                                   variant="ghost" 
                                   size="icon"
-                                  className="h-8 w-8"
-                                  onClick={() => processDocument(doc.id)}
+                                  className="h-8 w-8 text-primary"
+                                  onClick={() => extractAndFill(doc.id)}
                                   disabled={isProcessing}
                                 >
                                   {isProcessing ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
                                   ) : (
-                                    <Cpu className="h-4 w-4" />
+                                    <Sparkles className="h-4 w-4" />
                                   )}
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent>Processar OCR</TooltipContent>
+                              <TooltipContent>Extrair e Preencher com IA</TooltipContent>
                             </Tooltip>
                           )}
 
-                          {(doc.status === "embedded" || doc.status === "completed") && (
+                          {(doc.status === "embedded" || doc.status === "completed" || doc.status === "extracted" || doc.status === "ocr_done") && (
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button 
                                   variant="ghost" 
                                   size="icon"
                                   className="h-8 w-8"
-                                  onClick={() => processDocument(doc.id)}
+                                  onClick={() => extractAndFill(doc.id)}
                                   disabled={isProcessing}
                                 >
                                   <RefreshCw className="h-4 w-4" />
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent>Reprocessar</TooltipContent>
+                              <TooltipContent>Re-extrair e Preencher</TooltipContent>
                             </Tooltip>
                           )}
 
