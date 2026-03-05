@@ -806,121 +806,235 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
   );
 
   // ── VERBAS ──
-  const renderVerbas = () => (
+  const [expandedVerbas, setExpandedVerbas] = useState<Set<string>>(new Set());
+
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedVerbas(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleReflexaAtiva = useCallback(async (reflexaId: string, currentAtiva: boolean) => {
+    await supabase.from("pjecalc_verbas" as any).update({ ativa: !currentAtiva }).eq("id", reflexaId);
+    queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] });
+  }, [caseId, queryClient]);
+
+  const expandAll = useCallback(() => {
+    const ids = verbas.filter((v: any) => v.tipo === 'principal').map((v: any) => v.id);
+    setExpandedVerbas(new Set(ids));
+  }, [verbas]);
+
+  const collapseAll = useCallback(() => setExpandedVerbas(new Set()), []);
+
+  const renderVerbas = () => {
+    const principals = verbas.filter((v: any) => v.tipo === 'principal');
+    const getReflexas = (principalId: string) => verbas.filter((v: any) => v.tipo === 'reflexa' && v.verba_principal_id === principalId);
+    const orphanReflexas = verbas.filter((v: any) => v.tipo === 'reflexa' && !v.verba_principal_id);
+
+    return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Verbas</h2>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={async () => {
-            const periodo = formParams.data_admissao && formParams.data_demissao ? { inicio: formParams.data_admissao, fim: formParams.data_demissao } : { inicio: new Date().toISOString().slice(0, 10), fim: new Date().toISOString().slice(0, 10) };
-            // 1. Insert principal first
-            const { data: principalData } = await supabase.from("pjecalc_verbas" as any).insert({
-              case_id: caseId, nome: 'Horas Extras 50%', caracteristica: 'comum', ocorrencia_pagamento: 'mensal',
-              tipo: 'principal', multiplicador: 1.5, divisor_informado: formParams.carga_horaria_padrao || 220,
-              periodo_inicio: periodo.inicio, periodo_fim: periodo.fim, ordem: verbas.length,
-            }).select("id").single();
-            const principalId = (principalData as any)?.id || null;
-            // 2. Insert reflexas linked to principal
-            const reflexas = [
-              { nome: 'RSR s/ Horas Extras', caracteristica: 'comum', ocorrencia_pagamento: 'mensal', multiplicador: 1, divisor_informado: 30 },
-              { nome: '13º Salário', caracteristica: '13_salario', ocorrencia_pagamento: 'dezembro', multiplicador: 1, divisor_informado: 12 },
-              { nome: 'Férias + 1/3', caracteristica: 'ferias', ocorrencia_pagamento: 'periodo_aquisitivo', multiplicador: 1.3333, divisor_informado: 12 },
-            ];
-            for (let i = 0; i < reflexas.length; i++) {
-              await supabase.from("pjecalc_verbas" as any).insert({
-                case_id: caseId, ...reflexas[i], tipo: 'reflexa',
-                periodo_inicio: periodo.inicio, periodo_fim: periodo.fim,
-                ordem: verbas.length + 1 + i,
-                verba_principal_id: principalId,
-                base_calculo: { historicos: [], verbas: principalId ? [principalId] : [], tabelas: [], proporcionalizar: false, integralizar: false },
-              });
-            }
-            queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] });
-            toast.success("Verbas expressas adicionadas com vinculação!");
-          }}><Briefcase className="h-4 w-4 mr-1" /> Expresso</Button>
-          <Button size="sm" onClick={async () => {
-            const periodo = formParams.data_admissao && formParams.data_demissao ? { inicio: formParams.data_admissao, fim: formParams.data_demissao } : { inicio: new Date().toISOString().slice(0, 10), fim: new Date().toISOString().slice(0, 10) };
-            // Only allow creating reflexa if there's at least one principal
-            await supabase.from("pjecalc_verbas" as any).insert({ case_id: caseId, nome: `Verba ${verbas.length + 1}`, tipo: 'principal', periodo_inicio: periodo.inicio, periodo_fim: periodo.fim, ordem: verbas.length });
-            queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] });
-          }}><Plus className="h-4 w-4 mr-1" /> Manual</Button>
-        </div>
-      </div>
-      {verbas.length === 0 ? (
-        <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Use "Expresso" para incluir verbas comuns ou "Manual" para criar uma verba personalizada.</CardContent></Card>
+      {/* Header matching PJe-Calc layout */}
+      <Card className="border-primary/20">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold">Lançamento</span>
+              <Button size="sm" onClick={async () => {
+                const periodo = formParams.data_admissao && formParams.data_demissao
+                  ? { inicio: formParams.data_admissao, fim: formParams.data_demissao }
+                  : { inicio: new Date().toISOString().slice(0, 10), fim: new Date().toISOString().slice(0, 10) };
+                await supabase.from("pjecalc_verbas" as any).insert({
+                  case_id: caseId, nome: `Verba ${verbas.length + 1}`, tipo: 'principal',
+                  periodo_inicio: periodo.inicio, periodo_fim: periodo.fim, ordem: verbas.length,
+                });
+                queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] });
+              }}><Plus className="h-4 w-4 mr-1" /> Manual</Button>
+              <Button size="sm" variant="outline" onClick={async () => {
+                const periodo = formParams.data_admissao && formParams.data_demissao
+                  ? { inicio: formParams.data_admissao, fim: formParams.data_demissao }
+                  : { inicio: new Date().toISOString().slice(0, 10), fim: new Date().toISOString().slice(0, 10) };
+                const { data: principalData } = await supabase.from("pjecalc_verbas" as any).insert({
+                  case_id: caseId, nome: 'Horas Extras 50%', caracteristica: 'comum', ocorrencia_pagamento: 'mensal',
+                  tipo: 'principal', multiplicador: 1.5, divisor_informado: formParams.carga_horaria_padrao || 220,
+                  periodo_inicio: periodo.inicio, periodo_fim: periodo.fim, ordem: verbas.length,
+                }).select("id").single();
+                const principalId = (principalData as any)?.id;
+                if (principalId) {
+                  const reflexas = [
+                    { nome: '13º SALÁRIO SOBRE HORAS EXTRAS', caracteristica: '13_salario', ocorrencia_pagamento: 'dezembro', multiplicador: 1, divisor_informado: 12 },
+                    { nome: 'FÉRIAS + 1/3 SOBRE HORAS EXTRAS', caracteristica: 'ferias', ocorrencia_pagamento: 'periodo_aquisitivo', multiplicador: 1.3333, divisor_informado: 12 },
+                    { nome: 'RSR E FERIADO SOBRE HORAS EXTRAS', caracteristica: 'comum', ocorrencia_pagamento: 'mensal', multiplicador: 1, divisor_informado: 26 },
+                    { nome: 'AVISO PRÉVIO SOBRE HORAS EXTRAS', caracteristica: 'aviso_previo', ocorrencia_pagamento: 'desligamento', multiplicador: 1, divisor_informado: 12 },
+                    { nome: 'MULTA DO ARTIGO 477 DA CLT SOBRE HORAS EXTRAS', caracteristica: 'comum', ocorrencia_pagamento: 'desligamento', multiplicador: 1, divisor_informado: 1, ativa: false },
+                  ];
+                  for (let i = 0; i < reflexas.length; i++) {
+                    const { ativa, ...rest } = reflexas[i] as any;
+                    await supabase.from("pjecalc_verbas" as any).insert({
+                      case_id: caseId, ...rest, tipo: 'reflexa',
+                      periodo_inicio: periodo.inicio, periodo_fim: periodo.fim,
+                      ordem: verbas.length + 1 + i,
+                      verba_principal_id: principalId,
+                      ativa: ativa ?? true,
+                      base_calculo: { historicos: [], verbas: [principalId], tabelas: [], proporcionalizar: false, integralizar: false },
+                    });
+                  }
+                }
+                queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] });
+                toast.success("Verba expressa com reflexas adicionada!");
+              }}><Briefcase className="h-4 w-4 mr-1" /> Expresso</Button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground font-medium">Registros encontrados: {principals.length}</span>
+              <Button size="sm" variant="ghost" className="text-xs h-7" onClick={expandAll}>
+                <Check className="h-3 w-3 mr-1" /> Exibir Todas
+              </Button>
+              <Button size="sm" variant="ghost" className="text-xs h-7" onClick={collapseAll}>Ocultar Todas</Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {principals.length === 0 ? (
+        <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Use "Expresso" para incluir verbas comuns com reflexas ou "Manual" para criar manualmente.</CardContent></Card>
       ) : (
-        <div className="space-y-2">
-          {/* Render verbas hierarchically: principals first, then their reflexas indented */}
-          {verbas.filter((v: any) => v.tipo === 'principal').map((principal: any) => {
-            const reflexas = verbas.filter((v: any) => v.tipo === 'reflexa' && v.verba_principal_id === principal.id);
-            const orphanCount = reflexas.length;
+        <div className="space-y-1">
+          {/* Table header */}
+          <div className="grid grid-cols-[32px_100px_1fr_120px] gap-1 px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider bg-muted/50 rounded-t-lg border">
+            <div></div>
+            <div>Ações</div>
+            <div className="text-center">Verba Principal</div>
+            <div className="text-right">Verba Reflexa</div>
+          </div>
+
+          {principals.map((principal: any) => {
+            const reflexas = getReflexas(principal.id);
+            const isExpanded = expandedVerbas.has(principal.id);
+            const activeReflexas = reflexas.filter((r: any) => r.ativa !== false);
+
             return (
-              <div key={principal.id} className="space-y-1">
-                <Card className="hover:border-primary/30 transition-colors">
-                  <CardContent className="p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Badge variant="default" className="text-[10px]">P</Badge>
-                        <div>
-                          <div className="text-sm font-medium">{principal.nome}</div>
-                          <div className="text-[10px] text-muted-foreground flex gap-2"><span>{principal.caracteristica}</span><span>•</span><span>{principal.ocorrencia_pagamento}</span><span>•</span><span>×{principal.multiplicador} ÷{principal.divisor_informado || 30}</span>{orphanCount > 0 && <span className="text-primary">• {orphanCount} reflexo(s)</span>}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px] font-mono">{principal.periodo_inicio?.slice(0, 7)} → {principal.periodo_fim?.slice(0, 7)}</Badge>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={async () => { await supabase.from("pjecalc_verbas" as any).delete().eq("id", principal.id); queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] }); }}><Trash2 className="h-3 w-3" /></Button>
-                      </div>
+              <div key={principal.id}>
+                {/* Principal row */}
+                <div className="grid grid-cols-[32px_100px_1fr_120px] gap-1 items-center px-3 py-2.5 border border-b-0 bg-card hover:bg-muted/30 transition-colors">
+                  <Checkbox checked={false} className="h-4 w-4" />
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-6 w-6" title="Duplicar"
+                      onClick={async () => {
+                        const periodo = { inicio: principal.periodo_inicio, fim: principal.periodo_fim };
+                        const { data: newP } = await supabase.from("pjecalc_verbas" as any).insert({
+                          case_id: caseId, nome: principal.nome + ' (cópia)', tipo: 'principal',
+                          caracteristica: principal.caracteristica, ocorrencia_pagamento: principal.ocorrencia_pagamento,
+                          multiplicador: principal.multiplicador, divisor_informado: principal.divisor_informado,
+                          periodo_inicio: periodo.inicio, periodo_fim: periodo.fim, ordem: verbas.length,
+                          incidencias: principal.incidencias,
+                        }).select("id").single();
+                        queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] });
+                        if (newP) toast.success("Verba duplicada!");
+                      }}>
+                      <FileText className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" title="Editar">
+                      <FileBarChart className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" title="Excluir"
+                      onClick={async () => {
+                        // Delete reflexas first, then principal
+                        for (const r of reflexas) await supabase.from("pjecalc_verbas" as any).delete().eq("id", r.id);
+                        await supabase.from("pjecalc_verbas" as any).delete().eq("id", principal.id);
+                        queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] });
+                      }}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-sm font-semibold">{principal.nome}</span>
+                    <div className="text-[10px] text-muted-foreground">
+                      ×{principal.multiplicador} ÷{principal.divisor_informado || 30} • {principal.ocorrencia_pagamento}
                     </div>
-                  </CardContent>
-                </Card>
-                {/* Reflexas indented under principal */}
-                {reflexas.map((ref: any) => (
-                  <Card key={ref.id} className="ml-6 border-l-2 border-primary/20 hover:border-primary/40 transition-colors">
-                    <CardContent className="p-2.5">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="text-muted-foreground text-[10px]">└</span>
-                          <Badge variant="secondary" className="text-[10px]">R</Badge>
-                          <div>
-                            <div className="text-sm font-medium">{ref.nome}</div>
-                            <div className="text-[10px] text-muted-foreground flex gap-2"><span>{ref.caracteristica}</span><span>•</span><span>×{ref.multiplicador} ÷{ref.divisor_informado || 30}</span></div>
+                  </div>
+                  <div className="text-right">
+                    <Button variant="link" size="sm" className="text-xs text-primary h-auto p-0"
+                      onClick={() => toggleExpand(principal.id)}>
+                      {isExpanded ? '▾ Ocultar' : `▸ Exibir`}
+                      <Badge variant="secondary" className="ml-1 text-[9px]">{activeReflexas.length}/{reflexas.length}</Badge>
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Reflexas panel (expanded) */}
+                {isExpanded && reflexas.length > 0 && (
+                  <div className="border border-t-0 bg-muted/10">
+                    {reflexas.map((ref: any) => {
+                      const isActive = ref.ativa !== false;
+                      return (
+                        <div key={ref.id}
+                          className={cn(
+                            "grid grid-cols-[32px_60px_1fr_80px] gap-1 items-center px-3 py-2 border-b last:border-b-0 transition-colors",
+                            isActive ? "bg-green-50 dark:bg-green-950/20" : "bg-card opacity-60"
+                          )}>
+                          <Checkbox checked={false} className="h-4 w-4" />
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-5 w-5" title="Duplicar">
+                              <FileText className="h-3 w-3" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-5 w-5" title="Editar">
+                              <FileBarChart className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              checked={isActive}
+                              onCheckedChange={() => toggleReflexaAtiva(ref.id, isActive)}
+                              className="h-4 w-4"
+                            />
+                            <span className={cn("text-sm", isActive ? "font-medium" : "text-muted-foreground line-through")}>{ref.nome}</span>
+                          </div>
+                          <div className="text-right">
+                            <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive hover:text-destructive"
+                              onClick={async () => {
+                                await supabase.from("pjecalc_verbas" as any).delete().eq("id", ref.id);
+                                queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] });
+                              }}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-[10px] font-mono">{ref.periodo_inicio?.slice(0, 7)} → {ref.periodo_fim?.slice(0, 7)}</Badge>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={async () => { await supabase.from("pjecalc_verbas").delete().eq("id", ref.id); queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] }); }}><Trash2 className="h-3 w-3" /></Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })}
-          {/* Orphan reflexas (no verba_principal_id) */}
-          {verbas.filter((v: any) => v.tipo === 'reflexa' && !v.verba_principal_id).map((v: any) => (
-            <Card key={v.id} className="hover:border-destructive/30 transition-colors border-destructive/20">
-              <CardContent className="p-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Badge variant="destructive" className="text-[10px]">R⚠</Badge>
-                    <div>
-                      <div className="text-sm font-medium">{v.nome}</div>
-                      <div className="text-[10px] text-destructive">Sem verba principal vinculada</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-[10px] font-mono">{v.periodo_inicio?.slice(0, 7)} → {v.periodo_fim?.slice(0, 7)}</Badge>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={async () => { await supabase.from("pjecalc_verbas").delete().eq("id", v.id); queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] }); }}><Trash2 className="h-3 w-3" /></Button>
+
+          {/* Orphan reflexas */}
+          {orphanReflexas.length > 0 && (
+            <div className="mt-4">
+              <div className="text-xs text-destructive font-medium mb-1">⚠ Reflexas sem verba principal:</div>
+              {orphanReflexas.map((v: any) => (
+                <div key={v.id} className="grid grid-cols-[32px_1fr_80px] gap-1 items-center px-3 py-2 border bg-destructive/5">
+                  <Checkbox checked={false} className="h-4 w-4" />
+                  <span className="text-sm">{v.nome}</span>
+                  <div className="text-right">
+                    <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive"
+                      onClick={async () => {
+                        await supabase.from("pjecalc_verbas" as any).delete().eq("id", v.id);
+                        queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] });
+                      }}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
+  };
 
   return (
     <div className="space-y-3">
