@@ -972,7 +972,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
                         <div key={ref.id}
                           className={cn(
                             "grid grid-cols-[32px_60px_1fr_80px] gap-1 items-center px-3 py-2 border-b last:border-b-0 transition-colors",
-                            isActive ? "bg-green-50 dark:bg-green-950/20" : "bg-card opacity-60"
+                            isActive ? "bg-primary/5" : "bg-card opacity-60"
                           )}>
                           <Checkbox checked={false} className="h-4 w-4" />
                           <div className="flex items-center gap-1">
