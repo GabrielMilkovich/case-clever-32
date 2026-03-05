@@ -40,7 +40,7 @@ interface Props { caseId: string; }
 export function ModuloResumo({ caseId }: Props) {
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'resumo' | 'memoria' | 'revisao' | 'comparacao'>('resumo');
+  const [activeTab, setActiveTab] = useState<'resumo' | 'memoria' | 'revisao' | 'comparacao' | 'paridade'>('resumo');
   const [liquidando, setLiquidando] = useState(false);
   const [validacao, setValidacao] = useState<PjeValidationResult | null>(null);
   const [operando, setOperando] = useState(false);
