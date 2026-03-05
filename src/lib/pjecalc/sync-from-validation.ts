@@ -232,25 +232,3 @@ async function autoConfigureModules(caseId: string, params: any, factMap: Record
     multa_523_percentual: 0,
     data_liquidacao: new Date().toISOString().slice(0, 10),
     ...(dataCitacao ? { data_citacao: dataCitacao } : {}),
-  }, errors, "Correção Config");
-}
-
-    // Honorários: percentual, sobre
-    upsertConfig("pjecalc_honorarios", caseId, {
-      percentual: 15,
-      sobre: "condenacao",
-    }, errors, "Honorários"),
-
-    // Custas: percentual, limite
-    upsertConfig("pjecalc_custas_config", caseId, {
-      percentual: 2,
-      limite: 10.64,
-    }, errors, "Custas"),
-
-    // Multas CLT: multa_477, multa_467
-    upsertConfig("pjecalc_multas_config", caseId, {
-      multa_477: true,
-      multa_467: false,
-    }, errors, "Multas CLT"),
-  ]);
-}
