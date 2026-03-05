@@ -1,6 +1,9 @@
 /**
  * Seed completo do caso Maria Madalena a partir do Golden Snapshot.
  * Popula TODOS os módulos PJe-Calc com os dados corretos do PDF.
+ * 
+ * IMPORTANTE: Este seed usa as VIEWS do pjecalc (pjecalc_faltas, pjecalc_ferias, etc.)
+ * que possuem triggers INSTEAD OF INSERT para redirecionar para as tabelas base.
  */
 import { supabase } from "@/integrations/supabase/client";
 import { MARIA_MADALENA_SNAPSHOT } from "@/lib/golden/maria-madalena-snapshot";
@@ -9,195 +12,197 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
   const errors: string[] = [];
   const snap = MARIA_MADALENA_SNAPSHOT;
 
-  // ── 0. Limpar dados existentes do caso (ordem reversa de FK) ──
-  const tablesToClear = [
-    'pjecalc_liquidacao_resultado',
-    'pjecalc_ocorrencia_calculo',
+  // ── 0. NUKE: Apagar TUDO do caso (tabelas base, ordem reversa de FK) ──
+  const baseTablesToNuke = [
+    'pjecalc_audit_log',
     'pjecalc_resultado',
-    'pjecalc_historico_ocorrencias',
+    'pjecalc_ocorrencia_calculo',
+    'pjecalc_reflexo',
+    'pjecalc_reflexo_base_verba',
+    'pjecalc_verba_base',
+    'pjecalc_hist_salarial_mes',
+    'pjecalc_hist_salarial',
+    'pjecalc_evento_intervalo',
+    'pjecalc_apuracao_diaria',
+    'pjecalc_atualizacao_config',
+  ];
+
+  // Get calculo_id first
+  const { data: calcData } = await supabase
+    .from('pjecalc_calculos' as any)
+    .select('id')
+    .eq('case_id', caseId);
+
+  const calculoIds = (calcData || []).map((c: any) => c.id);
+
+  // Delete from base tables using calculo_id
+  for (const table of baseTablesToNuke) {
+    if (calculoIds.length > 0) {
+      for (const cid of calculoIds) {
+        await supabase.from(table as any).delete().eq('calculo_id', cid);
+      }
+    }
+    // Also try case_id for tables that have it
+    await supabase.from(table as any).delete().eq('case_id', caseId);
+  }
+
+  // Delete the calculo itself and recreate
+  if (calculoIds.length > 0) {
+    await supabase.from('pjecalc_calculos' as any).delete().eq('case_id', caseId);
+  }
+
+  // Also clear views that might have orphan data
+  const viewsToClear = [
+    'pjecalc_liquidacao_resultado',
+    'pjecalc_ocorrencias',
     'pjecalc_verbas',
+    'pjecalc_historico_ocorrencias',
     'pjecalc_historico_salarial',
     'pjecalc_faltas',
     'pjecalc_ferias',
     'pjecalc_cartao_ponto',
-    'pjecalc_ponto_diario',
+    'pjecalc_correcao_config',
+    'pjecalc_honorarios',
+    'pjecalc_custas_config',
+    'pjecalc_cs_config',
+    'pjecalc_ir_config',
+    'pjecalc_fgts_config',
+    'pjecalc_dados_processo',
+    'pjecalc_parametros',
   ];
-  for (const table of tablesToClear) {
-    await supabase.from(table as any).delete().eq('case_id', caseId);
+  for (const v of viewsToClear) {
+    await supabase.from(v as any).delete().eq('case_id', caseId);
   }
 
-  // ── 1. Parâmetros ──
-  const paramPayload: any = {
-    case_id: caseId,
-    data_admissao: snap.meta.admissao,
-    data_demissao: snap.meta.demissao,
-    data_ajuizamento: snap.meta.data_ajuizamento,
-    data_inicial: snap.meta.periodo_calculo_inicio,
-    data_final: snap.meta.periodo_calculo_fim,
-    estado: snap.meta.estado,
-    municipio: snap.meta.municipio,
-    carga_horaria_padrao: snap.meta.carga_horaria,
-    regime_trabalho: 'tempo_integral',
-    sabado_dia_util: snap.meta.sabado_dia_util,
-    considerar_feriado_estadual: snap.meta.considerar_feriados_estaduais,
-    considerar_feriado_municipal: false,
-    prescricao_quinquenal: snap.meta.prescricao_quinquenal,
-    prescricao_fgts: false,
-    limitar_avos_periodo: snap.meta.limitar_avos_periodo,
-    projetar_aviso_indenizado: snap.meta.projetar_aviso_previo,
-    zerar_valor_negativo: snap.meta.zerar_valor_negativo,
-    prazo_aviso_previo: 'calculado',
-  };
-
-  const { data: existingParams } = await supabase.from('pjecalc_parametros' as any).select('id').eq('case_id', caseId).maybeSingle();
-  if (existingParams) {
-    const { error } = await supabase.from('pjecalc_parametros' as any).update(paramPayload).eq('case_id', caseId);
+  // ── 1. Parâmetros (view: pjecalc_parametros) ──
+  // Columns: id, case_id, data_admissao, data_demissao, data_ajuizamento, data_inicial, data_final,
+  //   estado, municipio, prescricao_quinquenal, prescricao_fgts, regime_trabalho, carga_horaria_padrao,
+  //   maior_remuneracao, ultima_remuneracao, prazo_aviso_previo, prazo_aviso_dias,
+  //   projetar_aviso_indenizado, limitar_avos_periodo, zerar_valor_negativo, sabado_dia_util,
+  //   considerar_feriado_estadual, considerar_feriado_municipal, comentarios
+  {
+    const { error } = await supabase.from('pjecalc_parametros' as any).insert({
+      case_id: caseId,
+      data_admissao: snap.meta.admissao,
+      data_demissao: snap.meta.demissao,
+      data_ajuizamento: snap.meta.data_ajuizamento,
+      data_inicial: snap.meta.periodo_calculo_inicio,
+      data_final: snap.meta.periodo_calculo_fim,
+      estado: snap.meta.estado,
+      municipio: snap.meta.municipio,
+      carga_horaria_padrao: snap.meta.carga_horaria,
+      regime_trabalho: 'tempo_integral',
+      sabado_dia_util: snap.meta.sabado_dia_util,
+      considerar_feriado_estadual: snap.meta.considerar_feriados_estaduais,
+      considerar_feriado_municipal: false,
+      prescricao_quinquenal: snap.meta.prescricao_quinquenal,
+      prescricao_fgts: false,
+      limitar_avos_periodo: snap.meta.limitar_avos_periodo,
+      projetar_aviso_indenizado: snap.meta.projetar_aviso_previo,
+      zerar_valor_negativo: snap.meta.zerar_valor_negativo,
+      prazo_aviso_previo: 'calculado',
+    });
     if (error) errors.push(`Parâmetros: ${error.message}`);
-  } else {
-    const { error } = await supabase.from('pjecalc_parametros' as any).insert(paramPayload);
-    if (error) errors.push(`Parâmetros: ${error.message}`);
   }
 
-  // ── 2. Dados do Processo ──
-  const dpPayload: any = {
-    case_id: caseId,
-    numero_processo: snap.meta.processo,
-    reclamante_nome: snap.meta.reclamante,
-    reclamada_nome: snap.meta.reclamado,
-  };
-  const { data: existDP } = await supabase.from('pjecalc_dados_processo' as any).select('id').eq('case_id', caseId).maybeSingle();
-  if (existDP) {
-    await supabase.from('pjecalc_dados_processo' as any).update(dpPayload).eq('case_id', caseId);
-  } else {
-    await supabase.from('pjecalc_dados_processo' as any).insert(dpPayload);
+  // ── 2. Dados do Processo (view: pjecalc_dados_processo) ──
+  // Columns: id, case_id, numero_processo, reclamante_nome, reclamante_cpf, reclamada_nome, reclamada_cnpj, vara, comarca, objeto
+  {
+    const { error } = await supabase.from('pjecalc_dados_processo' as any).insert({
+      case_id: caseId,
+      numero_processo: snap.meta.processo,
+      reclamante_nome: snap.meta.reclamante,
+      reclamada_nome: snap.meta.reclamado,
+    });
+    if (error) errors.push(`Dados Processo: ${error.message}`);
   }
 
-  // ── 3. Histórico Salarial ──
-  // O relatório mostra que a reclamante era comissionista com componentes variáveis.
-  // Valores extraídos do histórico salarial original do caso:
+  // ── 3. Histórico Salarial (view: pjecalc_historico_salarial) ──
+  // Columns: id, case_id, calculo_id, nome, tipo_valor, valor_informado, periodo_inicio, periodo_fim, incidencia_fgts, incidencia_cs, observacoes
   const historicoItems = [
-    { nome: 'COMISSÕES PAGAS', valor: 1800, tipo: 'VARIAVEL', fgts: true, cs: true },
-    { nome: 'COMISSÕES ESTORNADAS', valor: 150, tipo: 'VARIAVEL', fgts: true, cs: true },
-    { nome: 'DSR S/ COMISSÃO', valor: 360, tipo: 'VARIAVEL', fgts: true, cs: true },
-    { nome: 'MÍNIMO GARANTIDO', valor: 1200, tipo: 'VARIAVEL', fgts: true, cs: true },
-    { nome: 'PRÊMIOS PAGOS', valor: 280, tipo: 'VARIAVEL', fgts: true, cs: true },
-    { nome: 'VENDAS VF', valor: 450, tipo: 'VARIAVEL', fgts: true, cs: true },
+    { nome: 'COMISSÕES PAGAS', valor: 1800, tipo: 'VARIAVEL' },
+    { nome: 'COMISSÕES ESTORNADAS', valor: 150, tipo: 'VARIAVEL' },
+    { nome: 'DSR S/ COMISSÃO', valor: 360, tipo: 'VARIAVEL' },
+    { nome: 'MÍNIMO GARANTIDO', valor: 1200, tipo: 'VARIAVEL' },
+    { nome: 'PRÊMIOS PAGOS', valor: 280, tipo: 'VARIAVEL' },
+    { nome: 'VENDAS VF', valor: 450, tipo: 'VARIAVEL' },
   ];
 
-  const insertedHistIds: Record<string, string> = {};
   for (const h of historicoItems) {
-    const { data, error } = await supabase.from('pjecalc_historico_salarial' as any).insert({
+    const { error } = await supabase.from('pjecalc_historico_salarial' as any).insert({
       case_id: caseId,
       nome: h.nome,
       periodo_inicio: snap.meta.periodo_calculo_inicio,
       periodo_fim: snap.meta.periodo_calculo_fim,
       tipo_valor: h.tipo,
       valor_informado: h.valor,
-      incidencia_fgts: h.fgts,
-      incidencia_cs: h.cs,
-    }).select('id').single();
+      incidencia_fgts: true,
+      incidencia_cs: true,
+    });
     if (error) errors.push(`Hist ${h.nome}: ${error.message}`);
-    if (data) insertedHistIds[h.nome] = (data as any).id;
   }
 
-  // ── 4. Faltas ──
+  // ── 4. Faltas (view: pjecalc_faltas) ──
+  // Columns: id, case_id, calculo_id, data_inicial, data_final, tipo_falta, justificada, motivo, observacoes
   for (const falta of snap.faltas) {
     const { error } = await supabase.from('pjecalc_faltas' as any).insert({
       case_id: caseId,
       data_inicial: falta.inicio,
       data_final: falta.fim,
       justificada: falta.justificada,
-      justificativa: falta.justificativa,
+      motivo: falta.justificativa,
+      tipo_falta: 'FALTA',
     });
     if (error) errors.push(`Falta: ${error.message}`);
   }
 
-  // ── 5. Férias ──
+  // ── 5. Férias (view: pjecalc_ferias) ──
+  // Columns: id, case_id, calculo_id, periodo_aquisitivo_inicio, periodo_aquisitivo_fim,
+  //   periodo_concessivo_inicio, periodo_concessivo_fim, gozo_inicio, gozo_fim,
+  //   dias, abono, dias_abono, dobra, situacao, gozo2_inicio, gozo2_fim, gozo3_inicio, gozo3_fim, observacoes
   for (const ferias of snap.ferias) {
-    const periodos_gozo: any[] = [{ inicio: ferias.gozo1_inicio, fim: ferias.gozo1_fim, dias: 30 }];
-    if (ferias.gozo2_inicio) periodos_gozo.push({ inicio: ferias.gozo2_inicio, fim: ferias.gozo2_fim, dias: 10 });
-    if (ferias.gozo3_inicio) periodos_gozo.push({ inicio: ferias.gozo3_inicio, fim: ferias.gozo3_fim, dias: 10 });
-
     const { error } = await supabase.from('pjecalc_ferias' as any).insert({
       case_id: caseId,
-      relativas: ferias.relativa,
       periodo_aquisitivo_inicio: ferias.periodo_aquisitivo_inicio,
       periodo_aquisitivo_fim: ferias.periodo_aquisitivo_fim,
       periodo_concessivo_inicio: ferias.periodo_concessivo_inicio,
       periodo_concessivo_fim: ferias.periodo_concessivo_fim,
-      prazo_dias: ferias.prazo,
-      situacao: ferias.situacao.toLowerCase().replace(/ /g, '_'),
+      gozo_inicio: ferias.gozo1_inicio,
+      gozo_fim: ferias.gozo1_fim,
+      dias: ferias.prazo || 30,
+      abono: ferias.abono || false,
+      dias_abono: 0,
       dobra: false,
-      abono: ferias.abono,
-      periodos_gozo: periodos_gozo,
+      situacao: ferias.situacao || 'GOZADAS',
+      gozo2_inicio: ferias.gozo2_inicio || null,
+      gozo2_fim: ferias.gozo2_fim || null,
+      gozo3_inicio: ferias.gozo3_inicio || null,
+      gozo3_fim: ferias.gozo3_fim || null,
     });
     if (error) errors.push(`Férias ${ferias.relativa}: ${error.message}`);
   }
 
-  // ── 6. Verbas (estrutura hierárquica com reflexos) ──
+  // ── 6. Verbas (view: pjecalc_verbas) ──
+  // Columns: id, case_id, calculo_id, nome, codigo, caracteristica, ocorrencia_pagamento,
+  //   tipo, multiplicador, divisor_informado, periodo_inicio, periodo_fim, ordem, ativa,
+  //   incide_inss, incide_fgts, incide_ir, verba_principal_id, base_calculo, incidencias, observacoes
   const periodo = { inicio: snap.meta.periodo_calculo_inicio, fim: snap.meta.periodo_calculo_fim };
-  const allHistIds = Object.values(insertedHistIds);
-  
-  const baseCalcComHistorico = {
-    historicos: allHistIds,
-    verbas: [],
-    tabelas: [],
-    proporcionalizar: false,
-    integralizar: false,
-  };
 
   const defaultIncidencias = {
     fgts: true, irpf: true, contribuicao_social: true,
     previdencia_privada: false, pensao_alimenticia: false,
   };
 
-  // Definição das rubricas principais com seus parâmetros
   const rubricas = [
-    { nome: 'COMISSÕES ESTORNADAS', codigo: 'COMISSOES_ESTORNADAS', mult: 1, div: 1, ordem: 1, tipo_qtd: 'informada', qtd: 1, caract: 'comum', ocorrencia: 'mensal', 
-      base_hist: insertedHistIds['COMISSÕES ESTORNADAS'] ? [insertedHistIds['COMISSÕES ESTORNADAS']] : allHistIds },
-    { nome: 'VENDAS A PRAZO', codigo: 'VENDAS_A_PRAZO', mult: 1, div: 1, ordem: 2, tipo_qtd: 'informada', qtd: 1, caract: 'comum', ocorrencia: 'mensal',
-      base_hist: insertedHistIds['VENDAS VF'] ? [insertedHistIds['VENDAS VF']] : allHistIds },
-    { nome: 'PRÊMIO ESTÍMULO', codigo: 'PREMIO_ESTIMULO', mult: 1, div: 1, ordem: 3, tipo_qtd: 'informada', qtd: 1, caract: 'comum', ocorrencia: 'mensal',
-      base_hist: insertedHistIds['PRÊMIOS PAGOS'] ? [insertedHistIds['PRÊMIOS PAGOS']] : allHistIds },
-    { nome: 'ARTIGO 384 DA CLT', codigo: 'ART384', mult: 1.5, div: 220, ordem: 4, tipo_qtd: 'cartao_ponto', qtd: 0, caract: 'comum', ocorrencia: 'mensal',
-      base_hist: allHistIds, qtd_colunas: ['horas_art384'] },
-    { nome: 'DOMINGOS E FERIADOS', codigo: 'DOMINGOS_FERIADOS', mult: 1, div: 1, ordem: 5, tipo_qtd: 'informada', qtd: 1, caract: 'comum', ocorrencia: 'mensal',
-      base_hist: allHistIds },
-    { nome: 'HORAS EXTRAS', codigo: 'HORAS_EXTRAS', mult: 1.5, div: 220, ordem: 6, tipo_qtd: 'cartao_ponto', qtd: 0, caract: 'comum', ocorrencia: 'mensal',
-      base_hist: allHistIds, qtd_colunas: ['horas_extras_50'] },
-    { nome: 'INTERVALO INTERJORNADAS', codigo: 'INTERJORNADAS', mult: 1.5, div: 220, ordem: 7, tipo_qtd: 'cartao_ponto', qtd: 0, caract: 'comum', ocorrencia: 'mensal',
-      base_hist: allHistIds, qtd_colunas: ['intervalo_interjornada'] },
-    { nome: 'REPOUSO SEMANAL REMUNERADO (COMISSIONISTA)', codigo: 'RSR_COMISSIONISTA', mult: 1, div: 26, ordem: 8, tipo_qtd: 'calendario', qtd: 0, caract: 'comum', ocorrencia: 'mensal',
-      base_hist: allHistIds },
+    { nome: 'COMISSÕES ESTORNADAS', codigo: 'COMISSOES_ESTORNADAS', mult: 1, div: 1, ordem: 1, caract: 'comum', ocorrencia: 'mensal' },
+    { nome: 'VENDAS A PRAZO', codigo: 'VENDAS_A_PRAZO', mult: 1, div: 1, ordem: 2, caract: 'comum', ocorrencia: 'mensal' },
+    { nome: 'PRÊMIO ESTÍMULO', codigo: 'PREMIO_ESTIMULO', mult: 1, div: 1, ordem: 3, caract: 'comum', ocorrencia: 'mensal' },
+    { nome: 'ARTIGO 384 DA CLT', codigo: 'ART384', mult: 1.5, div: 220, ordem: 4, caract: 'comum', ocorrencia: 'mensal' },
+    { nome: 'DOMINGOS E FERIADOS', codigo: 'DOMINGOS_FERIADOS', mult: 1, div: 1, ordem: 5, caract: 'comum', ocorrencia: 'mensal' },
+    { nome: 'HORAS EXTRAS', codigo: 'HORAS_EXTRAS', mult: 1.5, div: 220, ordem: 6, caract: 'comum', ocorrencia: 'mensal' },
+    { nome: 'INTERVALO INTERJORNADAS', codigo: 'INTERJORNADAS', mult: 1.5, div: 220, ordem: 7, caract: 'comum', ocorrencia: 'mensal' },
+    { nome: 'REPOUSO SEMANAL REMUNERADO (COMISSIONISTA)', codigo: 'RSR_COMISSIONISTA', mult: 1, div: 26, ordem: 8, caract: 'comum', ocorrencia: 'mensal' },
   ];
-
-  // Reflexos padrão para cada rubrica principal
-  const reflexosDef = (principal: string, principalId: string, ordem: number, hasAP: boolean) => {
-    const refs: any[] = [
-      { nome: `13º SALÁRIO SOBRE ${principal}`, caract: '13_salario', ocorrencia: 'dezembro', mult: 1, div: 12, ordem: ordem + 0.1,
-        comportamento: 'media_pela_quantidade', periodo_media: 'ano_civil' },
-      { nome: `FÉRIAS + 1/3 SOBRE ${principal}`, caract: 'ferias', ocorrencia: 'periodo_aquisitivo', mult: 1.3333, div: 12, ordem: ordem + 0.3,
-        comportamento: 'media_pela_quantidade', periodo_media: 'periodo_aquisitivo' },
-    ];
-    if (hasAP) {
-      refs.push({
-        nome: `AVISO PRÉVIO SOBRE ${principal}`, caract: 'aviso_previo', ocorrencia: 'desligamento', mult: 1, div: 30, ordem: ordem + 0.2,
-        comportamento: 'media_pela_quantidade', periodo_media: 'global',
-      });
-    }
-    // RSR only for certain rubricas (not RSR_COMISSIONISTA itself)
-    if (!['RSR_COMISSIONISTA', 'DOMINGOS_FERIADOS'].includes(principal.replace(/\s/g, '_').toUpperCase())) {
-      const hasRSR = snap.rubricas.some(r => r.codigo.startsWith('RSR_') && r.rubrica_principal === principal.replace(/\s/g, '_').toUpperCase());
-      if (hasRSR || ['COMISSOES_ESTORNADAS', 'VENDAS_A_PRAZO', 'PREMIO_ESTIMULO', 'ART384', 'HORAS_EXTRAS', 'INTERJORNADAS'].includes(
-        principal.replace(/\s/g, '_').toUpperCase())) {
-        refs.push({
-          nome: `RSR E FERIADO SOBRE ${principal}`, caract: 'comum', ocorrencia: 'mensal', mult: 1, div: 26, ordem: ordem + 0.4,
-          comportamento: 'valor_mensal', periodo_media: 'global',
-        });
-      }
-    }
-    return refs;
-  };
 
   // Determinar quais rubricas têm aviso prévio no snapshot
   const hasAPMap: Record<string, boolean> = {};
@@ -208,15 +213,8 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
   }
 
   for (const rub of rubricas) {
-    const baseCalc = {
-      historicos: rub.base_hist,
-      verbas: [],
-      tabelas: [],
-      proporcionalizar: false,
-      integralizar: false,
-    };
-
-    const verbaPrincipal: any = {
+    // Insert principal
+    const { data: vData, error: vError } = await supabase.from('pjecalc_verbas' as any).insert({
       case_id: caseId,
       nome: rub.nome,
       codigo: rub.codigo,
@@ -228,17 +226,26 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
       periodo_inicio: periodo.inicio,
       periodo_fim: periodo.fim,
       ordem: rub.ordem,
-      base_calculo: baseCalc,
+      ativa: true,
       incidencias: defaultIncidencias,
-    };
+    }).select('id').single();
 
-    const { data: vData, error: vError } = await supabase.from('pjecalc_verbas' as any).insert(verbaPrincipal).select('id').single();
     if (vError) { errors.push(`Verba ${rub.nome}: ${vError.message}`); continue; }
     const principalId = (vData as any).id;
 
-    // Criar reflexos
-    const hasAP = hasAPMap[rub.codigo] || false;
-    const reflexos = reflexosDef(rub.nome, principalId, rub.ordem * 10, hasAP);
+    // Reflexos
+    const reflexos: any[] = [
+      { nome: `13º SALÁRIO SOBRE ${rub.nome}`, caract: '13_salario', ocorrencia: 'dezembro', mult: 1, div: 12, ordemDelta: 0.1 },
+      { nome: `FÉRIAS + 1/3 SOBRE ${rub.nome}`, caract: 'ferias', ocorrencia: 'periodo_aquisitivo', mult: 1.3333, div: 12, ordemDelta: 0.3 },
+    ];
+    if (hasAPMap[rub.codigo]) {
+      reflexos.push({ nome: `AVISO PRÉVIO SOBRE ${rub.nome}`, caract: 'aviso_previo', ocorrencia: 'desligamento', mult: 1, div: 30, ordemDelta: 0.2 });
+    }
+    // RSR reflexo for applicable rubricas
+    if (!['RSR_COMISSIONISTA', 'DOMINGOS_FERIADOS'].includes(rub.codigo)) {
+      reflexos.push({ nome: `RSR E FERIADO SOBRE ${rub.nome}`, caract: 'comum', ocorrencia: 'mensal', mult: 1, div: 26, ordemDelta: 0.4 });
+    }
+
     for (const ref of reflexos) {
       const { error } = await supabase.from('pjecalc_verbas' as any).insert({
         case_id: caseId,
@@ -250,137 +257,93 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
         divisor_informado: ref.div,
         periodo_inicio: periodo.inicio,
         periodo_fim: periodo.fim,
-        ordem: ref.ordem,
+        ordem: rub.ordem * 10 + ref.ordemDelta,
+        ativa: true,
         verba_principal_id: principalId,
-        base_calculo: { historicos: [], verbas: [principalId], tabelas: [], proporcionalizar: false, integralizar: false },
         incidencias: defaultIncidencias,
       });
       if (error) errors.push(`Reflexo ${ref.nome}: ${error.message}`);
     }
   }
 
-  // ── 7. FGTS como verba principal ──
-  // FGTS 8% e Multa 40% são calculados automaticamente pelo engine via config
-
-  // ── 8. Correção monetária — configurar no pjecalc_correcao_config ──
-  const correcaoPayload: any = {
-    case_id: caseId,
-    indice: 'IPCA-E',
-    epoca: 'mensal',
-    juros_tipo: 'simples_mensal',
-    juros_percentual: 1,
-    juros_inicio: 'vencimento',
-    multa_523: false,
-    multa_523_percentual: 10,
-    data_liquidacao: snap.meta.data_liquidacao,
-  };
-
-  const { data: existCorrecao } = await supabase.from('pjecalc_correcao_config' as any).select('id').eq('case_id', caseId).maybeSingle();
-  if (existCorrecao) {
-    await supabase.from('pjecalc_correcao_config' as any).update(correcaoPayload).eq('case_id', caseId);
-  } else {
-    await supabase.from('pjecalc_correcao_config' as any).insert(correcaoPayload);
+  // ── 7. Correção monetária (view: pjecalc_correcao_config) ──
+  // Columns: id, case_id, indice, combinacoes_indice, combinacoes_juros, juros_tipo,
+  //   transicao_adc58, data_citacao, epoca, data_fixa, juros_percentual, juros_inicio,
+  //   juros_pro_rata, indice_pos_citacao, multa_523, multa_523_percentual, multa_467,
+  //   multa_467_percentual, data_liquidacao
+  {
+    const { error } = await supabase.from('pjecalc_correcao_config' as any).insert({
+      case_id: caseId,
+      indice: 'IPCA-E',
+      epoca: 'mensal',
+      juros_tipo: 'simples_mensal',
+      juros_percentual: 1,
+      juros_inicio: 'vencimento',
+      multa_523: false,
+      multa_523_percentual: 10,
+      data_liquidacao: snap.meta.data_liquidacao,
+    });
+    if (error) errors.push(`Correção: ${error.message}`);
   }
 
-  // ── 9. Honorários (10% conforme PDF) ──
-  const honPayload: any = {
-    case_id: caseId,
-    apurar_sucumbenciais: true,
-    percentual_sucumbenciais: 10,
-    base_sucumbenciais: 'condenacao',
-    apurar_contratuais: false,
-    percentual_contratuais: 0,
-  };
-  const { data: existHon } = await supabase.from('pjecalc_honorarios' as any).select('id').eq('case_id', caseId).maybeSingle();
-  if (existHon) {
-    await supabase.from('pjecalc_honorarios' as any).update(honPayload).eq('case_id', caseId);
-  } else {
-    await supabase.from('pjecalc_honorarios' as any).insert(honPayload);
+  // ── 8. Honorários (view: pjecalc_honorarios) ──
+  // Columns: id, case_id, percentual, sobre
+  {
+    const { error } = await supabase.from('pjecalc_honorarios' as any).insert({
+      case_id: caseId,
+      percentual: 10,
+      sobre: 'condenacao',
+    });
+    if (error) errors.push(`Honorários: ${error.message}`);
   }
 
-  // ── 10. Custas (isento conforme relatório — custas não aparecem no resumo) ──
-  const custasPayload: any = {
-    case_id: caseId,
-    apurar: false,
-    percentual: 2,
-    valor_minimo: 10.64,
-    isento: true,
-    assistencia_judiciaria: true,
-    itens: [],
-  };
-  const { data: existCustas } = await supabase.from('pjecalc_custas_config' as any).select('id').eq('case_id', caseId).maybeSingle();
-  if (existCustas) {
-    await supabase.from('pjecalc_custas_config' as any).update(custasPayload).eq('case_id', caseId);
-  } else {
-    await supabase.from('pjecalc_custas_config' as any).insert(custasPayload);
+  // ── 9. Custas (view: pjecalc_custas_config) ──
+  // Columns: id, case_id, percentual, limite
+  {
+    const { error } = await supabase.from('pjecalc_custas_config' as any).insert({
+      case_id: caseId,
+      percentual: 2,
+      limite: 0,
+    });
+    if (error) errors.push(`Custas: ${error.message}`);
   }
 
-  // ── 11. CS Config ──
-  const csPayload: any = {
-    case_id: caseId,
-    apurar_segurado: true,
-    cobrar_reclamante: true,
-    cs_sobre_salarios_pagos: false,
-    aliquota_segurado_tipo: 'empregado',
-    limitar_teto: true,
-    apurar_empresa: true,
-    aliquota_empresa_fixa: 20,
-    apurar_sat: false,
-    apurar_terceiros: false,
-    periodos_simples: [],
-  };
-  const { data: existCS } = await supabase.from('pjecalc_cs_config' as any).select('id').eq('case_id', caseId).maybeSingle();
-  if (existCS) {
-    await supabase.from('pjecalc_cs_config' as any).update(csPayload).eq('case_id', caseId);
-  } else {
-    await supabase.from('pjecalc_cs_config' as any).insert(csPayload);
+  // ── 10. CS Config (view: pjecalc_cs_config) ──
+  // Columns: id, case_id, habilitado, regime
+  {
+    const { error } = await supabase.from('pjecalc_cs_config' as any).insert({
+      case_id: caseId,
+      habilitado: true,
+      regime: 'empregado',
+    });
+    if (error) errors.push(`CS: ${error.message}`);
   }
 
-  // ── 12. IR Config (apurar mas resultado será 0 conforme relatório) ──
-  const irPayload: any = {
-    case_id: caseId,
-    apurar: true,
-    incidir_sobre_juros: false,
-    cobrar_reclamado: false,
-    tributacao_exclusiva_13: true,
-    tributacao_separada_ferias: false,
-    deduzir_cs: true,
-    deduzir_prev_privada: false,
-    deduzir_pensao: false,
-    deduzir_honorarios: false,
-    aposentado_65: false,
-    dependentes: 0,
-  };
-  const { data: existIR } = await supabase.from('pjecalc_ir_config' as any).select('id').eq('case_id', caseId).maybeSingle();
-  if (existIR) {
-    await supabase.from('pjecalc_ir_config' as any).update(irPayload).eq('case_id', caseId);
-  } else {
-    await supabase.from('pjecalc_ir_config' as any).insert(irPayload);
+  // ── 11. IR Config (view: pjecalc_ir_config) ──
+  // Columns: id, case_id, habilitado, metodo, dependentes
+  {
+    const { error } = await supabase.from('pjecalc_ir_config' as any).insert({
+      case_id: caseId,
+      habilitado: true,
+      metodo: 'progressivo_acumulado',
+      dependentes: 0,
+    });
+    if (error) errors.push(`IR: ${error.message}`);
   }
 
-  // ── 13. FGTS Config ──
-  const fgtsPayload: any = {
-    case_id: caseId,
-    apurar: true,
-    destino: 'pagar_reclamante',
-    compor_principal: true,
-    multa_apurar: true,
-    multa_tipo: 'calculada',
-    multa_percentual: 40,
-    multa_base: 'devido',
-    saldos_saques: [],
-    deduzir_saldo: false,
-    lc110_10: false,
-    lc110_05: false,
-  };
-  const { data: existFGTS } = await supabase.from('pjecalc_fgts_config' as any).select('id').eq('case_id', caseId).maybeSingle();
-  if (existFGTS) {
-    await supabase.from('pjecalc_fgts_config' as any).update(fgtsPayload).eq('case_id', caseId);
-  } else {
-    await supabase.from('pjecalc_fgts_config' as any).insert(fgtsPayload);
+  // ── 12. FGTS Config (view: pjecalc_fgts_config) ──
+  // Columns: id, case_id, habilitado, percentual_deposito, percentual_multa
+  {
+    const { error } = await supabase.from('pjecalc_fgts_config' as any).insert({
+      case_id: caseId,
+      habilitado: true,
+      percentual_deposito: 8,
+      percentual_multa: 40,
+    });
+    if (error) errors.push(`FGTS: ${error.message}`);
   }
 
-  // ── 14. Update case table ──
+  // ── 13. Update case table ──
   await supabase.from('cases').update({
     cliente: snap.meta.reclamante,
     numero_processo: snap.meta.processo,
