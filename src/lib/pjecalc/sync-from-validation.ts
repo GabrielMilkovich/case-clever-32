@@ -256,17 +256,19 @@ async function autoConfigureModules(caseId: string, params: Record<string, unkno
     }
 
     // Upsert juros config
-    const { data: existJuros } = await supabase
+    const existJurosRes = await supabase
       .from("pjecalc_atualizacao_config" as any)
       .select("id")
       .eq("calculo_id", calcId)
       .eq("tipo", "juros")
       .maybeSingle();
 
+    const existJuros = existJurosRes.data as unknown as { id: string } | null;
+
     if (existJuros) {
       await supabase.from("pjecalc_atualizacao_config" as any).update({
         regime_padrao: "simples_mensal",
-      }).eq("id", (existJuros as Record<string, unknown>).id);
+      }).eq("id", existJuros.id);
     } else {
       const { error } = await supabase.from("pjecalc_atualizacao_config" as any).insert({
         calculo_id: calcId,
