@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
+import * as svc from "@/lib/pjecalc/service";
 import { toast } from "sonner";
 import { Loader2, Wand2, Trash2, RefreshCw } from "lucide-react";
 import {
@@ -32,20 +32,13 @@ export function GeradorReflexos({ caseId }: Props) {
 
   const { data: verbas = [], isLoading } = useQuery({
     queryKey: ["pjecalc_verbas", caseId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("pjecalc_verbas" as any)
-        .select("*")
-        .eq("case_id", caseId)
-        .order("ordem");
-      return (data || []) as any[];
-    },
+    queryFn: () => svc.getVerbas(caseId),
   });
 
   const verbasPrincipais = verbas.filter(
-    (v: any) => !v.verba_principal_id && v.ativa !== false
+    (v) => !v.verba_principal_id && v.ativa !== false
   );
-  const verbasReflexas = verbas.filter((v: any) => v.verba_principal_id);
+  const verbasReflexas = verbas.filter((v) => v.verba_principal_id);
 
   const templates = listarTemplatesReflexo();
 
@@ -59,14 +52,14 @@ export function GeradorReflexos({ caseId }: Props) {
   };
 
   const handlePreview = () => {
-    const bases: VerbaBase[] = verbasPrincipais.map((v: any) => ({
+    const bases: VerbaBase[] = verbasPrincipais.map((v) => ({
       id: v.id,
       nome: v.nome,
-      ordem: v.ordem || 0,
+      ordem: (v as any).ordem || 0,
       incidencias: {
-        fgts: v.incidencia_fgts !== false,
-        irpf: v.incidencia_irpf !== false,
-        cs: v.incidencia_cs !== false,
+        fgts: (v as any).incidencia_fgts !== false,
+        irpf: (v as any).incidencia_irpf !== false,
+        cs: (v as any).incidencia_cs !== false,
       },
     }));
     const excludes = templates
@@ -82,12 +75,12 @@ export function GeradorReflexos({ caseId }: Props) {
     try {
       // Delete existing reflexos
       for (const vr of verbasReflexas) {
-        await supabase.from("pjecalc_verbas" as any).delete().eq("id", vr.id);
+        await svc.deleteVerba(vr.id);
       }
 
       // Insert new reflexos
       for (const r of preview) {
-        await supabase.from("pjecalc_verbas" as any).insert({
+        await svc.insertVerba({
           case_id: caseId,
           nome: r.nome,
           tipo: 'reflexa',
@@ -123,7 +116,7 @@ export function GeradorReflexos({ caseId }: Props) {
     if (verbasReflexas.length === 0) return;
     try {
       for (const vr of verbasReflexas) {
-        await supabase.from("pjecalc_verbas" as any).delete().eq("id", vr.id);
+        await svc.deleteVerba(vr.id);
       }
       qc.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] });
       toast.success("Reflexos removidos");

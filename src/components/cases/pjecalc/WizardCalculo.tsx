@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { supabase } from "@/integrations/supabase/client";
+import * as svc from "@/lib/pjecalc/service";
 import { toast } from "sonner";
 import {
   ChevronRight, ChevronLeft, Check, AlertTriangle,
@@ -77,50 +77,32 @@ export function WizardCalculo({ caseId, onComplete, onExit }: WizardProps) {
   // Load data for completude check
   const { data: params } = useQuery({
     queryKey: ["pjecalc_parametros", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_parametros" as any).select("*").eq("case_id", caseId).maybeSingle();
-      return data as any;
-    },
+    queryFn: () => svc.getParametros(caseId),
   });
 
   const { data: faltas = [] } = useQuery({
     queryKey: ["pjecalc_faltas", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_faltas" as any).select("*").eq("case_id", caseId);
-      return (data || []) as any[];
-    },
+    queryFn: () => svc.getFaltas(caseId),
   });
 
   const { data: ferias = [] } = useQuery({
     queryKey: ["pjecalc_ferias", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_ferias" as any).select("*").eq("case_id", caseId);
-      return (data || []) as any[];
-    },
+    queryFn: () => svc.getFerias(caseId),
   });
 
   const { data: historicos = [] } = useQuery({
     queryKey: ["pjecalc_historico", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_historico_salarial" as any).select("*").eq("case_id", caseId);
-      return (data || []) as any[];
-    },
+    queryFn: () => svc.getHistoricoSalarial(caseId),
   });
 
   const { data: verbas = [] } = useQuery({
     queryKey: ["pjecalc_verbas", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_verbas" as any).select("*").eq("case_id", caseId);
-      return (data || []) as any[];
-    },
+    queryFn: () => svc.getVerbas(caseId),
   });
 
   const { data: resultado } = useQuery({
     queryKey: ["pjecalc_liquidacao", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_liquidacao_resultado" as any).select("*").eq("case_id", caseId).order("created_at", { ascending: false }).limit(1).maybeSingle();
-      return data as any;
-    },
+    queryFn: () => svc.getResultado(caseId),
   });
 
   // Calculate step status
