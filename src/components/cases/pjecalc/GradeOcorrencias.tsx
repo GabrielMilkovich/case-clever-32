@@ -134,16 +134,16 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
   const executeBatchEdit = async () => {
     setBatchLoading(true);
     try {
-      const filtro: Record<string, unknown> = { verba_ids: [verbaId] };
-      if (batchCompInicio) filtro.competencia_inicio = batchCompInicio;
-      if (batchCompFim) filtro.competencia_fim = batchCompFim;
+      const filtro = { verba_ids: [verbaId] } as Record<string, unknown>;
+      if (batchCompInicio) (filtro as Record<string, unknown>).competencia_inicio = batchCompInicio;
+      if (batchCompFim) (filtro as Record<string, unknown>).competencia_fim = batchCompFim;
       const changes: Record<string, unknown> = {};
       changes[batchField] = parseFloat(batchValue) || 0;
 
       const { data, error } = await supabase.rpc('pjecalc_batch_update_ocorrencias', {
         p_calculo_id: caseId,
-        p_filtro: filtro,
-        p_changes: changes,
+        p_filtro: filtro as unknown as import("@/integrations/supabase/types").Json,
+        p_changes: changes as unknown as import("@/integrations/supabase/types").Json,
       });
       if (error) throw error;
       qc.invalidateQueries({ queryKey });

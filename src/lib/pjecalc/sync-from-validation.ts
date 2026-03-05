@@ -22,7 +22,7 @@ export async function syncFromValidation(caseId: string): Promise<SyncResult> {
     svc.getDadosProcesso(caseId),
     svc.getHistoricoSalarial(caseId),
     svc.getVerbas(caseId),
-    supabase.from("extracao_item").select("*").eq("case_id", caseId).in("status", ["AUTO", "APROVADO"]),
+    supabase.from("extracao_item").select("*").eq("case_id", caseId).in("status", ["AUTO", "APROVADO"] as any),
     supabase.from("extractions").select("*").eq("case_id", caseId).in("status", ["validado", "pendente"]),
   ]);
 
@@ -233,17 +233,19 @@ async function autoConfigureModules(caseId: string, params: Record<string, unkno
     }).eq("id", calcId);
 
     // Upsert correcao config via fromView helper in service
-    const { data: existCorrecao } = await supabase
+    const existCorrecaoRes = await supabase
       .from("pjecalc_atualizacao_config" as any)
       .select("id")
       .eq("calculo_id", calcId)
       .eq("tipo", "correcao")
       .maybeSingle();
 
+    const existCorrecao = existCorrecaoRes.data as unknown as { id: string } | null;
+
     if (existCorrecao) {
       await supabase.from("pjecalc_atualizacao_config" as any).update({
         regime_padrao: "IPCA-E",
-      }).eq("id", (existCorrecao as Record<string, unknown>).id);
+      }).eq("id", existCorrecao.id);
     } else {
       const { error } = await supabase.from("pjecalc_atualizacao_config" as any).insert({
         calculo_id: calcId,

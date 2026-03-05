@@ -122,7 +122,7 @@ export function ModuloCartaoPonto({ caseId, dataAdmissao, dataDemissao }: Props)
                   <td className="p-2 font-mono font-medium">{r.competencia}</td>
                   {(["dias_uteis","dias_trabalhados","horas_extras_50","horas_extras_100","horas_noturnas","intervalo_suprimido","dsr_horas"] as const).map(field => (
                     <td key={field} className="p-1 text-center">
-                      <Input type="number" step="0.01" defaultValue={(r as Record<string, unknown>)[field] as number || 0} className="h-7 text-xs w-16 text-center mx-auto" onBlur={e => updateField(r.id, field, parseFloat(e.target.value) || 0)} />
+                      <Input type="number" step="0.01" defaultValue={r[field] || 0} className="h-7 text-xs w-16 text-center mx-auto" onBlur={e => updateField(r.id, field, parseFloat(e.target.value) || 0)} />
                     </td>
                   ))}
                   <td className="p-1">
