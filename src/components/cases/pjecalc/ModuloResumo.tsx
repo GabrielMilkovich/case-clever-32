@@ -296,13 +296,14 @@ export function ModuloResumo({ caseId }: Props) {
       }));
 
       // Execute engine com TODOS os dados
+      const verbasCast = verbas.map(v => ({ ...v, valor: v.valor as "calculado" | "informado" }));
       const engine = new PjeCalcEngine(
-        params, historicos, faltas, ferias, verbas, cartaoPonto,
+        params, historicos, faltas, ferias, verbasCast, cartaoPonto,
         fgtsConfig, csConfig, irConfig, correcaoConfigLocal,
         honorariosConfig, custasConfigLocal, seguroConfig,
         indicesDB, faixasINSSDB, faixasIRDB,
         [], // excecoesCargas (TODO: load if table exists)
-        feriadosDB,
+        feriadosDB.map(f => ({ ...f, tipo: f.tipo as "estadual" | "facultativo" | "municipal" | "nacional" })),
         prevPrivadaConfig,
         pensaoConfig,
         salarioFamiliaConfig,
