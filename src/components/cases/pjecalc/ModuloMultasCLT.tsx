@@ -40,7 +40,7 @@ export function ModuloMultasCLT({ caseId }: Props) {
 
   useEffect(() => {
     if (data) {
-      const d = data as Record<string, unknown>;
+      const d = data as unknown as Record<string, unknown>;
       if (d.multas_indenizacoes && Array.isArray(d.multas_indenizacoes)) setMultas(d.multas_indenizacoes as MultaIndenizacao[]);
     }
   }, [data]);

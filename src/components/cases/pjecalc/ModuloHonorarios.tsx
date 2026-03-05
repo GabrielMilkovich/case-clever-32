@@ -39,7 +39,7 @@ export function ModuloHonorarios({ caseId }: Props) {
 
   useEffect(() => {
     if (data) {
-      const d = data as Record<string, unknown>;
+      const d = data as unknown as Record<string, unknown>;
       if (d.items && Array.isArray(d.items)) {
         setItems(d.items as HonorarioItem[]);
       } else if (d.apurar_sucumbenciais) {
