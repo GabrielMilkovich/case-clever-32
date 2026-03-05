@@ -1512,10 +1512,10 @@ export class PjeCalcEngine {
         breakpoints.add(compDateCorrecao);
         breakpoints.add(dataLiq);
         for (const ci of combinacoes_indice) {
-          if (ci.de && ci.de > compDate && ci.de <= dataLiq) breakpoints.add(ci.de);
+          if (ci.de && ci.de > compDateCorrecao && ci.de <= dataLiq) breakpoints.add(ci.de);
         }
         for (const cj of combinacoes_juros) {
-          if (cj.de && cj.de > compDate && cj.de <= dataLiq) breakpoints.add(cj.de);
+          if (cj.de && cj.de > compDateCorrecao && cj.de <= dataLiq) breakpoints.add(cj.de);
         }
         const datas = Array.from(breakpoints).sort();
 
