@@ -730,3 +730,146 @@ export function toCompletionInput(data: PjecalcCaseData): CompletionInput {
     correcaoConfig: data.correcaoConfig,
   };
 }
+
+// =====================================================
+// OBSERVAÇÕES TÉCNICAS
+// =====================================================
+
+export interface PjecalcObservacaoRow {
+  id: string;
+  case_id: string;
+  modulo: string;
+  tipo: string;
+  texto: string;
+  created_by: string | null;
+  created_at: string;
+}
+
+export async function getObservacoes(caseId: string, modulo: string): Promise<PjecalcObservacaoRow[]> {
+  const { data, error } = await fromView('pjecalc_observacoes')
+    .select('*')
+    .eq('case_id', caseId)
+    .eq('modulo', modulo)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as PjecalcObservacaoRow[];
+}
+
+export async function insertObservacao(payload: { case_id: string; modulo: string; tipo: string; texto: string; created_by?: string }): Promise<void> {
+  const { error } = await fromView('pjecalc_observacoes').insert(payload);
+  if (error) throw error;
+}
+
+export async function deleteObservacao(id: string): Promise<void> {
+  const { error } = await fromView('pjecalc_observacoes').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// =====================================================
+// TABELAS DE REFERÊNCIA (reference_table_registry, etc.)
+// =====================================================
+
+export async function getReferenceTableRegistry(): Promise<Record<string, unknown>[]> {
+  const { data, error } = await fromView('reference_table_registry').select('*').order('name');
+  if (error) throw error;
+  return (data || []) as Record<string, unknown>[];
+}
+
+export async function getRecentImportRuns(limit = 20): Promise<Record<string, unknown>[]> {
+  const { data, error } = await fromView('reference_import_runs').select('*').order('started_at', { ascending: false }).limit(limit);
+  if (error) throw error;
+  return (data || []) as Record<string, unknown>[];
+}
+
+export async function upsertReferenceTable(tableName: string, record: Record<string, unknown>, onConflict?: string): Promise<boolean> {
+  const query = onConflict
+    ? fromView(tableName).upsert(record, { onConflict })
+    : fromView(tableName).insert(record);
+  const { error } = await query;
+  return !error;
+}
+
+// =====================================================
+// LIQUIDAÇÕES (múltiplas para comparação)
+// =====================================================
+
+export async function getLiquidacoes(caseId: string, limit = 10): Promise<PjecalcLiquidacaoResultadoRow[]> {
+  const { data, error } = await fromView('pjecalc_liquidacao_resultado')
+    .select('*')
+    .eq('case_id', caseId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data || []) as PjecalcLiquidacaoResultadoRow[];
+}
+
+// =====================================================
+// SÉRIES HISTÓRICAS (correção, INSS, IR, feriados)
+// =====================================================
+
+export async function getIndicesCorrecao(): Promise<Record<string, unknown>[]> {
+  const { data, error } = await fromView('pjecalc_correcao_monetaria').select('*').order('competencia');
+  if (error) throw error;
+  return (data || []) as Record<string, unknown>[];
+}
+
+export async function getInssFaixas(): Promise<Record<string, unknown>[]> {
+  const { data, error } = await fromView('pjecalc_inss_faixas').select('*').order('competencia_inicio,faixa');
+  if (error) throw error;
+  return (data || []) as Record<string, unknown>[];
+}
+
+export async function getIrFaixas(): Promise<Record<string, unknown>[]> {
+  const { data, error } = await fromView('pjecalc_ir_faixas').select('*').order('competencia_inicio,faixa');
+  if (error) throw error;
+  return (data || []) as Record<string, unknown>[];
+}
+
+export async function getFeriados(): Promise<Record<string, unknown>[]> {
+  const { data, error } = await fromView('pjecalc_feriados').select('*');
+  if (error) throw error;
+  return (data || []) as Record<string, unknown>[];
+}
+
+// =====================================================
+// TABELAS REAIS (acesso direto para persistência de resultado)
+// =====================================================
+
+export async function getCalculoId(caseId: string): Promise<string | null> {
+  const { data } = await supabase.from('pjecalc_calculos').select('id').eq('case_id', caseId).maybeSingle();
+  return (data as { id: string } | null)?.id ?? null;
+}
+
+export async function deleteResultadoReal(calculoId: string): Promise<void> {
+  await fromView('pjecalc_resultado').delete().eq('calculo_id', calculoId);
+}
+
+export async function insertResultadoReal(payload: Record<string, unknown>): Promise<void> {
+  const { error } = await fromView('pjecalc_resultado').insert(payload);
+  if (error) console.error("Erro ao persistir resultado:", error);
+}
+
+export async function deleteOcorrenciasReais(calculoId: string, origem: string): Promise<void> {
+  await fromView('pjecalc_ocorrencia_calculo').delete().eq('calculo_id', calculoId).eq('origem', origem);
+}
+
+export async function insertOcorrenciasReaisBatch(rows: Record<string, unknown>[]): Promise<void> {
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await fromView('pjecalc_ocorrencia_calculo').insert(rows.slice(i, i + 500));
+    if (error) console.error("Erro ao persistir ocorrências:", error);
+  }
+}
+
+// =====================================================
+// HISTORICO OCORRENCIAS (por IDs)
+// =====================================================
+
+export async function getHistoricoOcorrenciasByIds(histIds: string[]): Promise<Record<string, unknown>[]> {
+  if (histIds.length === 0) return [];
+  const { data, error } = await fromView('pjecalc_historico_ocorrencias')
+    .select('*')
+    .in('historico_id', histIds)
+    .order('competencia');
+  if (error) throw error;
+  return (data || []) as Record<string, unknown>[];
+}

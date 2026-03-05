@@ -70,15 +70,13 @@ export function ModuloCorrecao({ caseId }: Props) {
     setSaving(true);
     try {
       await svc.upsertCorrecaoConfig({
-        case_id: caseId, indice: form.indice, indice_pos_citacao: 'SELIC',
-        transicao_adc58: form.combinar_indice, epoca: 'mensal',
+        case_id: caseId, indice: form.indice,
+        epoca: 'mensal',
         juros_tipo: form.tabela_juros === 'SELIC_RF' ? 'selic' : 'simples_mensal',
-        juros_percentual: 1, juros_inicio: 'ajuizamento', juros_pro_rata: true,
-        multa_523: false, multa_523_percentual: 10, multa_467: false, multa_467_percentual: 50,
-        data_liquidacao: form.data_liquidacao, data_citacao: null, data_fixa: null,
-        combinacoes_indice: JSON.stringify(form.combinacoes_indice),
-        combinacoes_juros: JSON.stringify(form.combinacoes_juros),
-      } as any);
+        juros_percentual: 1, juros_inicio: 'ajuizamento',
+        multa_523: false, multa_523_percentual: 10,
+        data_liquidacao: form.data_liquidacao,
+      });
       qc.invalidateQueries({ queryKey: ["pjecalc_correcao_config", caseId] });
       qc.invalidateQueries({ queryKey: ["pjecalc_case_data", caseId] });
       toast.success("Correção/Juros configurados!");

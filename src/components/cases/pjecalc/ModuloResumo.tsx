@@ -13,6 +13,7 @@ import { PainelRevisao } from "./PainelRevisao";
 import { MemoriaCalculoExpandida } from "./MemoriaCalculoExpandida";
 import { ComparacaoCenarios } from "./ComparacaoCenarios";
 import { calcularCompletude } from "@/lib/pjecalc/completude";
+import * as svc from "@/lib/pjecalc/service";
 import {
   PjeCalcEngine,
   type PjeParametros, type PjeHistoricoSalarial, type PjeFalta, type PjeFerias,
@@ -54,124 +55,107 @@ export function ModuloResumo({ caseId }: Props) {
   // Load additional data for comprehensive report
   const { data: paramsData } = useQuery({
     queryKey: ["pjecalc_parametros_report", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_parametros" as any).select("*").eq("case_id", caseId).maybeSingle();
-      return data as any;
-    },
+    queryFn: () => svc.getParametros(caseId),
   });
 
   const { data: correcaoData } = useQuery({
     queryKey: ["pjecalc_correcao_report", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_correcao_config" as any).select("*").eq("case_id", caseId).maybeSingle();
-      return data as any;
-    },
+    queryFn: () => svc.getCorrecaoConfig(caseId),
   });
 
   const { data: dadosProcessoData } = useQuery({
     queryKey: ["pjecalc_dados_processo_report", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_dados_processo" as any).select("*").eq("case_id", caseId).maybeSingle();
-      return data as any;
-    },
+    queryFn: () => svc.getDadosProcesso(caseId),
   });
 
   const { data: resultado } = useQuery({
     queryKey: ["pjecalc_liquidacao", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_liquidacao_resultado" as any).select("*").eq("case_id", caseId).order("created_at", { ascending: false }).limit(1).maybeSingle();
-      return data as any;
-    },
+    queryFn: () => svc.getResultado(caseId),
   });
 
   // Load verbas to get verba_principal_id linkage for hierarchical display
   const { data: verbasDB = [] } = useQuery({
     queryKey: ["pjecalc_verbas", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_verbas" as any).select("id, verba_principal_id, tipo").eq("case_id", caseId).order("ordem");
-      return (data || []) as any[];
-    },
+    queryFn: () => svc.getVerbas(caseId),
   });
 
   const executarLiquidacao = async () => {
     setLiquidando(true);
     setValidacao(null);
     try {
-      // Load all module data in parallel
-      const [paramsRes, histRes, faltasRes, feriasRes, verbasRes, cartaoRes] = await Promise.all([
-        supabase.from("pjecalc_parametros" as any).select("*").eq("case_id", caseId).maybeSingle(),
-        supabase.from("pjecalc_historico_salarial" as any).select("*").eq("case_id", caseId).order("periodo_inicio"),
-        supabase.from("pjecalc_faltas" as any).select("*").eq("case_id", caseId),
-        supabase.from("pjecalc_ferias" as any).select("*").eq("case_id", caseId),
-        supabase.from("pjecalc_verbas" as any).select("*").eq("case_id", caseId).order("ordem"),
-        supabase.from("pjecalc_cartao_ponto" as any).select("*").eq("case_id", caseId).order("competencia"),
+      // Load all module data in parallel via service layer
+      const [paramsRes, histData, faltasData, feriasData, verbasData, cartaoData] = await Promise.all([
+        svc.getParametros(caseId),
+        svc.getHistoricoSalarial(caseId),
+        svc.getFaltas(caseId),
+        svc.getFerias(caseId),
+        svc.getVerbas(caseId),
+        svc.getCartaoPonto(caseId),
       ]);
 
       // Load config tables in parallel
-      const [fgtsData, csData, irData, correcaoData, honorariosData, custasData, seguroData] = await Promise.all([
-        supabase.from("pjecalc_fgts_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
-        supabase.from("pjecalc_cs_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
-        supabase.from("pjecalc_ir_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
-        supabase.from("pjecalc_correcao_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
-        supabase.from("pjecalc_honorarios" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
-        supabase.from("pjecalc_custas_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
-        supabase.from("pjecalc_seguro_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
+      const [fgtsData, csData, irData, correcaoDataLocal, honorariosData, custasData, seguroData] = await Promise.all([
+        svc.getFgtsConfig(caseId).then(r => (r || {}) as Record<string, unknown>),
+        svc.getCsConfig(caseId).then(r => (r || {}) as Record<string, unknown>),
+        svc.getIrConfig(caseId).then(r => (r || {}) as Record<string, unknown>),
+        svc.getCorrecaoConfig(caseId).then(r => (r || {}) as Record<string, unknown>),
+        svc.getHonorarios(caseId).then(r => (r || {}) as Record<string, unknown>),
+        svc.getCustasConfig(caseId).then(r => (r || {}) as Record<string, unknown>),
+        svc.getSeguroConfig(caseId).then(r => (r || {}) as Record<string, unknown>),
       ]);
 
       // ── Fase 1: Carregar dados do banco (séries históricas e tabelas versionadas) ──
-      const [indicesRes, inssFaixasRes, irFaixasRes, dadosProcessoRes,
-             prevPrivadaData, pensaoData, sfData, feriadosRes, multasData] = await Promise.all([
-        supabase.from("pjecalc_correcao_monetaria" as any).select("*").order("competencia"),
-        supabase.from("pjecalc_inss_faixas" as any).select("*").order("competencia_inicio,faixa"),
-        supabase.from("pjecalc_ir_faixas" as any).select("*").order("competencia_inicio,faixa"),
-        supabase.from("pjecalc_dados_processo" as any).select("*").eq("case_id", caseId).maybeSingle(),
-        supabase.from("pjecalc_previdencia_privada_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
-        supabase.from("pjecalc_pensao_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
-        supabase.from("pjecalc_salario_familia_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
-        supabase.from("pjecalc_feriados" as any).select("*"),
-        supabase.from("pjecalc_multas_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
+      const [indicesData, inssFaixasData, irFaixasData, dadosProcessoLocal,
+             prevPrivadaData, pensaoData, sfData, feriadosData, multasData] = await Promise.all([
+        svc.getIndicesCorrecao(),
+        svc.getInssFaixas(),
+        svc.getIrFaixas(),
+        svc.getDadosProcesso(caseId),
+        svc.getPrevPrivConfig(caseId).then(r => (r || {}) as Record<string, unknown>),
+        svc.getPensaoConfig(caseId).then(r => (r || {}) as Record<string, unknown>),
+        svc.getSalarioFamiliaConfig(caseId).then(r => (r || {}) as Record<string, unknown>),
+        svc.getFeriados(),
+        svc.getMultasConfig(caseId).then(r => (r || {}) as Record<string, unknown>),
       ]);
 
-      if (!paramsRes.data) throw new Error("Configure os Parâmetros primeiro.");
-      if (!verbasRes.data?.length) throw new Error("Adicione pelo menos uma Verba.");
+      if (!paramsRes) throw new Error("Configure os Parâmetros primeiro.");
+      if (!verbasData?.length) throw new Error("Adicione pelo menos uma Verba.");
 
-      const params = paramsRes.data as unknown as PjeParametros;
+      const params = paramsRes as unknown as PjeParametros;
       params.case_id = caseId;
 
       // Preencher data_citacao dos Dados do Processo se disponível
-      const dadosProcesso = (dadosProcessoRes as any)?.data;
-      if (dadosProcesso?.data_citacao && !params.data_citacao) {
-        params.data_citacao = dadosProcesso.data_citacao;
+      if (dadosProcessoLocal?.data_citacao && !params.data_citacao) {
+        params.data_citacao = dadosProcessoLocal.data_citacao;
       }
 
       // Calcular ultima_remuneracao a partir dos historicos se não informada
-      if (!params.ultima_remuneracao && histRes.data?.length) {
-        const somaHistoricos = (histRes.data as any[]).reduce((sum: number, h: any) => {
+      if (!params.ultima_remuneracao && histData?.length) {
+        const somaHistoricos = histData.reduce((sum: number, h) => {
           return sum + (Number(h.valor_informado) || 0);
         }, 0);
         if (somaHistoricos > 0) params.ultima_remuneracao = somaHistoricos;
       }
 
       // Load historico ocorrencias per historico
-      const histIds = (histRes.data || []).map((h: any) => h.id);
-      let histOcorrencias: any[] = [];
-      if (histIds.length > 0) {
-        const { data: ho } = await supabase.from("pjecalc_historico_ocorrencias" as any)
-          .select("*").in("historico_id", histIds).order("competencia");
-        histOcorrencias = ho || [];
-      }
-      const historicos: PjeHistoricoSalarial[] = (histRes.data || []).map((h: any) => ({
-        ...h,
+      const histIds = histData.map(h => h.id);
+      const histOcorrencias = await svc.getHistoricoOcorrenciasByIds(histIds);
+
+      const historicos = histData.map((h) => ({
+        ...(h as unknown as PjeHistoricoSalarial),
         periodo_inicio: h.periodo_inicio || params.data_inicial || params.data_admissao,
         periodo_fim: h.periodo_fim || params.data_final || params.data_demissao,
         ocorrencias: histOcorrencias
-          .filter((o: any) => o.historico_id === h.id)
-          .map((o: any) => ({ id: o.id, historico_id: o.historico_id, competencia: o.competencia, valor: Number(o.valor), tipo: o.tipo || 'calculado' })),
+          .filter((o) => (o as Record<string, unknown>).historico_id === h.id)
+          .map((o) => {
+            const oc = o as Record<string, unknown>;
+            return { id: oc.id as string, historico_id: oc.historico_id as string, competencia: oc.competencia as string, valor: Number(oc.valor), tipo: ((oc.tipo as string) || 'calculado') as 'calculado' | 'informado' };
+          }),
       }));
-      const faltas: PjeFalta[] = (faltasRes.data || []).map((f: any) => ({ ...f }));
-      const ferias: PjeFerias[] = (feriasRes.data || []).map((f: any) => ({ ...f }));
+      const faltas = faltasData as unknown as PjeFalta[];
+      const ferias = feriasData as unknown as PjeFerias[];
 
-      const cartaoPonto: PjeCartaoPonto[] = (cartaoRes.data || []).map((r: any) => ({
+      const cartaoPonto: PjeCartaoPonto[] = cartaoData.map((r) => ({
         competencia: r.competencia,
         dias_uteis: r.dias_uteis || 22,
         dias_trabalhados: r.dias_trabalhados || 22,
@@ -183,178 +167,139 @@ export function ModuloResumo({ caseId }: Props) {
         sobreaviso: r.sobreaviso || 0,
       }));
 
-      const verbas: PjeVerba[] = (verbasRes.data || []).map((v: any) => ({
-        ...v,
+      const verbas = verbasData.map((v) => ({
+        ...(v as unknown as PjeVerba),
         base_calculo: {
-          historicos: v.base_calculo?.historicos || [],
-          verbas: v.base_calculo?.verbas || [],
-          tabelas: v.base_calculo?.tabelas || ['ultima_remuneracao'],
-          proporcionalizar: v.base_calculo?.proporcionalizar ?? false,
-          integralizar: v.base_calculo?.integralizar ?? false,
+          historicos: (v as Record<string, any>).base_calculo?.historicos || [],
+          verbas: (v as Record<string, any>).base_calculo?.verbas || [],
+          tabelas: (v as Record<string, any>).base_calculo?.tabelas || ['ultima_remuneracao'],
+          proporcionalizar: (v as Record<string, any>).base_calculo?.proporcionalizar ?? false,
+          integralizar: (v as Record<string, any>).base_calculo?.integralizar ?? false,
         },
-        exclusoes: v.exclusoes || { faltas_justificadas: false, faltas_nao_justificadas: true, ferias_gozadas: false },
-        incidencias: v.incidencias || { fgts: true, irpf: true, contribuicao_social: true, previdencia_privada: false, pensao_alimenticia: false },
-        juros_ajuizamento: v.juros_ajuizamento || 'ocorrencias_vencidas',
-        gerar_verba_reflexa: v.gerar_verba_reflexa || 'diferenca',
-        gerar_verba_principal: v.gerar_verba_principal || 'diferenca',
+        exclusoes: (v as Record<string, any>).exclusoes || { faltas_justificadas: false, faltas_nao_justificadas: true, ferias_gozadas: false },
+        incidencias: (v as Record<string, any>).incidencias || { fgts: true, irpf: true, contribuicao_social: true, previdencia_privada: false, pensao_alimenticia: false },
+        juros_ajuizamento: (v as Record<string, any>).juros_ajuizamento || 'ocorrencias_vencidas',
+        gerar_verba_reflexa: (v as Record<string, any>).gerar_verba_reflexa || 'diferenca',
+        gerar_verba_principal: (v as Record<string, any>).gerar_verba_principal || 'diferenca',
         valor: v.valor || 'calculado',
-        tipo_divisor: v.tipo_divisor || 'informado',
-        tipo_quantidade: v.tipo_quantidade || 'informada',
-        quantidade_proporcionalizar: v.quantidade_proporcionalizar || false,
-        dobrar_valor_devido: v.dobrar_valor_devido || false,
-        zerar_valor_negativo: v.zerar_valor_negativo || false,
-        compor_principal: v.compor_principal ?? true,
+        tipo_divisor: (v as Record<string, any>).tipo_divisor || 'informado',
+        tipo_quantidade: (v as Record<string, any>).tipo_quantidade || 'informada',
+        quantidade_proporcionalizar: (v as Record<string, any>).quantidade_proporcionalizar || false,
+        dobrar_valor_devido: (v as Record<string, any>).dobrar_valor_devido || false,
+        zerar_valor_negativo: (v as Record<string, any>).zerar_valor_negativo || false,
+        compor_principal: (v as Record<string, any>).compor_principal ?? true,
         divisor_informado: v.divisor_informado || 30,
         multiplicador: v.multiplicador || 1,
-        quantidade_informada: v.quantidade_informada || 1,
+        quantidade_informada: (v as Record<string, any>).quantidade_informada || 1,
       }));
 
-      const fgtsConfig: PjeFGTSConfig = {
-        apurar: fgtsData?.apurar ?? true,
-        destino: fgtsData?.destino || 'pagar_reclamante',
-        compor_principal: fgtsData?.compor_principal ?? true,
-        multa_apurar: fgtsData?.multa_apurar ?? true,
-        multa_tipo: fgtsData?.multa_tipo || 'calculada',
-        multa_percentual: fgtsData?.multa_percentual ?? 40,
-        multa_base: fgtsData?.multa_base || 'devido',
-        multa_valor_informado: fgtsData?.multa_valor_informado,
-        saldos_saques: fgtsData?.saldos_saques || [],
-        deduzir_saldo: fgtsData?.deduzir_saldo ?? false,
-        lc110_10: fgtsData?.lc110_10 ?? false,
-        lc110_05: fgtsData?.lc110_05 ?? false,
-      };
+      // Cast config objects to engine types (DB schema → engine interface bridge)
+      const d = (obj: Record<string, unknown>, key: string, fallback: unknown = undefined) => obj[key] ?? fallback;
 
-      const csConfig: PjeCSConfig = {
-        apurar_segurado: csData?.apurar_segurado ?? true,
-        cobrar_reclamante: csData?.cobrar_reclamante ?? true,
-        cs_sobre_salarios_pagos: csData?.cs_sobre_salarios_pagos ?? false,
-        aliquota_segurado_tipo: csData?.aliquota_segurado_tipo || 'empregado',
-        aliquota_segurado_fixa: csData?.aliquota_segurado_fixa,
-        limitar_teto: csData?.limitar_teto ?? true,
-        apurar_empresa: csData?.apurar_empresa ?? true,
-        apurar_sat: csData?.apurar_sat ?? true,
-        apurar_terceiros: csData?.apurar_terceiros ?? true,
-        aliquota_empregador_tipo: 'fixa',
-        aliquota_empresa_fixa: csData?.aliquota_empresa_fixa ?? 20,
-        aliquota_sat_fixa: csData?.aliquota_sat_fixa ?? 2,
-        aliquota_terceiros_fixa: csData?.aliquota_terceiros_fixa ?? 5.8,
-        periodos_simples: csData?.periodos_simples || [],
-      };
+      const fgtsConfig = {
+        apurar: d(fgtsData, 'apurar', true), destino: d(fgtsData, 'destino', 'pagar_reclamante'),
+        compor_principal: d(fgtsData, 'compor_principal', true), multa_apurar: d(fgtsData, 'multa_apurar', true),
+        multa_tipo: d(fgtsData, 'multa_tipo', 'calculada'), multa_percentual: d(fgtsData, 'multa_percentual', 40),
+        multa_base: d(fgtsData, 'multa_base', 'devido'), multa_valor_informado: d(fgtsData, 'multa_valor_informado'),
+        saldos_saques: d(fgtsData, 'saldos_saques', []), deduzir_saldo: d(fgtsData, 'deduzir_saldo', false),
+        lc110_10: d(fgtsData, 'lc110_10', false), lc110_05: d(fgtsData, 'lc110_05', false),
+      } as PjeFGTSConfig;
 
-      const irConfig: PjeIRConfig = {
-        apurar: irData?.apurar ?? true,
-        incidir_sobre_juros: irData?.incidir_sobre_juros ?? false,
-        cobrar_reclamado: irData?.cobrar_reclamado ?? false,
-        tributacao_exclusiva_13: irData?.tributacao_exclusiva_13 ?? true,
-        tributacao_separada_ferias: irData?.tributacao_separada_ferias ?? false,
-        deduzir_cs: irData?.deduzir_cs ?? true,
-        deduzir_prev_privada: irData?.deduzir_prev_privada ?? false,
-        deduzir_pensao: irData?.deduzir_pensao ?? false,
-        deduzir_honorarios: irData?.deduzir_honorarios ?? false,
-        aposentado_65: irData?.aposentado_65 ?? false,
-        dependentes: irData?.dependentes ?? 0,
-      };
+      const csConfig = {
+        apurar_segurado: d(csData, 'apurar_segurado', true), cobrar_reclamante: d(csData, 'cobrar_reclamante', true),
+        cs_sobre_salarios_pagos: d(csData, 'cs_sobre_salarios_pagos', false),
+        aliquota_segurado_tipo: d(csData, 'aliquota_segurado_tipo', 'empregado'),
+        aliquota_segurado_fixa: d(csData, 'aliquota_segurado_fixa'), limitar_teto: d(csData, 'limitar_teto', true),
+        apurar_empresa: d(csData, 'apurar_empresa', true), apurar_sat: d(csData, 'apurar_sat', true),
+        apurar_terceiros: d(csData, 'apurar_terceiros', true), aliquota_empregador_tipo: 'fixa',
+        aliquota_empresa_fixa: d(csData, 'aliquota_empresa_fixa', 20),
+        aliquota_sat_fixa: d(csData, 'aliquota_sat_fixa', 2),
+        aliquota_terceiros_fixa: d(csData, 'aliquota_terceiros_fixa', 5.8),
+        periodos_simples: d(csData, 'periodos_simples', []),
+      } as PjeCSConfig;
 
-      const correcaoConfig: PjeCorrecaoConfig = {
-        indice: correcaoData?.indice || 'IPCA-E',
-        epoca: correcaoData?.epoca || 'mensal',
-        data_fixa: correcaoData?.data_fixa,
-        juros_tipo: correcaoData?.juros_tipo || 'simples_mensal',
-        juros_percentual: correcaoData?.juros_percentual ?? 1,
-        juros_inicio: correcaoData?.juros_inicio || 'ajuizamento',
-        multa_523: correcaoData?.multa_523 ?? false,
-        multa_523_percentual: correcaoData?.multa_523_percentual ?? 10,
-        multa_467: multasData?.apurar_467 ?? false,
-        multa_467_percentual: multasData?.percentual_467 ?? 50,
-        data_liquidacao: correcaoData?.data_liquidacao || new Date().toISOString().slice(0, 10),
-      };
+      const irConfig = {
+        apurar: d(irData, 'apurar', true), incidir_sobre_juros: d(irData, 'incidir_sobre_juros', false),
+        cobrar_reclamado: d(irData, 'cobrar_reclamado', false), tributacao_exclusiva_13: d(irData, 'tributacao_exclusiva_13', true),
+        tributacao_separada_ferias: d(irData, 'tributacao_separada_ferias', false), deduzir_cs: d(irData, 'deduzir_cs', true),
+        deduzir_prev_privada: d(irData, 'deduzir_prev_privada', false), deduzir_pensao: d(irData, 'deduzir_pensao', false),
+        deduzir_honorarios: d(irData, 'deduzir_honorarios', false), aposentado_65: d(irData, 'aposentado_65', false),
+        dependentes: d(irData, 'dependentes', 0),
+      } as PjeIRConfig;
 
-      const honorariosConfig: PjeHonorariosConfig = {
-        apurar_sucumbenciais: honorariosData?.apurar_sucumbenciais ?? true,
-        percentual_sucumbenciais: honorariosData?.percentual_sucumbenciais ?? 15,
-        base_sucumbenciais: honorariosData?.base_sucumbenciais || 'condenacao',
-        apurar_contratuais: honorariosData?.apurar_contratuais ?? false,
-        percentual_contratuais: honorariosData?.percentual_contratuais ?? 20,
-        valor_fixo: honorariosData?.valor_fixo,
-      };
+      const correcaoConfigLocal = {
+        indice: correcaoDataLocal.indice || 'IPCA-E', epoca: correcaoDataLocal.epoca || 'mensal',
+        data_fixa: correcaoDataLocal.data_fixa,
+        juros_tipo: correcaoDataLocal.juros_tipo || 'simples_mensal',
+        juros_percentual: correcaoDataLocal.juros_percentual ?? 1,
+        juros_inicio: correcaoDataLocal.juros_inicio || 'ajuizamento',
+        multa_523: correcaoDataLocal.multa_523 ?? false, multa_523_percentual: correcaoDataLocal.multa_523_percentual ?? 10,
+        multa_467: d(multasData, 'apurar_467', false), multa_467_percentual: d(multasData, 'percentual_467', 50),
+        data_liquidacao: correcaoDataLocal.data_liquidacao || new Date().toISOString().slice(0, 10),
+      } as PjeCorrecaoConfig;
 
-      const custasConfig: PjeCustasConfig = {
-        apurar: custasData?.apurar ?? true,
-        percentual: custasData?.percentual ?? 2,
-        valor_minimo: custasData?.valor_minimo ?? 10.64,
-        valor_maximo: custasData?.valor_maximo,
-        isento: custasData?.isento ?? false,
-        assistencia_judiciaria: custasData?.assistencia_judiciaria ?? false,
-        itens: custasData?.itens ?? [],
-      };
+      const honorariosConfig = {
+        apurar_sucumbenciais: d(honorariosData, 'apurar_sucumbenciais', true),
+        percentual_sucumbenciais: d(honorariosData, 'percentual_sucumbenciais', 15),
+        base_sucumbenciais: d(honorariosData, 'base_sucumbenciais', 'condenacao'),
+        apurar_contratuais: d(honorariosData, 'apurar_contratuais', false),
+        percentual_contratuais: d(honorariosData, 'percentual_contratuais', 20),
+        valor_fixo: d(honorariosData, 'valor_fixo'),
+      } as PjeHonorariosConfig;
 
-      const seguroConfig: PjeSeguroConfig = {
-        apurar: seguroData?.apurar ?? false,
-        parcelas: seguroData?.parcelas ?? 5,
-        valor_parcela: seguroData?.valor_parcela,
-        recebeu: seguroData?.recebeu ?? false,
-      };
+      const custasConfigLocal = {
+        apurar: d(custasData, 'apurar', true), percentual: d(custasData, 'percentual', 2),
+        valor_minimo: d(custasData, 'valor_minimo', 10.64), valor_maximo: d(custasData, 'valor_maximo'),
+        isento: d(custasData, 'isento', false), assistencia_judiciaria: d(custasData, 'assistencia_judiciaria', false),
+        itens: d(custasData, 'itens', []),
+      } as PjeCustasConfig;
 
-      // ── Configs extras (antes faltavam na integração) ──
-      const prevPrivadaConfig: PjePrevidenciaPrivadaConfig = {
-        apurar: prevPrivadaData?.apurar ?? false,
-        percentual: prevPrivadaData?.percentual ?? 0,
-        base_calculo: prevPrivadaData?.base_calculo || 'diferenca',
-        deduzir_ir: prevPrivadaData?.deduzir_ir ?? false,
-      };
+      const seguroConfig = {
+        apurar: d(seguroData, 'apurar', false), parcelas: d(seguroData, 'parcelas', 5),
+        valor_parcela: d(seguroData, 'valor_parcela'), recebeu: d(seguroData, 'recebeu', false),
+      } as PjeSeguroConfig;
 
-      const pensaoConfig: PjePensaoConfig = {
-        apurar: pensaoData?.apurar ?? false,
-        percentual: pensaoData?.percentual ?? 0,
-        valor_fixo: pensaoData?.valor_fixo,
-        base: pensaoData?.base || 'liquido',
-      };
+      const prevPrivadaConfig = {
+        apurar: d(prevPrivadaData, 'apurar', false), percentual: d(prevPrivadaData, 'percentual', 0),
+        base_calculo: d(prevPrivadaData, 'base_calculo', 'diferenca'), deduzir_ir: d(prevPrivadaData, 'deduzir_ir', false),
+      } as PjePrevidenciaPrivadaConfig;
 
-      const salarioFamiliaConfig: PjeSalarioFamiliaConfig = {
-        apurar: sfData?.apurar ?? false,
-        numero_filhos: sfData?.numero_filhos ?? 0,
-        filhos_detalhes: sfData?.filhos_detalhes,
-      };
+      const pensaoConfig = {
+        apurar: d(pensaoData, 'apurar', false), percentual: d(pensaoData, 'percentual', 0),
+        valor_fixo: d(pensaoData, 'valor_fixo'), base: d(pensaoData, 'base', 'liquido'),
+      } as PjePensaoConfig;
 
-      const feriadosDB: PjeFeriadoDB[] = (feriadosRes.data || []).map((f: any) => ({
-        data: f.data,
-        nome: f.nome,
-        tipo: f.tipo || 'nacional',
-        uf: f.uf,
-        municipio: f.municipio,
+      const salarioFamiliaConfig = {
+        apurar: d(sfData, 'apurar', false), numero_filhos: d(sfData, 'numero_filhos', 0),
+        filhos_detalhes: d(sfData, 'filhos_detalhes'),
+      } as PjeSalarioFamiliaConfig;
+
+      const feriadosDB = feriadosData.map((f) => ({
+        data: f.data as string, nome: f.nome as string, tipo: (f.tipo as string) || 'nacional',
+        uf: f.uf as string | undefined, municipio: f.municipio as string | undefined,
       }));
 
-      // ── Preparar dados do banco para o engine ──
-      const indicesDB: PjeIndiceRow[] = (indicesRes.data || []).map((i: any) => ({
-        indice: i.indice,
-        competencia: i.competencia,
-        valor: Number(i.valor),
-        acumulado: Number(i.acumulado || 0),
+      const indicesDB: PjeIndiceRow[] = indicesData.map((i) => ({
+        indice: i.indice as string, competencia: i.competencia as string,
+        valor: Number(i.valor), acumulado: Number(i.acumulado || 0),
       }));
 
-      const faixasINSSDB: PjeINSSFaixaRow[] = ((inssFaixasRes as any).data || []).map((f: any) => ({
-        competencia_inicio: f.competencia_inicio,
-        competencia_fim: f.competencia_fim,
-        faixa: f.faixa,
-        valor_ate: Number(f.valor_ate),
-        aliquota: Number(f.aliquota),
+      const faixasINSSDB: PjeINSSFaixaRow[] = inssFaixasData.map((f) => ({
+        competencia_inicio: f.competencia_inicio as string, competencia_fim: f.competencia_fim as string,
+        faixa: f.faixa as number, valor_ate: Number(f.valor_ate), aliquota: Number(f.aliquota),
       }));
 
-      const faixasIRDB: PjeIRFaixaRow[] = ((irFaixasRes as any).data || []).map((f: any) => ({
-        competencia_inicio: f.competencia_inicio,
-        competencia_fim: f.competencia_fim,
-        faixa: f.faixa,
-        valor_ate: Number(f.valor_ate),
-        aliquota: Number(f.aliquota),
-        deducao: Number(f.deducao),
-        deducao_dependente: Number(f.deducao_dependente),
+      const faixasIRDB: PjeIRFaixaRow[] = irFaixasData.map((f) => ({
+        competencia_inicio: f.competencia_inicio as string, competencia_fim: f.competencia_fim as string,
+        faixa: f.faixa as number, valor_ate: Number(f.valor_ate), aliquota: Number(f.aliquota),
+        deducao: Number(f.deducao), deducao_dependente: Number(f.deducao_dependente),
       }));
 
       // Execute engine com TODOS os dados
       const engine = new PjeCalcEngine(
         params, historicos, faltas, ferias, verbas, cartaoPonto,
-        fgtsConfig, csConfig, irConfig, correcaoConfig,
-        honorariosConfig, custasConfig, seguroConfig,
+        fgtsConfig, csConfig, irConfig, correcaoConfigLocal,
+        honorariosConfig, custasConfigLocal, seguroConfig,
         indicesDB, faixasINSSDB, faixasIRDB,
         [], // excecoesCargas (TODO: load if table exists)
         feriadosDB,
@@ -461,7 +406,7 @@ export function ModuloResumo({ caseId }: Props) {
     }
   };
 
-  const res: PjeLiquidacaoResult | null = resultado?.resultado || null;
+  const res = (resultado?.resultado as unknown as PjeLiquidacaoResult) || null;
   const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
   const isFechado = resultado?.status === 'fechado';
   const reportMeta = {

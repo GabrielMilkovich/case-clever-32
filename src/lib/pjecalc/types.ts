@@ -83,6 +83,10 @@ export interface PjecalcDadosProcessoRow {
   reclamada_nome: string | null;
   reclamada_cnpj: string | null;
   vara: string | null;
+  reclamado: string | null;
+  perito: string | null;
+  funcao: string | null;
+  data_citacao: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -338,6 +342,8 @@ export interface PjecalcLiquidacaoResultadoRow {
   total_reclamado: number;
   resultado: Record<string, unknown> | null;
   engine_version: string | null;
+  status: string | null;
+  data_liquidacao: string | null;
   created_at: string;
 }
 
