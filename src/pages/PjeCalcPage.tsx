@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { MainLayoutPremium } from "@/components/layout/MainLayoutPremium";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -121,21 +121,15 @@ export default function PjeCalcPage() {
     isLoading: paramsLoading, completude: hookCompletude, invalidate,
   } = usePjeCalcData(caseId);
 
-  // Case data still from cases table (not pjecalc)
-  const { data: caseData } = useQueryClient().getQueryData(["case", caseId]) 
-    ? { data: useQueryClient().getQueryData(["case", caseId]) as any }
-    : (() => {
-        // eslint-disable-next-line react-hooks/rules-of-hooks
-        const { useQuery } = require("@tanstack/react-query");
-        return useQuery({
-          queryKey: ["case", caseId],
-          queryFn: async () => {
-            const { data, error } = await supabase.from("cases").select("*").eq("id", caseId).single();
-            if (error) throw error;
-            return data;
-          },
-        });
-      })();
+  // Case data (from cases table, not pjecalc)
+  const { data: caseData } = useQuery({
+    queryKey: ["case", caseId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("cases").select("*").eq("id", caseId).single();
+      if (error) throw error;
+      return data;
+    },
+  });
 
   // =====================================================
   // Phase 4: Completude indicators (use hook's completude)
