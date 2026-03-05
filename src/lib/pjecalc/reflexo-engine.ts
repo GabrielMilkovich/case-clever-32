@@ -8,8 +8,8 @@ export interface ReflexoTemplate {
   sufixo: string;
   caracteristica: string;
   ocorrencia_pagamento: string;
-  comportamento_reflexo: 'valor_mensal' | 'media_valor_absoluto' | 'media_valor_corrigido' | 'media_quantidade';
-  periodo_media_reflexo?: string;
+  comportamento_reflexo: 'valor_mensal' | 'media_valor_absoluto' | 'media_valor_corrigido' | 'media_quantidade' | 'media_pela_quantidade';
+  periodo_media_reflexo?: 'ano_civil' | 'periodo_aquisitivo' | 'global';
   tratamento_fracao_mes: 'manter_fracao' | 'integralizar' | 'desprezar' | 'desprezar_menor_15';
   multiplicador: number;
   divisor_tipo: string;
@@ -19,6 +19,8 @@ export interface ReflexoTemplate {
   gerar_reflexo: 'devido' | 'diferenca';
   incidencias: { fgts: boolean; irpf: boolean; cs: boolean };
   ordem_offset: number;
+  /** Whether to integralize base values before calculating the reflexo */
+  integralizar_base?: boolean;
 }
 
 // Templates padrão de reflexos do PJe-Calc

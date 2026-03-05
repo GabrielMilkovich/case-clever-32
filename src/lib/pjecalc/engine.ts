@@ -2325,6 +2325,53 @@ export class PjeCalcEngine {
     return { apurado: true, cotas, total: Number(new Decimal(totalSF).toDP(2)) };
   }
 
+  // =====================================================
+  // AGRUPAMENTO POR PERÍODO (ANO_CIVIL / PERIODO_AQUISITIVO)
+  // =====================================================
+
+  private agruparPorPeriodo(
+    ocorrencias: PjeOcorrenciaResult[],
+    modo: 'ano_civil' | 'periodo_aquisitivo' | 'global',
+  ): Map<string, PjeOcorrenciaResult[]> {
+    const grupos = new Map<string, PjeOcorrenciaResult[]>();
+
+    if (modo === 'global') {
+      grupos.set('global', [...ocorrencias]);
+      return grupos;
+    }
+
+    if (modo === 'ano_civil') {
+      for (const oc of ocorrencias) {
+        const ano = oc.competencia.slice(0, 4);
+        if (!grupos.has(ano)) grupos.set(ano, []);
+        grupos.get(ano)!.push(oc);
+      }
+      return grupos;
+    }
+
+    if (modo === 'periodo_aquisitivo') {
+      // Group by the vacation acquisition period the competencia falls into
+      for (const oc of ocorrencias) {
+        const compDate = new Date(oc.competencia + '-01');
+        let grupKey = 'default';
+        for (const fer of this.ferias) {
+          const paInicio = new Date(fer.periodo_aquisitivo_inicio);
+          const paFim = new Date(fer.periodo_aquisitivo_fim);
+          if (compDate >= paInicio && compDate <= paFim) {
+            grupKey = `${fer.periodo_aquisitivo_inicio}_${fer.periodo_aquisitivo_fim}`;
+            break;
+          }
+        }
+        if (!grupos.has(grupKey)) grupos.set(grupKey, []);
+        grupos.get(grupKey)!.push(oc);
+      }
+      return grupos;
+    }
+
+    grupos.set('global', [...ocorrencias]);
+    return grupos;
+  }
+
   private calcularVerbaReflexa(reflexa: PjeVerba, principalResult: PjeVerbaResult): PjeVerbaResult {
     const comportamento = reflexa.comportamento_reflexo || 'valor_mensal';
     const ocorrencias: PjeOcorrenciaResult[] = [];
@@ -2352,21 +2399,47 @@ export class PjeCalcEngine {
         break;
       }
       case 'media_valor_absoluto': {
-        const valores = principalResult.ocorrencias
-          .filter(o => (reflexa.gerar_verba_reflexa === 'devido' ? o.devido : o.diferenca) > 0)
-          .map(o => reflexa.gerar_verba_reflexa === 'devido' ? o.devido : o.diferenca);
-        const media = valores.length > 0 ? valores.reduce((s, v) => s + v, 0) / valores.length : 0;
-        const comp = this.params.data_demissao?.slice(0, 7) || new Date().toISOString().slice(0, 7);
-        const result = this.calcularOcorrencia(reflexa, comp, media);
-        ocorrencias.push(result);
-        totalDevido += result.devido;
-        totalPago += result.pago;
-        totalDiferenca += result.diferenca;
+        // Determine grouping mode
+        const periodoMedia = reflexa.periodo_media_reflexo || 'global';
+        const grupos = this.agruparPorPeriodo(principalResult.ocorrencias, periodoMedia);
+
+        for (const [grupoKey, grupoOcs] of grupos) {
+          const valores = grupoOcs
+            .filter(o => (reflexa.gerar_verba_reflexa === 'devido' ? o.devido : o.diferenca) > 0)
+            .map(o => {
+              let val = reflexa.gerar_verba_reflexa === 'devido' ? o.devido : o.diferenca;
+              // Use integral values when integralizing
+              if (shouldIntegralizar && o.devido_integral !== undefined) {
+                val = reflexa.gerar_verba_reflexa === 'devido' 
+                  ? o.devido_integral 
+                  : (o.devido_integral - (o.pago || 0));
+              }
+              return val;
+            });
+          const media = valores.length > 0 ? valores.reduce((s, v) => s + v, 0) / valores.length : 0;
+          
+          // Determine competencia for this group
+          let comp: string;
+          if (periodoMedia === 'ano_civil') {
+            comp = `${grupoKey}-12`; // December of the year
+          } else if (periodoMedia === 'periodo_aquisitivo') {
+            // Use end of acquisition period
+            const parts = grupoKey.split('_');
+            comp = parts.length > 1 ? parts[1].slice(0, 7) : (this.params.data_demissao?.slice(0, 7) || new Date().toISOString().slice(0, 7));
+          } else {
+            comp = this.params.data_demissao?.slice(0, 7) || new Date().toISOString().slice(0, 7);
+          }
+
+          const result = this.calcularOcorrencia(reflexa, comp, media);
+          ocorrencias.push(result);
+          totalDevido += result.devido;
+          totalPago += result.pago;
+          totalDiferenca += result.diferenca;
+        }
         break;
       }
       case 'media_valor_corrigido': {
         // Média dos valores corrigidos monetariamente (Fase 6)
-        // Usa o índice de correção para trazer cada ocorrência a valor presente antes de calcular a média
         const compLiq = this.correcaoConfig.data_liquidacao.slice(0, 7);
         const valoresCorrigidos = principalResult.ocorrencias
           .filter(o => (reflexa.gerar_verba_reflexa === 'devido' ? o.devido : o.diferenca) > 0)
@@ -2398,6 +2471,75 @@ export class PjeCalcEngine {
         totalDevido += result.devido;
         totalPago += result.pago;
         totalDiferenca += result.diferenca;
+        break;
+      }
+      // =====================================================
+      // MEDIA_PELA_QUANTIDADE — PJe-Calc Ground Truth
+      // soma(diferenças_integralizadas) / soma(quantidades) = média ponderada
+      // Agrupado por ANO_CIVIL (13º) ou PERIODO_AQUISITIVO (férias)
+      // =====================================================
+      case 'media_pela_quantidade': {
+        const periodoMedia = reflexa.periodo_media_reflexo || 
+          (reflexa.caracteristica === '13_salario' ? 'ano_civil' : 
+           reflexa.caracteristica === 'ferias' ? 'periodo_aquisitivo' : 'global');
+        
+        const grupos = this.agruparPorPeriodo(principalResult.ocorrencias, periodoMedia);
+
+        for (const [grupoKey, grupoOcs] of grupos) {
+          // Filter to positive-value occurrences
+          const ocsAtivas = grupoOcs.filter(o => {
+            const val = reflexa.gerar_verba_reflexa === 'devido' ? o.devido : o.diferenca;
+            return val > 0 || o.quantidade > 0;
+          });
+
+          if (ocsAtivas.length === 0) continue;
+
+          // Sum of differences (integralized when configured)
+          let somaDiferencas = new Decimal(0);
+          let somaQuantidades = new Decimal(0);
+
+          for (const oc of ocsAtivas) {
+            let val: number;
+            if (shouldIntegralizar && oc.devido_integral !== undefined) {
+              // Use integral value (full month)
+              val = reflexa.gerar_verba_reflexa === 'devido'
+                ? oc.devido_integral
+                : (oc.devido_integral - (oc.pago || 0));
+            } else {
+              val = reflexa.gerar_verba_reflexa === 'devido' ? oc.devido : oc.diferenca;
+            }
+            somaDiferencas = somaDiferencas.plus(val);
+
+            // Use integral quantity when available and integralizing
+            const qtd = (shouldIntegralizar && oc.quantidade_integral !== undefined)
+              ? oc.quantidade_integral
+              : oc.quantidade;
+            somaQuantidades = somaQuantidades.plus(qtd > 0 ? qtd : 1);
+          }
+
+          // Weighted average: soma_diferencas / soma_quantidades
+          const mediaPonderada = somaQuantidades.greaterThan(0)
+            ? somaDiferencas.div(somaQuantidades).toDP(2).toNumber()
+            : 0;
+
+          // Determine competencia for this group
+          let comp: string;
+          if (periodoMedia === 'ano_civil') {
+            comp = `${grupoKey}-12`; // December of the year for 13º
+          } else if (periodoMedia === 'periodo_aquisitivo') {
+            const parts = grupoKey.split('_');
+            comp = parts.length > 1 ? parts[1].slice(0, 7) : (this.params.data_demissao?.slice(0, 7) || new Date().toISOString().slice(0, 7));
+          } else {
+            comp = this.params.data_demissao?.slice(0, 7) || new Date().toISOString().slice(0, 7);
+          }
+
+          // Calculate occurrence using the weighted average as base
+          const result = this.calcularOcorrencia(reflexa, comp, mediaPonderada);
+          ocorrencias.push(result);
+          totalDevido += result.devido;
+          totalPago += result.pago;
+          totalDiferenca += result.diferenca;
+        }
         break;
       }
       default: {
