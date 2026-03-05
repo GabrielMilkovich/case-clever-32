@@ -232,50 +232,58 @@ async function autoConfigureModules(caseId: string, params: Record<string, unkno
       data_liquidacao: new Date().toISOString().slice(0, 10),
     }).eq("id", calcId);
 
-    // Upsert correcao config via fromView helper in service
+    // Upsert correcao config — skip if combination-by-date already set
     const existCorrecaoRes = await supabase
       .from("pjecalc_atualizacao_config" as any)
-      .select("id")
+      .select("id, combinacoes_indice, regime_padrao")
       .eq("calculo_id", calcId)
       .eq("tipo", "correcao")
       .maybeSingle();
 
-    const existCorrecao = existCorrecaoRes.data as unknown as { id: string } | null;
+    const existCorrecao = existCorrecaoRes.data as unknown as { id: string; combinacoes_indice?: string; regime_padrao?: string } | null;
 
-    if (existCorrecao) {
-      await supabase.from("pjecalc_atualizacao_config" as any).update({
-        regime_padrao: "IPCA-E",
-      }).eq("id", existCorrecao.id);
-    } else {
-      const { error } = await supabase.from("pjecalc_atualizacao_config" as any).insert({
-        calculo_id: calcId,
-        tipo: "correcao",
-        regime_padrao: "IPCA-E",
-      });
-      if (error) errors.push(`Correção Config: ${error.message}`);
+    // Don't overwrite if combinations are already configured (golden seed or manual)
+    const hasCombinations = existCorrecao?.combinacoes_indice || existCorrecao?.regime_padrao === 'COMBINACAO';
+
+    if (!hasCombinations) {
+      if (existCorrecao) {
+        await supabase.from("pjecalc_atualizacao_config" as any).update({
+          regime_padrao: "IPCA-E",
+        }).eq("id", existCorrecao.id);
+      } else {
+        const { error } = await supabase.from("pjecalc_atualizacao_config" as any).insert({
+          calculo_id: calcId,
+          tipo: "correcao",
+          regime_padrao: "IPCA-E",
+        });
+        if (error) errors.push(`Correção Config: ${error.message}`);
+      }
     }
 
-    // Upsert juros config
+    // Upsert juros config — skip if combination already set
     const existJurosRes = await supabase
       .from("pjecalc_atualizacao_config" as any)
-      .select("id")
+      .select("id, regime_padrao")
       .eq("calculo_id", calcId)
       .eq("tipo", "juros")
       .maybeSingle();
 
-    const existJuros = existJurosRes.data as unknown as { id: string } | null;
+    const existJuros = existJurosRes.data as unknown as { id: string; regime_padrao?: string } | null;
+    const hasCombJuros = existJuros?.regime_padrao === 'COMBINACAO';
 
-    if (existJuros) {
-      await supabase.from("pjecalc_atualizacao_config" as any).update({
-        regime_padrao: "simples_mensal",
-      }).eq("id", existJuros.id);
-    } else {
-      const { error } = await supabase.from("pjecalc_atualizacao_config" as any).insert({
-        calculo_id: calcId,
-        tipo: "juros",
-        regime_padrao: "simples_mensal",
-      });
-      if (error) errors.push(`Juros Config: ${error.message}`);
+    if (!hasCombJuros) {
+      if (existJuros) {
+        await supabase.from("pjecalc_atualizacao_config" as any).update({
+          regime_padrao: "simples_mensal",
+        }).eq("id", existJuros.id);
+      } else {
+        const { error } = await supabase.from("pjecalc_atualizacao_config" as any).insert({
+          calculo_id: calcId,
+          tipo: "juros",
+          regime_padrao: "simples_mensal",
+        });
+        if (error) errors.push(`Juros Config: ${error.message}`);
+      }
     }
   }
 }

@@ -208,10 +208,11 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
   }
 
   // ── 7. Correção monetária (view: pjecalc_correcao_config) ──
+  // Uses combination-by-date from golden snapshot (3-phase regime)
   {
     const { error } = await supabase.from('pjecalc_correcao_config' as any).insert({
       case_id: caseId,
-      indice: 'IPCA-E',
+      indice: 'IPCA-E', // fallback label
       epoca: 'mensal',
       juros_tipo: 'simples_mensal',
       juros_percentual: 1,
@@ -221,6 +222,59 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
       data_liquidacao: snap.meta.data_liquidacao,
     });
     if (error) errors.push(`Correção: ${error.message}`);
+  }
+
+  // ── 7b. Gravar combinação por data (3 faixas de correção + 3 faixas de juros) ──
+  {
+    // Wait for calculo to be created by trigger
+    await new Promise(r => setTimeout(r, 300));
+    const { data: calculoRow } = await supabase
+      .from("pjecalc_calculos")
+      .select("id")
+      .eq("case_id", caseId)
+      .maybeSingle();
+
+    if (calculoRow) {
+      const calcId = (calculoRow as any).id;
+
+      // Update data_liquidacao on calculo
+      await supabase.from("pjecalc_calculos").update({
+        data_liquidacao: snap.meta.data_liquidacao,
+      }).eq("id", calcId);
+
+      // Write correction combinations from golden snapshot criteria
+      const combinacoesIndice = snap.criterios.correcao.fases.map(f => ({
+        indice: f.indice,
+        de: f.a_partir || undefined,
+        ate: f.ate || undefined,
+      }));
+
+      const combinacoesJuros = snap.criterios.juros.fases.map(f => ({
+        tipo: f.tipo,
+        de: f.a_partir || undefined,
+        ate: f.ate || undefined,
+      }));
+
+      // Upsert into pjecalc_atualizacao_config for correction
+      const { error: atErr } = await supabase.from("pjecalc_atualizacao_config" as any).insert({
+        calculo_id: calcId,
+        tipo: "correcao",
+        regime_padrao: "COMBINACAO",
+        regimes: { combinacoes: combinacoesIndice },
+        combinacoes_indice: JSON.stringify(combinacoesIndice),
+        combinacoes_juros: JSON.stringify(combinacoesJuros),
+      });
+      if (atErr) errors.push(`Atualizacao Config: ${atErr.message}`);
+
+      // Juros config row
+      const { error: jErr } = await supabase.from("pjecalc_atualizacao_config" as any).insert({
+        calculo_id: calcId,
+        tipo: "juros",
+        regime_padrao: "COMBINACAO",
+        regimes: { combinacoes: combinacoesJuros },
+      });
+      if (jErr) errors.push(`Juros Config: ${jErr.message}`);
+    }
   }
 
   // ── 8. Honorários (view: pjecalc_honorarios) ──
