@@ -243,6 +243,14 @@ export default function Casos() {
           <div className="flex gap-2">
             <Button 
               variant="outline" size="sm" 
+              onClick={handleSeedMaria}
+              disabled={seedingMaria}
+              className="gap-1.5 h-9 text-sm"
+            >
+              <FlaskConical className="h-4 w-4" />
+              {seedingMaria ? "Criando..." : "Caso Maria (Comissionista)"}
+            </Button>
+              variant="outline" size="sm" 
               onClick={handleSeedTestCase}
               disabled={seedingTest}
               className="gap-1.5 h-9 text-sm"
