@@ -221,16 +221,55 @@ async function autoConfigureModules(caseId: string, params: any, factMap: Record
     if (error) errors.push(`Config Calculos: ${error.message}`);
   }
 
-  // Correção config — this view has its own INSTEAD OF triggers or is a real table mapping
-  await upsertConfig("pjecalc_correcao_config", caseId, {
-    indice: "IPCA-E",
-    epoca: "mensal",
-    juros_tipo: "simples_mensal",
-    juros_percentual: 1,
-    juros_inicio: "ajuizamento",
-    multa_523: false,
-    multa_523_percentual: 0,
-    data_liquidacao: new Date().toISOString().slice(0, 10),
-    ...(dataCitacao ? { data_citacao: dataCitacao } : {}),
-  }, errors, "Correção Config");
+  // Correção config — write directly to pjecalc_atualizacao_config + pjecalc_calculos
+  if (calculoRow) {
+    const calcId = (calculoRow as any).id;
+    
+    // Set data_liquidacao on calculos
+    await supabase.from("pjecalc_calculos").update({
+      data_liquidacao: new Date().toISOString().slice(0, 10),
+    }).eq("id", calcId);
+
+    // Upsert correcao config
+    const { data: existCorrecao } = await supabase
+      .from("pjecalc_atualizacao_config" as any)
+      .select("id")
+      .eq("calculo_id", calcId)
+      .eq("tipo", "correcao")
+      .maybeSingle();
+
+    if (existCorrecao) {
+      await supabase.from("pjecalc_atualizacao_config" as any).update({
+        regime_padrao: "IPCA-E",
+      }).eq("id", (existCorrecao as any).id);
+    } else {
+      const { error } = await supabase.from("pjecalc_atualizacao_config" as any).insert({
+        calculo_id: calcId,
+        tipo: "correcao",
+        regime_padrao: "IPCA-E",
+      });
+      if (error) errors.push(`Correção Config: ${error.message}`);
+    }
+
+    // Upsert juros config
+    const { data: existJuros } = await supabase
+      .from("pjecalc_atualizacao_config" as any)
+      .select("id")
+      .eq("calculo_id", calcId)
+      .eq("tipo", "juros")
+      .maybeSingle();
+
+    if (existJuros) {
+      await supabase.from("pjecalc_atualizacao_config" as any).update({
+        regime_padrao: "simples_mensal",
+      }).eq("id", (existJuros as any).id);
+    } else {
+      const { error } = await supabase.from("pjecalc_atualizacao_config" as any).insert({
+        calculo_id: calcId,
+        tipo: "juros",
+        regime_padrao: "simples_mensal",
+      });
+      if (error) errors.push(`Juros Config: ${error.message}`);
+    }
+  }
 }
