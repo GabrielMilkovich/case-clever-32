@@ -2389,12 +2389,31 @@ export class PjeCalcEngine {
     }
 
     // ── 4. Correção Monetária + Juros ──
-    this.aplicarCorrecaoJuros(verbaResults);
+    // PJe-Calc Criterion 8: "Juros de mora sobre verbas apurados após a dedução 
+    // da contribuição social devida pelo reclamante"
+    // When juros_apos_deducao_cs=true:
+    //   Step A: Apply correction ONLY (no interest)
+    //   Step B: Calculate CS on corrected nominal values
+    //   Step C: Deduct CS share per occurrence
+    //   Step D: Apply interest on (corrected - CS_share)
+    if (this.correcaoConfig.juros_apos_deducao_cs) {
+      // Step A: Correction only
+      this.aplicarCorrecaoSomente(verbaResults);
+      
+      // Step B: CS on corrected values (uses valor_corrigido which is now set)
+      const csPreJuros = this.calcularCS(verbaResults);
+      const csDescontadoPreJuros = this.csConfig.cobrar_reclamante ? csPreJuros.total_segurado : 0;
+      
+      // Step C+D: Apply interest on (corrected - CS_share_pro_rata)
+      this.aplicarJurosAposCS(verbaResults, csDescontadoPreJuros);
+    } else {
+      this.aplicarCorrecaoJuros(verbaResults);
+    }
 
     // ── 5. FGTS ──
     const fgts = this.calcularFGTS(verbaResults);
 
-    // ── 6. Contribuição Social ──
+    // ── 6. Contribuição Social (recalculate if juros_apos_deducao_cs — CS was already computed above but we need the full result) ──
     const cs = this.calcularCS(verbaResults);
 
     // ── 7. IR ──
