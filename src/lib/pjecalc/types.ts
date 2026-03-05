@@ -247,7 +247,10 @@ export interface PjecalcVerbaRow {
   valor: string;
   valor_informado_devido: number | null;
   valor_informado_pago: number | null;
-  base_calculo: Record<string, string> | null;
+  base_calculo: Record<string, unknown> | null;
+  incide_fgts?: boolean;
+  incide_inss?: boolean;
+  incide_ir?: boolean;
   created_at: string;
   updated_at: string;
 }
