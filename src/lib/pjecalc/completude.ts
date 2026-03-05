@@ -3,12 +3,9 @@
  * Phase 4, Item 5: Rastreabilidade jurídica — fundamentação por verba
  */
 
-import type { CompletionInput as TypedCompletionInput } from './types';
-
 export type ModuleStatus = 'nao_iniciado' | 'incompleto' | 'preenchido' | 'alerta' | 'validado';
 
-// Accept both typed and untyped inputs for backward compatibility
-type CompletionInput = Partial<TypedCompletionInput> & {
+interface CompletionInput {
   params: any;
   faltas: any[];
   ferias: any[];
@@ -21,7 +18,7 @@ type CompletionInput = Partial<TypedCompletionInput> & {
   irConfig?: any;
   correcaoConfig?: any;
   pensaoConfig?: any;
-};
+}
 
 export function calcularCompletude(input: CompletionInput): Record<string, ModuleStatus> {
   const { params, faltas, ferias, historicos, verbas, resultado } = input;
