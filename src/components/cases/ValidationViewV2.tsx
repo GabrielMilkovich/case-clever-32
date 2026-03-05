@@ -48,6 +48,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { syncFromValidation } from '@/lib/pjecalc/sync-from-validation';
 
 interface Extraction {
   id: string;
@@ -203,17 +204,60 @@ export function ValidationViewV2({ caseId, onValidationComplete }: ValidationVie
 
       return { acao };
     },
-    onSuccess: ({ acao }) => {
+    onSuccess: async ({ acao }) => {
       toast({
         title: acao === 'aprovar' ? 'Aprovado' : acao === 'editar' ? 'Editado' : 'Rejeitado',
         description: 'Validação registrada com sucesso.',
       });
-      queryClient.invalidateQueries({ queryKey: ['extractions', caseId] });
-      queryClient.invalidateQueries({ queryKey: ['validations', caseId] });
+      await queryClient.invalidateQueries({ queryKey: ['extractions', caseId] });
+      await queryClient.invalidateQueries({ queryKey: ['validations', caseId] });
       setShowEditDialog(false);
       setSelectedExtraction(null);
       setEditValue('');
       setJustificativa('');
+
+      // Check if all extractions are now validated — auto-sync
+      const { data: remaining } = await supabase
+        .from('extractions')
+        .select('id')
+        .eq('case_id', caseId)
+        .eq('status', 'pendente');
+      
+      if (!remaining?.length) {
+        toast({
+          title: 'Sincronizando dados...',
+          description: 'Todas as extrações foram validadas. Sincronizando com os módulos de cálculo.',
+        });
+        try {
+          const result = await syncFromValidation(caseId);
+          // Invalidate PjeCalc queries
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["pjecalc_parametros", caseId] }),
+            queryClient.invalidateQueries({ queryKey: ["pjecalc_dados_processo", caseId] }),
+            queryClient.invalidateQueries({ queryKey: ["pjecalc_historico", caseId] }),
+            queryClient.invalidateQueries({ queryKey: ["pjecalc_verbas", caseId] }),
+          ]);
+          if (result.errors.length > 0) {
+            toast({
+              title: 'Sincronizado com avisos',
+              description: `${result.syncedFields} campos sincronizados, ${result.errors.length} aviso(s).`,
+              variant: 'default',
+            });
+          } else {
+            toast({
+              title: 'Sincronização completa!',
+              description: `${result.syncedFields} campos sincronizados automaticamente.`,
+            });
+          }
+          onValidationComplete?.();
+        } catch (e) {
+          toast({
+            title: 'Erro na sincronização',
+            description: (e as Error).message,
+            variant: 'destructive',
+          });
+        }
+      }
     },
     onError: (error) => {
       toast({
