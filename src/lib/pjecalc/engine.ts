@@ -634,7 +634,18 @@ export class PjeCalcEngine {
     this.historicos = historicos;
     this.faltas = faltas;
     this.ferias = ferias;
-    this.verbas = verbas;
+    this.verbas = verbas.map(v => ({
+      ...v,
+      base_calculo: {
+        historicos: v.base_calculo?.historicos || [],
+        verbas: v.base_calculo?.verbas || [],
+        tabelas: v.base_calculo?.tabelas || [],
+        proporcionalizar: v.base_calculo?.proporcionalizar ?? false,
+        integralizar: v.base_calculo?.integralizar ?? false,
+      },
+      exclusoes: v.exclusoes || { faltas_justificadas: false, faltas_nao_justificadas: true, ferias_gozadas: false },
+      incidencias: v.incidencias || { fgts: true, irpf: true, contribuicao_social: true, previdencia_privada: false, pensao_alimenticia: false },
+    }));
     this.cartaoPonto = cartaoPonto;
     this.fgtsConfig = fgtsConfig;
     this.csConfig = csConfig;
