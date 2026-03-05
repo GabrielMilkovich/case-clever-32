@@ -1012,6 +1012,30 @@ export class PjeCalcEngine {
       ? `(${base.toFixed(2)} × ${mult.toFixed(4)} / ${div.toFixed(2)}) × ${qtd.toFixed(4)} × ${dobra.toFixed(0)}`
       : `Valor Informado: ${devido.toFixed(2)}`;
 
+    // Compute integral values (full-month) for integralization in reflexos
+    let baseIntegral: number | undefined;
+    let qtdIntegral: number | undefined;
+    let devidoIntegral: number | undefined;
+    if (verba.quantidade_proporcionalizar) {
+      const [anoI, mesI] = competencia.split('-').map(Number);
+      const diasNoMesI = new Date(anoI, mesI, 0).getDate();
+      const admDateI = new Date(this.params.data_admissao);
+      const demDateI = this.params.data_demissao ? new Date(this.params.data_demissao) : null;
+      let diaInicioI = 1, diaFimI = diasNoMesI;
+      if (admDateI.getFullYear() === anoI && admDateI.getMonth() + 1 === mesI) diaInicioI = admDateI.getDate();
+      if (demDateI && demDateI.getFullYear() === anoI && demDateI.getMonth() + 1 === mesI) diaFimI = demDateI.getDate();
+      const diasTrabI = diaFimI - diaInicioI + 1;
+      if (diasTrabI < diasNoMesI) {
+        // This is a fractional month — compute integral (full-month) values
+        const frac = new Decimal(diasTrabI).div(diasNoMesI);
+        if (frac.greaterThan(0)) {
+          baseIntegral = base.toDP(2).toNumber();
+          qtdIntegral = qtd.div(frac).toDP(4).toNumber();
+          devidoIntegral = devido.div(frac).toDP(2).toNumber();
+        }
+      }
+    }
+
     return {
       competencia,
       base: base.toDP(2).toNumber(),
@@ -1027,6 +1051,9 @@ export class PjeCalcEngine {
       juros: 0,
       valor_final: diferenca.toDP(2).toNumber(),
       formula,
+      base_integral: baseIntegral,
+      quantidade_integral: qtdIntegral,
+      devido_integral: devidoIntegral,
     };
   }
 
