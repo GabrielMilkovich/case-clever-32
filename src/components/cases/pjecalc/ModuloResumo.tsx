@@ -763,35 +763,49 @@ export function ModuloResumo({ caseId }: Props) {
               <table className="w-full text-xs">
                 <tbody>
                   {[
-                    ['Principal Bruto', res.resumo.principal_bruto],
+                    ['Principal Bruto (nominal)', res.resumo.principal_bruto],
                     ['(+) Correção Monetária', res.resumo.principal_corrigido - res.resumo.principal_bruto],
                     ['(+) Juros de Mora', res.resumo.juros_mora],
-                    ['(+) FGTS (depósitos + multa)', res.resumo.fgts_total],
-                    ['(-) CS Segurado', -res.resumo.cs_segurado],
+                    ['= BRUTO DEVIDO AO RECLAMANTE', res.resumo.principal_corrigido + res.resumo.juros_mora],
+                    ['(-) Contribuição Social Segurado', -res.resumo.cs_segurado],
                     ['(-) IRRF (Art. 12-A RRA)', -res.resumo.ir_retido],
-                    ...(res.resumo.seguro_desemprego > 0 ? [['(+) Seguro-Desemprego (indenização)', res.resumo.seguro_desemprego]] : []),
-                    ...((res.resumo.salario_familia || 0) > 0 ? [['(+) Salário-Família (Art. 65, Lei 8.213/91)', res.resumo.salario_familia]] : []),
-                    ...(res.resumo.multa_523 > 0 ? [['(+) Multa Art. 523, §1º CPC', res.resumo.multa_523]] : []),
-                    ...((res.resumo.multa_467 || 0) > 0 ? [['(+) Multa Art. 467 CLT', res.resumo.multa_467]] : []),
-                    ...(res.resumo.honorarios_sucumbenciais > 0 ? [['(+) Honorários Sucumbenciais', res.resumo.honorarios_sucumbenciais]] : []),
-                    ...(res.resumo.honorarios_contratuais > 0 ? [['(+) Honorários Contratuais', res.resumo.honorarios_contratuais]] : []),
-                    ...(res.resumo.custas > 0 ? [['(+) Custas Processuais', res.resumo.custas]] : []),
                     ...((res.resumo.previdencia_privada || 0) > 0 ? [['(-) Previdência Privada', -res.resumo.previdencia_privada]] : []),
                     ...((res.resumo.pensao_total || 0) > 0 ? [['(-) Pensão Alimentícia', -res.resumo.pensao_total]] : []),
-                  ].map(([label, value]) => (
-                    <tr key={label as string} className="border-b border-border/30">
+                  ].map(([label, value]) => {
+                    const isBrutoLine = (label as string).startsWith('= BRUTO');
+                    return (
+                    <tr key={label as string} className={`border-b border-border/30 ${isBrutoLine ? 'font-semibold bg-muted/30' : ''}`}>
                       <td className="py-2 text-muted-foreground">{label}</td>
                       <td className="py-2 text-right font-mono font-medium">{fmt(value as number)}</td>
                     </tr>
-                  ))}
+                    );
+                  })}
                   <tr className="border-t-2 border-primary/30 font-bold">
                     <td className="py-2">LÍQUIDO RECLAMANTE</td>
                     <td className="py-2 text-right font-mono text-[hsl(var(--success))]">{fmt(res.resumo.liquido_reclamante)}</td>
                   </tr>
+                  {res.resumo.fgts_total > 0 && (
+                    <tr className="border-b border-border/30">
+                      <td className="py-2 text-muted-foreground">FGTS (depósitos + multa)</td>
+                      <td className="py-2 text-right font-mono font-medium">{fmt(res.resumo.fgts_total)}</td>
+                    </tr>
+                  )}
                   <tr className="font-bold">
                     <td className="py-2">CS EMPREGADOR</td>
                     <td className="py-2 text-right font-mono">{fmt(res.resumo.cs_empregador)}</td>
                   </tr>
+                  {res.resumo.honorarios_sucumbenciais > 0 && (
+                    <tr className="border-b border-border/30">
+                      <td className="py-2 text-muted-foreground">Honorários Sucumbenciais</td>
+                      <td className="py-2 text-right font-mono">{fmt(res.resumo.honorarios_sucumbenciais)}</td>
+                    </tr>
+                  )}
+                  {res.resumo.custas > 0 && (
+                    <tr className="border-b border-border/30">
+                      <td className="py-2 text-muted-foreground">Custas Processuais</td>
+                      <td className="py-2 text-right font-mono">{fmt(res.resumo.custas)}</td>
+                    </tr>
+                  )}
                   <tr className="border-t-2 border-destructive/30 font-bold">
                     <td className="py-2">TOTAL RECLAMADA</td>
                     <td className="py-2 text-right font-mono text-destructive">{fmt(res.resumo.total_reclamada)}</td>

@@ -1795,7 +1795,7 @@ export class PjeCalcEngine {
   // CALCULAR CONTRIBUIÇÃO SOCIAL (Tabelas Versionadas por Competência)
   // =====================================================
 
-  calcularCS(verbaResults: PjeVerbaResult[]): PjeCSResult {
+  calcularCS(verbaResults: PjeVerbaResult[], useCorrigido: boolean = false): PjeCSResult {
     const segurado_devidos: PjeCSResult['segurado_devidos'] = [];
     const segurado_pagos: PjeCSResult['segurado_pagos'] = [];
     const empregador: PjeCSResult['empregador'] = [];
@@ -1804,15 +1804,17 @@ export class PjeCalcEngine {
       return { segurado_devidos: [], segurado_pagos: [], empregador, total_segurado_devidos: 0, total_segurado_pagos: 0, total_segurado: 0, total_empregador: 0 };
     }
 
-    // ═══ Track 1: CS sobre salários DEVIDOS (diferenças) ═══
+    // ═══ Track 1: CS sobre salários DEVIDOS ═══
+    // When useCorrigido=true (juros_apos_deducao_cs flow), CS is on corrected values
     const basesDevidos: Record<string, number> = {};
     for (const vr of verbaResults) {
       const verba = this.verbas.find(v => v.id === vr.verba_id);
       if (!verba?.incidencias.contribuicao_social) continue;
       if (verba.caracteristica === 'ferias') continue;
       for (const oc of vr.ocorrencias) {
-        if (oc.diferenca <= 0) continue;
-        basesDevidos[oc.competencia] = (basesDevidos[oc.competencia] || 0) + oc.diferenca;
+        const val = useCorrigido ? oc.valor_corrigido : oc.diferenca;
+        if (val <= 0) continue;
+        basesDevidos[oc.competencia] = (basesDevidos[oc.competencia] || 0) + val;
       }
     }
 
@@ -2589,7 +2591,7 @@ export class PjeCalcEngine {
       this.aplicarCorrecaoSomente(verbaResults);
       
       // Step B: CS on corrected values (uses valor_corrigido which is now set)
-      const csPreJuros = this.calcularCS(verbaResults);
+      const csPreJuros = this.calcularCS(verbaResults, true);
       const csDescontadoPreJuros = this.csConfig.cobrar_reclamante ? csPreJuros.total_segurado : 0;
       
       // Step C+D: Apply interest on (corrected - CS_share_pro_rata)
@@ -2629,15 +2631,15 @@ export class PjeCalcEngine {
     const salarioFamilia = this.calcularSalarioFamilia(verbaResults);
 
     // ── 9. Composição do Resumo ──
-    const principalBruto = verbaResults
+    const principalBruto = Number(verbaResults
       .filter(v => { const verba = this.verbas.find(vb => vb.id === v.verba_id); return verba?.compor_principal !== false; })
-      .reduce((s, v) => s + v.total_diferenca, 0);
-    const principalCorrigido = verbaResults
+      .reduce((s, v) => s.plus(v.total_diferenca), new Decimal(0)).toDP(2));
+    const principalCorrigido = Number(verbaResults
       .filter(v => { const verba = this.verbas.find(vb => vb.id === v.verba_id); return verba?.compor_principal !== false; })
-      .reduce((s, v) => s + v.total_corrigido, 0);
-    const jurosMora = verbaResults
+      .reduce((s, v) => s.plus(v.total_corrigido), new Decimal(0)).toDP(2));
+    const jurosMora = Number(verbaResults
       .filter(v => { const verba = this.verbas.find(vb => vb.id === v.verba_id); return verba?.compor_principal !== false; })
-      .reduce((s, v) => s + v.total_juros, 0);
+      .reduce((s, v) => s.plus(v.total_juros), new Decimal(0)).toDP(2));
 
     const honorarios = this.calcularHonorarios(principalCorrigido, jurosMora, fgts.total_fgts);
     const valorCondenacao = principalCorrigido + jurosMora + fgts.total_fgts;
@@ -2669,21 +2671,29 @@ export class PjeCalcEngine {
       }
     }
 
-    // PJe-Calc: Bruto = verbas corrigidas + juros + FGTS (corrigido+juros+multa)
-    const brutoTotal = principalCorrigido + jurosMora + fgts.total_fgts;
+    // PJe-Calc: Bruto = verbas corrigidas + juros (FGTS is separate in PJe-Calc's "bruto devido ao reclamante")
+    const brutoTotal = Number(new Decimal(principalCorrigido).plus(jurosMora).toDP(2));
     
-    // Líquido = Bruto - CS segurado - IR - prev privada - pensão + seguro + multas + salário família
-    const liquido = Number(new Decimal(
-      brutoTotal + seguro.total + multa523 + multa467 + salarioFamilia.total
-      - csDescontado - ir.imposto_devido - prevPrivada.valor - pensaoTotal
-    ).toDP(2));
+    // Líquido = Bruto - CS segurado - IR - prev privada - pensão
+    // NOTE: seguro, multas and salário família are NOT added here — they are separate items
+    // This prevents the impossible "líquido > bruto" bug
+    const liquido = Number(new Decimal(brutoTotal)
+      .minus(csDescontado)
+      .minus(ir.imposto_devido)
+      .minus(prevPrivada.valor)
+      .minus(pensaoTotal)
+      .toDP(2));
 
-    // Total Reclamada = líquido + CS segurado (recolher) + CS empregador + honorários + custas + IR
-    const totalReclamada = Number(new Decimal(
-      liquido + csDescontado + cs.total_empregador 
-      + honorarios.sucumbenciais + honorarios.contratuais + custasResult.total
-      + ir.imposto_devido
-    ).toDP(2));
+    // Total Reclamada = líquido + CS segurado (recolher) + CS empregador + honorários + custas + IR + FGTS
+    const totalReclamada = Number(new Decimal(liquido)
+      .plus(csDescontado)
+      .plus(cs.total_empregador)
+      .plus(honorarios.sucumbenciais)
+      .plus(honorarios.contratuais)
+      .plus(custasResult.total)
+      .plus(ir.imposto_devido)
+      .plus(fgts.total_fgts)
+      .toDP(2));
 
     const resumo: PjeResumo = {
       principal_bruto: Number(new Decimal(principalBruto).toDP(2)),
