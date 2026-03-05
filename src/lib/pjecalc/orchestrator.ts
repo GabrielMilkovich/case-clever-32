@@ -383,6 +383,8 @@ export async function executarLiquidacao(
 
   let engineVerbas = toEngineVerbas(caseData.verbas);
 
+  console.log(`[ORCHESTRATOR] Loaded ${engineVerbas.length} verbas from DB (principals: ${engineVerbas.filter(v => v.tipo === 'principal').length}, reflexas: ${engineVerbas.filter(v => v.tipo === 'reflexa').length})`);
+
   // ── Auto-generate reflexes if not already present ──
   // Only generate if there are principal verbas without any reflexes linked to them
   const principalVerbas = engineVerbas.filter(v => v.tipo === 'principal');
@@ -392,6 +394,7 @@ export async function executarLiquidacao(
   const principalsSemReflexo = principalVerbas.filter(v => !principalsWithReflexas.has(v.id));
 
   if (principalsSemReflexo.length > 0) {
+    console.log(`[ORCHESTRATOR] Auto-generating reflexes for ${principalsSemReflexo.length} principals without reflexes`);
     // Build VerbaBase list for reflexo generation
     const verbasBase: VerbaBase[] = principalsSemReflexo.map(v => ({
       id: v.id,
