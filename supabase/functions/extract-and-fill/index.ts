@@ -838,8 +838,39 @@ async function processDocumentInBackground(
     const base64Data = arrayBufferToBase64(fileBuffer);
     console.log(`[EXTRACT] File: ${fileBuffer.byteLength} bytes, base64: ${base64Data.length} chars`);
 
-    // Call AI
-    const extracted = await callAI(base64Data, mimeType, LOVABLE_API_KEY);
+    // Step 1: OCR via Mistral
+    const MISTRAL_API_KEY = Deno.env.get("MISTRAL_API_KEY");
+    let ocrText = "";
+    let ocrPageCount = 1;
+
+    if (MISTRAL_API_KEY) {
+      console.log("[EXTRACT] Using Mistral OCR for text extraction...");
+      try {
+        const ocrResult = await callMistralOCR(fileUrl, base64Data, mimeType, MISTRAL_API_KEY);
+        ocrText = ocrResult.text;
+        ocrPageCount = ocrResult.pageCount;
+        console.log(`[EXTRACT] Mistral OCR: ${ocrText.length} chars, ${ocrPageCount} pages`);
+      } catch (ocrErr: any) {
+        console.warn("[EXTRACT] Mistral OCR failed, will fallback to vision:", ocrErr?.message);
+      }
+    } else {
+      console.warn("[EXTRACT] MISTRAL_API_KEY not set, skipping Mistral OCR");
+    }
+
+    // Step 2: Structured extraction from text (or fallback to vision)
+    let extracted: any;
+    if (ocrText.length > 50) {
+      // Use text-based extraction (cheaper, no base64 image needed)
+      extracted = await callAIFromText(ocrText, LOVABLE_API_KEY);
+      if (!extracted.paginas_detectadas) extracted.paginas_detectadas = ocrPageCount;
+    } else {
+      // Fallback: send image directly to Lovable AI (original behavior)
+      console.log("[EXTRACT] Fallback to vision-based extraction...");
+      extracted = await callAIFromText(
+        `[OCR falhou. Documento: ${doc.file_name}, tipo: ${mimeType}, tamanho: ${fileBuffer.byteLength} bytes. Dados insuficientes para extração.]`,
+        LOVABLE_API_KEY
+      );
+    }
 
     // Auto-fill
     const fills = await autoFill(supabase, doc.case_id, extracted);
