@@ -119,6 +119,7 @@ export interface ReflexoGerado {
   caracteristica: string;
   ocorrencia_pagamento: string;
   comportamento_reflexo: string;
+  periodo_media_reflexo?: string;
   tratamento_fracao_mes: string;
   multiplicador: number;
   divisor_tipo: string;
@@ -129,6 +130,7 @@ export interface ReflexoGerado {
   incidencias: { fgts: boolean; irpf: boolean; cs: boolean };
   ordem: number;
   base_verbas: string[]; // IDs das verbas base
+  integralizar_base?: boolean;
 }
 
 /**
