@@ -149,7 +149,7 @@ export function ModuloResumo({ caseId }: Props) {
           .filter((o) => (o as Record<string, unknown>).historico_id === h.id)
           .map((o) => {
             const oc = o as Record<string, unknown>;
-            return { id: oc.id as string, historico_id: oc.historico_id as string, competencia: oc.competencia as string, valor: Number(oc.valor), tipo: (oc.tipo as string) || 'calculado' };
+            return { id: oc.id as string, historico_id: oc.historico_id as string, competencia: oc.competencia as string, valor: Number(oc.valor), tipo: ((oc.tipo as string) || 'calculado') as 'calculado' | 'informado' };
           }),
       }));
       const faltas = faltasData as unknown as PjeFalta[];
