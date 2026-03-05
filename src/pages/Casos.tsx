@@ -250,6 +250,7 @@ export default function Casos() {
               <FlaskConical className="h-4 w-4" />
               {seedingMaria ? "Criando..." : "Caso Maria (Comissionista)"}
             </Button>
+            <Button
               variant="outline" size="sm" 
               onClick={handleSeedTestCase}
               disabled={seedingTest}
