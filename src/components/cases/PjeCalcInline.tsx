@@ -33,28 +33,30 @@ import { ModuloMultasCLT } from "./pjecalc/ModuloMultasCLT";
 import { ModuloPensaoAlimenticia } from "./pjecalc/ModuloPensaoAlimenticia";
 import { ModuloPrevidenciaPrivada } from "./pjecalc/ModuloPrevidenciaPrivada";
 import { ModuloSalarioFamilia } from "./pjecalc/ModuloSalarioFamilia";
+import { calcularCompletude, type ModuleStatus } from "@/lib/pjecalc/completude";
 
-const MODULOS = [
-  { id: 'dados_processo', label: 'Dados do Processo', icon: Gavel, desc: 'Identificação e partes' },
-  { id: 'parametros', label: 'Parâmetros', icon: Calendar, desc: 'Datas e configuração' },
-  { id: 'historico', label: 'Histórico Salarial', icon: DollarSign, desc: 'Bases de cálculo' },
-  { id: 'faltas', label: 'Faltas', icon: Clock, desc: 'Registros de ausência' },
-  { id: 'ferias', label: 'Férias', icon: Calendar, desc: 'Períodos aquisitivos' },
-  { id: 'cartao_ponto', label: 'Cartão de Ponto', icon: Clock, desc: 'Horas extras e noturnas' },
-  { id: 'verbas', label: 'Verbas', icon: FileText, desc: 'Parcelas do cálculo' },
-  { id: 'salario_familia', label: 'Salário-Família', icon: Users, desc: 'Cotas por dependente' },
-  { id: 'seguro_desemprego', label: 'Seguro-Desemprego', icon: Shield, desc: 'Indenização substitutiva' },
-  { id: 'fgts', label: 'FGTS', icon: Building2, desc: 'Depósitos e multa' },
-  { id: 'cs', label: 'Contrib. Social', icon: Receipt, desc: 'Segurado e empregador' },
-  { id: 'prev_privada', label: 'Previd. Privada', icon: Briefcase, desc: 'Complementar' },
-  { id: 'pensao', label: 'Pensão Alimentícia', icon: Users, desc: 'Percentual sobre crédito' },
-  { id: 'ir', label: 'Imposto de Renda', icon: Percent, desc: 'IRRF / RRA' },
-  { id: 'correcao', label: 'Correção/Juros', icon: TrendingUp, desc: 'Atualização monetária' },
-  { id: 'multas', label: 'Multas e Inden.', icon: Gavel, desc: 'CLT 467, 477, etc.' },
-  { id: 'honorarios', label: 'Honorários', icon: Scale, desc: 'Sucumbenciais e contratuais' },
-  { id: 'custas', label: 'Custas', icon: Landmark, desc: 'Custas e assistência' },
-  { id: 'resumo', label: 'Resumo', icon: FileBarChart, desc: 'Resultado da liquidação' },
-];
+  // Module definitions with metadata
+  const MODULOS = [
+    { id: 'dados_processo', label: 'Dados do Processo', icon: Gavel, desc: 'Identificação e partes' },
+    { id: 'parametros', label: 'Parâmetros', icon: Calendar, desc: 'Datas e configuração' },
+    { id: 'historico', label: 'Histórico Salarial', icon: DollarSign, desc: 'Bases de cálculo' },
+    { id: 'faltas', label: 'Faltas', icon: Clock, desc: 'Registros de ausência' },
+    { id: 'ferias', label: 'Férias', icon: Calendar, desc: 'Períodos aquisitivos' },
+    { id: 'cartao_ponto', label: 'Cartão de Ponto', icon: Clock, desc: 'Horas extras e noturnas' },
+    { id: 'verbas', label: 'Verbas', icon: FileText, desc: 'Parcelas do cálculo' },
+    { id: 'salario_familia', label: 'Salário-Família', icon: Users, desc: 'Cotas por dependente' },
+    { id: 'seguro_desemprego', label: 'Seguro-Desemprego', icon: Shield, desc: 'Indenização substitutiva' },
+    { id: 'fgts', label: 'FGTS', icon: Building2, desc: 'Depósitos e multa' },
+    { id: 'cs', label: 'Contrib. Social', icon: Receipt, desc: 'Segurado e empregador' },
+    { id: 'prev_privada', label: 'Previd. Privada', icon: Briefcase, desc: 'Complementar' },
+    { id: 'pensao', label: 'Pensão Alimentícia', icon: Users, desc: 'Percentual sobre crédito' },
+    { id: 'ir', label: 'Imposto de Renda', icon: Percent, desc: 'IRRF / RRA' },
+    { id: 'correcao', label: 'Correção/Juros', icon: TrendingUp, desc: 'Atualização monetária' },
+    { id: 'multas', label: 'Multas e Inden.', icon: Gavel, desc: 'CLT 467, 477, etc.' },
+    { id: 'honorarios', label: 'Honorários', icon: Scale, desc: 'Sucumbenciais e contratuais' },
+    { id: 'custas', label: 'Custas', icon: Landmark, desc: 'Custas e assistência' },
+    { id: 'resumo', label: 'Resumo', icon: FileBarChart, desc: 'Resultado da liquidação' },
+  ];
 
 const UFS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 
@@ -123,6 +125,14 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
     queryKey: ["pjecalc_dados_processo", caseId],
     queryFn: async () => {
       const { data } = await supabase.from("pjecalc_dados_processo" as any).select("*").eq("case_id", caseId).maybeSingle();
+      return data as any;
+    },
+  });
+
+  const { data: resultado } = useQuery({
+    queryKey: ["pjecalc_liquidacao", caseId],
+    queryFn: async () => {
+      const { data } = await supabase.from("pjecalc_liquidacao_resultado" as any).select("*").eq("case_id", caseId).order("created_at", { ascending: false }).limit(1).maybeSingle();
       return data as any;
     },
   });
@@ -286,16 +296,25 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
     }
   };
 
-  const moduleStatus = (modId: string): 'done' | 'active' | 'pending' => {
-    if (modId === activeModule) return 'active';
-    switch (modId) {
-      case 'dados_processo': return dadosProcesso ? 'done' : 'pending';
-      case 'parametros': return params ? 'done' : 'pending';
-      case 'faltas': return faltas.length > 0 ? 'done' : 'pending';
-      case 'ferias': return ferias.length > 0 ? 'done' : 'pending';
-      case 'historico': return historicos.length > 0 ? 'done' : 'pending';
-      case 'verbas': return verbas.length > 0 ? 'done' : 'pending';
-      default: return 'pending';
+  const completude = useMemo(() => {
+    return calcularCompletude({
+      params: formParams,
+      faltas,
+      ferias,
+      historicos,
+      verbas,
+      cartaoPonto: [], // TODO: load cartao ponto for check
+      resultado
+    });
+  }, [formParams, faltas, ferias, historicos, verbas, resultado]);
+
+  const getStatusColor = (status: ModuleStatus) => {
+    switch (status) {
+      case 'validado': return 'bg-[hsl(var(--success))]';
+      case 'preenchido': return 'bg-primary';
+      case 'alerta': return 'bg-yellow-500';
+      case 'incompleto': return 'bg-destructive';
+      default: return 'bg-muted-foreground/30';
     }
   };
 
