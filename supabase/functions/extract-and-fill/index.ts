@@ -1072,6 +1072,7 @@ async function processDocumentInBackground(
       const { data: caseRow } = await supabase.from("cases").select("criado_por").eq("id", doc.case_id).maybeSingle();
       userId = caseRow?.criado_por;
     }
+    if (userId) {
       const { data: existingCalc } = await supabase
         .from("pjecalc_calculos")
         .select("id")
