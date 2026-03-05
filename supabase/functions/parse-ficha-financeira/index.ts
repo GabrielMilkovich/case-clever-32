@@ -2,15 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
-
-interface RubricaExtraida {
-  codigo: string;
-  denominacao: string;
-  classificacao: string;
-  valores_mensais: { competencia: string; valor: number }[];
-}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -29,59 +22,47 @@ serve(async (req) => {
 
     const tipoLabel = tipo_documento === "contracheque" ? "Demonstrativo de Pagamento (Contracheque)" : "Ficha Financeira";
 
-    const systemPrompt = `Você é um especialista em análise de documentos trabalhistas brasileiros. 
-Sua tarefa é extrair dados estruturados de ${tipoLabel}.
+    const systemPrompt = `Você é um perito contábil trabalhista especializado em análise de ${tipoLabel}.
 
-REGRAS FUNDAMENTAIS:
+OBJETIVO: Extrair TODAS as rubricas de pagamento com seus valores mensais.
+
+REGRAS DE EXTRAÇÃO — ${tipoLabel}:
 ${tipo_documento === "contracheque" ? `
-- Considere APENAS valores na coluna "VENCIMENTOS" (pagamentos ao empregado)
-- IGNORE valores na coluna "DESCONTOS"
-- Cada demonstrativo refere-se a um único mês (referência no cabeçalho)
-- A referência do mês está no campo "REFERÊNCIA" (ex: JAN/2018)
+- Extraia APENAS valores da coluna "VENCIMENTOS" (créditos ao empregado)
+- IGNORE a coluna "DESCONTOS"  
+- O mês de referência está no cabeçalho (ex: "REFERÊNCIA: JAN/2018" ou "Competência: 01/2018")
+- Se houver múltiplos contracheques, extraia cada um com sua competência
 ` : `
-- Considere APENAS linhas cuja 3ª coluna "Clas." contenha "PGTO" (pagamento)
-- IGNORE linhas com classificação diferente de "PGTO" (como DESC, etc.)
-- Cada coluna após "Clas." representa um mês do ano (Janeiro, Fevereiro, etc.)
-- Valores em branco significam que não houve pagamento naquele mês
+- REGRA FUNDAMENTAL: Extraia APENAS linhas com classificação "PGTO" (pagamento)
+- IGNORE linhas com classificação "DESC" (desconto), "BASE", "INFO" ou qualquer outra
+- A classificação geralmente está na 3ª coluna, marcada como "Clas." ou "Cl."
+- Cada coluna numérica após a classificação representa um mês (Jan, Fev, Mar, etc.)
+- Valores em branco ou zero significam que não houve pagamento naquele mês — OMITA-OS
+- Se o documento tiver formato de tabela com meses nas colunas, mapeie cada coluna para YYYY-MM
 `}
 
-CATEGORIZAÇÃO POR COR/NATUREZA:
-- Comissões: códigos como 0620 (Comissões), 1307 (equivalentes)
-- DSR: códigos como 0501 (DSR Comissão), 0502 (DSR H.Extra)
-- Prêmios/Gratificações: códigos como 2377, 2477, 2481, 3290 (Prêmio, Antecipação Prêmio)
-- Adicional Noturno: código 1800
-- Horas Extras: códigos como 4001
-- Salário Base/Fixo: quando houver
-- Outros Vencimentos: demais rubricas PGTO
+IDENTIFICAÇÃO DE RUBRICAS — Categorize cada rubrica:
+| Padrão no nome/código | Categoria |
+|---|---|
+| Comissão, Comissões, COMISSOES, cod 0620 | comissao |
+| DSR, Repouso, Rep.Sem.Rem., cod 0501/0502 | dsr |
+| Prêmio, Premio, Gratificação, Estímulo, cod 2377/2477/2481/3290 | premio |
+| Adicional Noturno, Ad.Not., cod 1800 | adicional_noturno |
+| Hora Extra, H.Extra, HE, cod 4001 | hora_extra |
+| Salário, Sal.Base, Piso, Mínimo Garantido | salario_base |
+| Qualquer outro vencimento PGTO | outros |
 
-FORMATO DE SAÍDA:
-Retorne um JSON com a seguinte estrutura:
-{
-  "ano": number,
-  "empregado": string,
-  "empresa": string,
-  "rubricas": [
-    {
-      "codigo": "0620",
-      "denominacao": "Comissões",
-      "classificacao": "PGTO",
-      "categoria": "comissao|dsr|premio|adicional_noturno|hora_extra|salario_base|outros",
-      "valores_mensais": [
-        { "competencia": "2018-01", "valor": 1908.91 },
-        { "competencia": "2018-02", "valor": 1500.00 }
-      ]
-    }
-  ],
-  "resumo_mensal": [
-    { "competencia": "2018-01", "total_vencimentos": 3500.00 }
-  ]
-}
+FORMATO MONETÁRIO:
+- Documentos brasileiros usam: 1.234,56 (ponto = milhar, vírgula = decimal)
+- Converta para número decimal: 1234.56
+- Nunca inclua R$, pontos de milhar no output numérico
 
-IMPORTANTE:
-- Valores monetários devem ser números (sem R$, sem pontos de milhar — use ponto para decimal)
-- Competências no formato YYYY-MM
-- Se o ano não estiver claro, use ${ano_referencia || "o ano mencionado no documento"}
-- Não invente dados — se um valor estiver ilegível, omita-o`;
+FORMATO DE COMPETÊNCIA: sempre YYYY-MM (ex: 2018-01, 2019-12)
+
+EXTRAIA TUDO: Não omita rubricas. Se existem 10 rubricas PGTO, retorne as 10.
+Se uma rubrica tem valores em 12 meses, retorne os 12 valores.
+
+O ano de referência provável é ${ano_referencia || "indicado no documento"}.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -93,35 +74,41 @@ IMPORTANTE:
         model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Analise o seguinte documento e extraia os dados conforme instruído:\n\n${texto_documento}` },
+          { role: "user", content: `Analise o seguinte documento e extraia TODAS as rubricas de pagamento com seus valores mensais.\n\nDOCUMENTO:\n${texto_documento.slice(0, 50000)}` },
         ],
         tools: [{
           type: "function",
           function: {
             name: "extrair_dados_financeiros",
-            description: "Extrai dados estruturados de ficha financeira ou contracheque",
+            description: "Extrai dados estruturados de ficha financeira ou contracheque trabalhista",
             parameters: {
               type: "object",
               properties: {
-                ano: { type: "number" },
-                empregado: { type: "string" },
-                empresa: { type: "string" },
+                ano: { type: "number", description: "Ano principal de referência" },
+                empregado: { type: "string", description: "Nome do empregado" },
+                empresa: { type: "string", description: "Nome da empresa/empregador" },
                 rubricas: {
                   type: "array",
+                  description: "Lista de rubricas de pagamento extraídas",
                   items: {
                     type: "object",
                     properties: {
-                      codigo: { type: "string" },
-                      denominacao: { type: "string" },
-                      classificacao: { type: "string" },
-                      categoria: { type: "string", enum: ["comissao", "dsr", "premio", "adicional_noturno", "hora_extra", "salario_base", "outros"] },
+                      codigo: { type: "string", description: "Código da rubrica (ex: 0620)" },
+                      denominacao: { type: "string", description: "Nome da rubrica (ex: Comissões)" },
+                      classificacao: { type: "string", description: "Classificação: PGTO, DESC, etc." },
+                      categoria: { 
+                        type: "string", 
+                        enum: ["comissao", "dsr", "premio", "adicional_noturno", "hora_extra", "salario_base", "outros"],
+                        description: "Categoria funcional da rubrica" 
+                      },
                       valores_mensais: {
                         type: "array",
+                        description: "Valores por competência (apenas meses com valor > 0)",
                         items: {
                           type: "object",
                           properties: {
-                            competencia: { type: "string" },
-                            valor: { type: "number" }
+                            competencia: { type: "string", description: "YYYY-MM" },
+                            valor: { type: "number", description: "Valor numérico decimal" }
                           },
                           required: ["competencia", "valor"]
                         }
@@ -132,6 +119,7 @@ IMPORTANTE:
                 },
                 resumo_mensal: {
                   type: "array",
+                  description: "Total de vencimentos por mês",
                   items: {
                     type: "object",
                     properties: {
@@ -167,13 +155,42 @@ IMPORTANTE:
     }
 
     const aiResult = await response.json();
+    
+    // Handle both tool_calls and content-based responses
+    let extracted: any;
+    
     const toolCall = aiResult.choices?.[0]?.message?.tool_calls?.[0];
-
-    if (!toolCall?.function?.arguments) {
-      throw new Error("IA não retornou dados estruturados");
+    if (toolCall?.function?.arguments) {
+      extracted = JSON.parse(toolCall.function.arguments);
+    } else {
+      // Try to parse from content (some models return JSON in content)
+      const content = aiResult.choices?.[0]?.message?.content || "";
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        extracted = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error("IA não retornou dados estruturados. Tente novamente.");
+      }
     }
 
-    const extracted = JSON.parse(toolCall.function.arguments);
+    // Post-process: validate and clean data
+    if (extracted.rubricas) {
+      extracted.rubricas = extracted.rubricas
+        .filter((r: any) => r.valores_mensais && r.valores_mensais.length > 0)
+        .map((r: any) => ({
+          ...r,
+          valores_mensais: r.valores_mensais
+            .filter((v: any) => v.valor != null && v.valor > 0)
+            .map((v: any) => ({
+              competencia: v.competencia,
+              valor: typeof v.valor === 'string' ? parseFloat(v.valor.replace(/[^\d.,-]/g, '').replace(',', '.')) : v.valor,
+            }))
+            .filter((v: any) => !isNaN(v.valor) && v.valor > 0),
+        }))
+        .filter((r: any) => r.valores_mensais.length > 0);
+    }
+
+    console.log(`Extracted ${extracted.rubricas?.length || 0} rubricas from ${tipoLabel}`);
 
     return new Response(JSON.stringify(extracted), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
