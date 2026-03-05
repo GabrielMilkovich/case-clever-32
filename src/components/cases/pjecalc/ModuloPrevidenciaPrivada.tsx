@@ -5,10 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Save, Loader2 } from "lucide-react";
+import { Save, Loader2, Plus, Trash2 } from "lucide-react";
+
+interface AliquotaPeriodo {
+  competencia_inicial: string;
+  competencia_final: string;
+  aliquota: string;
+}
 
 interface Props { caseId: string; }
 
@@ -24,22 +29,20 @@ export function ModuloPrevidenciaPrivada({ caseId }: Props) {
     },
   });
 
-  const [form, setForm] = useState({
-    apurar: false,
-    percentual: '0',
-    base_calculo: 'diferenca',
-    deduzir_ir: true,
-    observacao: '',
-  });
+  const [apurar, setApurar] = useState(false);
+  const [periodos, setPeriodos] = useState<AliquotaPeriodo[]>([
+    { competencia_inicial: '', competencia_final: '', aliquota: '' }
+  ]);
 
   useEffect(() => {
-    if (data) setForm({
-      apurar: data.apurar ?? false,
-      percentual: data.percentual?.toString() || '0',
-      base_calculo: data.base_calculo || 'diferenca',
-      deduzir_ir: data.deduzir_ir ?? true,
-      observacao: data.observacao || '',
-    });
+    if (data) {
+      setApurar(data.apurar ?? false);
+      if (data.periodos && Array.isArray(data.periodos) && data.periodos.length > 0) {
+        setPeriodos(data.periodos);
+      } else if (data.percentual) {
+        setPeriodos([{ competencia_inicial: '', competencia_final: '', aliquota: data.percentual?.toString() || '' }]);
+      }
+    }
   }, [data]);
 
   const save = async () => {
@@ -47,11 +50,12 @@ export function ModuloPrevidenciaPrivada({ caseId }: Props) {
     try {
       const payload = {
         case_id: caseId,
-        apurar: form.apurar,
-        percentual: parseFloat(form.percentual) || 0,
-        base_calculo: form.base_calculo,
-        deduzir_ir: form.deduzir_ir,
-        observacao: form.observacao || null,
+        apurar,
+        percentual: periodos[0]?.aliquota ? parseFloat(periodos[0].aliquota) : 0,
+        base_calculo: 'diferenca',
+        deduzir_ir: true,
+        periodos,
+        observacao: null,
       };
       if (data?.id) await supabase.from("pjecalc_previdencia_privada_config" as any).update(payload).eq("id", data.id);
       else await supabase.from("pjecalc_previdencia_privada_config" as any).insert(payload);
@@ -69,45 +73,77 @@ export function ModuloPrevidenciaPrivada({ caseId }: Props) {
           {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />} Salvar
         </Button>
       </div>
+
       <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-sm">Configuração</CardTitle></CardHeader>
+        <CardHeader className="pb-3"><CardTitle className="text-sm">Dados de Previdência Privada</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-2">
-            <Checkbox checked={form.apurar} onCheckedChange={v => setForm(p => ({ ...p, apurar: !!v }))} />
-            <Label className="text-xs">Apurar Previdência Privada</Label>
+            <Checkbox checked={apurar} onCheckedChange={v => setApurar(!!v)} />
+            <Label className="text-xs font-medium">Apurar Previdência Privada</Label>
           </div>
-          {form.apurar && (
-            <>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-xs">Percentual (%)</Label>
-                  <Input type="number" step="0.01" value={form.percentual} onChange={e => setForm(p => ({ ...p, percentual: e.target.value }))} className="mt-1 h-8 text-xs" />
-                </div>
-                <div>
-                  <Label className="text-xs">Base de Cálculo</Label>
-                  <Select value={form.base_calculo} onValueChange={v => setForm(p => ({ ...p, base_calculo: v }))}>
-                    <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="diferenca">Diferença (Devido - Pago)</SelectItem>
-                      <SelectItem value="devido">Valor Devido</SelectItem>
-                      <SelectItem value="corrigido">Valor Corrigido</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+
+          {apurar && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold">Alíquota por Período</Label>
+                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setPeriodos(p => [...p, { competencia_inicial: '', competencia_final: '', aliquota: '' }])}>
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
               </div>
-              <div className="flex items-center gap-2">
-                <Checkbox checked={form.deduzir_ir} onCheckedChange={v => setForm(p => ({ ...p, deduzir_ir: !!v }))} />
-                <Label className="text-xs">Deduzir da Base de IR</Label>
+
+              <div className="border border-border rounded overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-muted/50 border-b border-border">
+                      <th className="p-2 text-left font-medium">Competência Inicial *</th>
+                      <th className="p-2 text-left font-medium">Competência Final *</th>
+                      <th className="p-2 text-left font-medium">Alíquota (%) *</th>
+                      <th className="p-2 w-8"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {periodos.map((p, idx) => (
+                      <tr key={idx} className="border-b border-border/50">
+                        <td className="p-1.5">
+                          <Input
+                            value={p.competencia_inicial}
+                            onChange={e => { const n = [...periodos]; n[idx] = { ...n[idx], competencia_inicial: e.target.value }; setPeriodos(n); }}
+                            className="h-7 text-xs" placeholder="MM/AAAA"
+                          />
+                        </td>
+                        <td className="p-1.5">
+                          <Input
+                            value={p.competencia_final}
+                            onChange={e => { const n = [...periodos]; n[idx] = { ...n[idx], competencia_final: e.target.value }; setPeriodos(n); }}
+                            className="h-7 text-xs" placeholder="MM/AAAA"
+                          />
+                        </td>
+                        <td className="p-1.5">
+                          <Input
+                            type="number" step="0.01"
+                            value={p.aliquota}
+                            onChange={e => { const n = [...periodos]; n[idx] = { ...n[idx], aliquota: e.target.value }; setPeriodos(n); }}
+                            className="h-7 text-xs"
+                          />
+                        </td>
+                        <td className="p-1.5">
+                          {periodos.length > 1 && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setPeriodos(p => p.filter((_, i) => i !== idx))}>
+                              <Trash2 className="h-3 w-3 text-destructive" />
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <div>
-                <Label className="text-xs">Observação</Label>
-                <Input value={form.observacao} onChange={e => setForm(p => ({ ...p, observacao: e.target.value }))} className="mt-1 h-8 text-xs" placeholder="Plano, CNPB, etc." />
-              </div>
-            </>
+
+              <p className="text-[10px] text-muted-foreground">
+                A previdência privada complementar será apurada sobre as verbas com incidência marcada e poderá ser deduzida da base do IR conforme Art. 11 da Lei 9.532/97.
+              </p>
+            </div>
           )}
-          <p className="text-[10px] text-muted-foreground">
-            A previdência privada complementar será apurada sobre as verbas com incidência marcada e poderá ser deduzida da base do IR conforme Art. 11 da Lei 9.532/97.
-          </p>
         </CardContent>
       </Card>
     </div>

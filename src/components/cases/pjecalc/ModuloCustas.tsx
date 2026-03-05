@@ -6,22 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Save, Loader2, Plus, Trash2 } from "lucide-react";
 
-interface CustaItem {
-  tipo: string;
-  descricao: string;
-  apurar: boolean;
-  valor_tipo: 'calculado' | 'informado' | 'nao_aplica';
-  percentual: number;
-  valor_fixo: string;
-  valor_minimo: number;
-  valor_maximo: string;
-  isento: boolean;
-  vencimento: string;
-}
+interface AutoItem { tipo: string; vencimento: string; valor_bem: string; }
+interface ArmazenamentoItem { inicio: string; termino: string; valor_bem: string; }
 
 interface Props { caseId: string; }
 
@@ -38,60 +29,48 @@ export function ModuloCustas({ caseId }: Props) {
   });
 
   const [form, setForm] = useState({
-    base_custas: 'bruto_reclamante' as 'bruto_reclamante' | 'bruto_mais_debitos',
+    base_custas: 'bruto_mais_debitos',
     // Reclamante
-    rec_conhecimento: 'nao_aplica' as string,
+    rec_conhecimento: 'nao_aplica',
     rec_conhecimento_valor: '',
-    rec_conhecimento_vencimento: '',
     // Reclamado
-    rdo_conhecimento: 'calculado_2' as string,
+    rdo_conhecimento: 'nao_aplica',
     rdo_conhecimento_valor: '',
-    rdo_conhecimento_vencimento: '',
-    rdo_liquidacao: 'nao_aplica' as string,
+    rdo_liquidacao: 'nao_aplica',
     rdo_liquidacao_valor: '',
-    rdo_liquidacao_vencimento: '',
-    rdo_fixas: false,
-    rdo_fixas_valor: '',
-    rdo_fixas_vencimento: '',
-    rdo_autos: false,
-    rdo_autos_valor: '',
-    rdo_armazenamento: false,
-    rdo_armazenamento_valor: '',
-    // Recolhidas
-    valor_minimo: 10.64,
-    isento: false,
-    assistencia_judiciaria: false,
+    // Custas fixas
+    custas_fixas_vencimento: '',
+    custas_fixas: {
+      oficiais_urbana: false, oficiais_rural: false,
+      agravo_instrumento: false, agravo_peticao: false,
+      impugnacao_sentenca: false, embargos_arrematacao: false,
+      embargos_execucao: false, embargos_terceiros: false,
+      recurso_revista: false,
+    },
+    // Autos
+    autos: [] as AutoItem[],
+    // Armazenamento
+    armazenamento: [] as ArmazenamentoItem[],
   });
 
-  const [itens, setItens] = useState<CustaItem[]>([]);
   const [recolhidas, setRecolhidas] = useState<{ descricao: string; valor: string; data: string }[]>([]);
 
   useEffect(() => {
     if (data) {
       setForm(prev => ({
         ...prev,
-        base_custas: data.base_custas || 'bruto_reclamante',
+        base_custas: data.base_custas || 'bruto_mais_debitos',
         rec_conhecimento: data.rec_conhecimento || 'nao_aplica',
         rec_conhecimento_valor: data.rec_conhecimento_valor?.toString() || '',
-        rec_conhecimento_vencimento: data.rec_conhecimento_vencimento || '',
-        rdo_conhecimento: data.rdo_conhecimento || 'calculado_2',
+        rdo_conhecimento: data.rdo_conhecimento || 'nao_aplica',
         rdo_conhecimento_valor: data.rdo_conhecimento_valor?.toString() || '',
-        rdo_conhecimento_vencimento: data.rdo_conhecimento_vencimento || '',
         rdo_liquidacao: data.rdo_liquidacao || 'nao_aplica',
         rdo_liquidacao_valor: data.rdo_liquidacao_valor?.toString() || '',
-        rdo_liquidacao_vencimento: data.rdo_liquidacao_vencimento || '',
-        rdo_fixas: data.rdo_fixas ?? false,
-        rdo_fixas_valor: data.rdo_fixas_valor?.toString() || '',
-        rdo_fixas_vencimento: data.rdo_fixas_vencimento || '',
-        rdo_autos: data.rdo_autos ?? false,
-        rdo_autos_valor: data.rdo_autos_valor?.toString() || '',
-        rdo_armazenamento: data.rdo_armazenamento ?? false,
-        rdo_armazenamento_valor: data.rdo_armazenamento_valor?.toString() || '',
-        valor_minimo: data.valor_minimo ?? 10.64,
-        isento: data.isento ?? false,
-        assistencia_judiciaria: data.assistencia_judiciaria ?? false,
+        custas_fixas_vencimento: (data as any).custas_fixas_vencimento || '',
+        custas_fixas: (data as any).custas_fixas || prev.custas_fixas,
+        autos: (data as any).autos || [],
+        armazenamento: (data as any).armazenamento || [],
       }));
-      if (data.itens && Array.isArray(data.itens)) setItens(data.itens);
       if (data.recolhidas && Array.isArray(data.recolhidas)) setRecolhidas(data.recolhidas);
     }
   }, [data]);
@@ -100,16 +79,22 @@ export function ModuloCustas({ caseId }: Props) {
     setSaving(true);
     try {
       const payload: any = {
-        case_id: caseId, ...form,
+        case_id: caseId,
+        apurar: true,
+        percentual: 2,
+        base_custas: form.base_custas,
+        rec_conhecimento: form.rec_conhecimento,
         rec_conhecimento_valor: form.rec_conhecimento_valor ? parseFloat(form.rec_conhecimento_valor) : null,
+        rdo_conhecimento: form.rdo_conhecimento,
         rdo_conhecimento_valor: form.rdo_conhecimento_valor ? parseFloat(form.rdo_conhecimento_valor) : null,
+        rdo_liquidacao: form.rdo_liquidacao,
         rdo_liquidacao_valor: form.rdo_liquidacao_valor ? parseFloat(form.rdo_liquidacao_valor) : null,
-        rdo_fixas_valor: form.rdo_fixas_valor ? parseFloat(form.rdo_fixas_valor) : null,
-        rdo_autos_valor: form.rdo_autos_valor ? parseFloat(form.rdo_autos_valor) : null,
-        rdo_armazenamento_valor: form.rdo_armazenamento_valor ? parseFloat(form.rdo_armazenamento_valor) : null,
-        // Keep legacy compatibility
-        apurar: true, percentual: 2,
-        itens, recolhidas,
+        custas_fixas_vencimento: form.custas_fixas_vencimento || null,
+        custas_fixas: form.custas_fixas,
+        autos: form.autos,
+        armazenamento: form.armazenamento,
+        recolhidas,
+        itens: [],
       };
       if (data?.id) {
         const { error } = await supabase.from("pjecalc_custas_config" as any).update(payload).eq("id", data.id);
@@ -124,18 +109,11 @@ export function ModuloCustas({ caseId }: Props) {
     finally { setSaving(false); }
   };
 
-  const CustaSelect = ({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) => (
-    <div>
-      <Label className="text-xs">{label}</Label>
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="nao_aplica">Não se aplica</SelectItem>
-          <SelectItem value="calculado_2">Calculada 2%</SelectItem>
-          <SelectItem value="informado">Informada</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
+  const RadioOption = ({ label, value, current, onChange }: { label: string; value: string; current: string; onChange: (v: string) => void }) => (
+    <label className="flex items-center gap-1.5 cursor-pointer">
+      <input type="radio" checked={current === value} onChange={() => onChange(value)} className="h-3 w-3 accent-primary" />
+      <span className="text-xs">{label}</span>
+    </label>
   );
 
   return (
@@ -147,104 +125,169 @@ export function ModuloCustas({ caseId }: Props) {
         </Button>
       </div>
 
-      {/* Base das Custas */}
       <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-sm">Base das Custas de Conhecimento e Liquidação</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Dados de Custas Judiciais</CardTitle></CardHeader>
         <CardContent>
-          <Select value={form.base_custas} onValueChange={v => setForm(p => ({ ...p, base_custas: v as any }))}>
-            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="bruto_reclamante">Bruto Devido ao Reclamante</SelectItem>
-              <SelectItem value="bruto_mais_debitos">Bruto Devido ao Reclamante + Outros Débitos da Reclamada</SelectItem>
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
+          <Tabs defaultValue="devidas">
+            <TabsList className="h-8 mb-3">
+              <TabsTrigger value="devidas" className="text-xs h-7">Custas Devidas</TabsTrigger>
+              <TabsTrigger value="recolhidas" className="text-xs h-7">Custas Recolhidas</TabsTrigger>
+            </TabsList>
 
-      {/* Custas do Reclamante */}
-      <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-sm">Custas do Reclamante</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          <CustaSelect value={form.rec_conhecimento} onChange={v => setForm(p => ({ ...p, rec_conhecimento: v }))} label="Conhecimento" />
-          {form.rec_conhecimento === 'informado' && (
-            <div className="grid grid-cols-2 gap-2">
-              <div><Label className="text-[10px]">Vencimento</Label><Input type="date" value={form.rec_conhecimento_vencimento} onChange={e => setForm(p => ({ ...p, rec_conhecimento_vencimento: e.target.value }))} className="mt-0.5 h-7 text-xs" /></div>
-              <div><Label className="text-[10px]">Valor (R$)</Label><Input type="number" step="0.01" value={form.rec_conhecimento_valor} onChange={e => setForm(p => ({ ...p, rec_conhecimento_valor: e.target.value }))} className="mt-0.5 h-7 text-xs" /></div>
-            </div>
-          )}
-          <p className="text-[10px] text-muted-foreground">Mínimo de R$ {form.valor_minimo.toFixed(2)} (Art. 789 CLT).</p>
-        </CardContent>
-      </Card>
+            <TabsContent value="devidas" className="space-y-4">
+              {/* Base */}
+              <div className="flex gap-6">
+                <div className="flex-1 space-y-3">
+                  <Label className="text-xs font-semibold">Base para Custas de Conhecimento e Liquidação</Label>
+                  <Select value={form.base_custas} onValueChange={v => setForm(p => ({ ...p, base_custas: v }))}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="bruto_reclamante">Bruto Devido ao Reclamante</SelectItem>
+                      <SelectItem value="bruto_mais_debitos">Bruto Devido ao Reclamante + Outros Débitos do Reclamado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-      {/* Custas do Reclamado */}
-      <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-sm">Custas do Reclamado</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <CustaSelect value={form.rdo_conhecimento} onChange={v => setForm(p => ({ ...p, rdo_conhecimento: v }))} label="Conhecimento" />
-          {form.rdo_conhecimento === 'informado' && (
-            <div className="grid grid-cols-2 gap-2">
-              <div><Label className="text-[10px]">Vencimento</Label><Input type="date" value={form.rdo_conhecimento_vencimento} onChange={e => setForm(p => ({ ...p, rdo_conhecimento_vencimento: e.target.value }))} className="mt-0.5 h-7 text-xs" /></div>
-              <div><Label className="text-[10px]">Valor (R$)</Label><Input type="number" step="0.01" value={form.rdo_conhecimento_valor} onChange={e => setForm(p => ({ ...p, rdo_conhecimento_valor: e.target.value }))} className="mt-0.5 h-7 text-xs" /></div>
-            </div>
-          )}
+                <div className="flex-1">
+                  <Card className="bg-muted/30">
+                    <CardContent className="p-3 space-y-2">
+                      <Label className="text-xs font-semibold">Custas do Reclamante - Conhecimento</Label>
+                      <div className="space-y-1">
+                        <RadioOption label="Não se Aplica" value="nao_aplica" current={form.rec_conhecimento} onChange={v => setForm(p => ({ ...p, rec_conhecimento: v }))} />
+                        <RadioOption label="Calculada 2%" value="calculado_2" current={form.rec_conhecimento} onChange={v => setForm(p => ({ ...p, rec_conhecimento: v }))} />
+                        <RadioOption label="Informada" value="informado" current={form.rec_conhecimento} onChange={v => setForm(p => ({ ...p, rec_conhecimento: v }))} />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
 
-          <CustaSelect value={form.rdo_liquidacao} onChange={v => setForm(p => ({ ...p, rdo_liquidacao: v }))} label="Liquidação" />
-          {form.rdo_liquidacao === 'informado' && (
-            <div className="grid grid-cols-2 gap-2">
-              <div><Label className="text-[10px]">Vencimento</Label><Input type="date" value={form.rdo_liquidacao_vencimento} onChange={e => setForm(p => ({ ...p, rdo_liquidacao_vencimento: e.target.value }))} className="mt-0.5 h-7 text-xs" /></div>
-              <div><Label className="text-[10px]">Valor (R$)</Label><Input type="number" step="0.01" value={form.rdo_liquidacao_valor} onChange={e => setForm(p => ({ ...p, rdo_liquidacao_valor: e.target.value }))} className="mt-0.5 h-7 text-xs" /></div>
-            </div>
-          )}
+              {/* Custas do Reclamado */}
+              <Card className="bg-muted/30">
+                <CardContent className="p-3">
+                  <Label className="text-xs font-semibold mb-2 block">Custas do Reclamado</Label>
+                  <div className="flex gap-6">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-medium">Conhecimento</Label>
+                      <RadioOption label="Não se Aplica" value="nao_aplica" current={form.rdo_conhecimento} onChange={v => setForm(p => ({ ...p, rdo_conhecimento: v }))} />
+                      <RadioOption label="Calculada 2%" value="calculado_2" current={form.rdo_conhecimento} onChange={v => setForm(p => ({ ...p, rdo_conhecimento: v }))} />
+                      <RadioOption label="Informada" value="informado" current={form.rdo_conhecimento} onChange={v => setForm(p => ({ ...p, rdo_conhecimento: v }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-medium">Liquidação</Label>
+                      <RadioOption label="Não se Aplica" value="nao_aplica" current={form.rdo_liquidacao} onChange={v => setForm(p => ({ ...p, rdo_liquidacao: v }))} />
+                      <RadioOption label="Calculada 0,5%" value="calculado_05" current={form.rdo_liquidacao} onChange={v => setForm(p => ({ ...p, rdo_liquidacao: v }))} />
+                      <RadioOption label="Informada" value="informado" current={form.rdo_liquidacao} onChange={v => setForm(p => ({ ...p, rdo_liquidacao: v }))} />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Checkbox checked={form.rdo_fixas} onCheckedChange={v => setForm(p => ({ ...p, rdo_fixas: !!v }))} />
-              <Label className="text-xs">Custas Fixas</Label>
-              {form.rdo_fixas && <Input type="number" step="0.01" value={form.rdo_fixas_valor} onChange={e => setForm(p => ({ ...p, rdo_fixas_valor: e.target.value }))} className="h-7 text-xs w-24" placeholder="R$" />}
-            </div>
-            <div className="flex items-center gap-2">
-              <Checkbox checked={form.rdo_autos} onCheckedChange={v => setForm(p => ({ ...p, rdo_autos: !!v }))} />
-              <Label className="text-xs">Custas de Autos</Label>
-              {form.rdo_autos && <Input type="number" step="0.01" value={form.rdo_autos_valor} onChange={e => setForm(p => ({ ...p, rdo_autos_valor: e.target.value }))} className="h-7 text-xs w-24" placeholder="R$" />}
-            </div>
-            <div className="flex items-center gap-2">
-              <Checkbox checked={form.rdo_armazenamento} onCheckedChange={v => setForm(p => ({ ...p, rdo_armazenamento: !!v }))} />
-              <Label className="text-xs">Custas de Armazenamento</Label>
-              {form.rdo_armazenamento && <Input type="number" step="0.01" value={form.rdo_armazenamento_valor} onChange={e => setForm(p => ({ ...p, rdo_armazenamento_valor: e.target.value }))} className="h-7 text-xs w-24" placeholder="R$" />}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+              {/* Custas Fixas + Autos 5% side by side */}
+              <div className="flex gap-4">
+                <div className="flex-1 space-y-2">
+                  <Label className="text-xs font-semibold">Custas Fixas</Label>
+                  <div>
+                    <Label className="text-[10px]">Vencimento</Label>
+                    <Input type="date" value={form.custas_fixas_vencimento} onChange={e => setForm(p => ({ ...p, custas_fixas_vencimento: e.target.value }))} className="h-7 text-xs mt-0.5 w-36" />
+                  </div>
+                  {Object.entries({
+                    oficiais_urbana: 'Atos dos Oficiais de Justiça - Zona Urbana',
+                    oficiais_rural: 'Atos dos Oficiais de Justiça - Zona Rural',
+                    agravo_instrumento: 'Agravo de Instrumento',
+                    agravo_peticao: 'Agravo de Petição',
+                    impugnacao_sentenca: 'Impugnação à Sentença de Liquidação',
+                    embargos_arrematacao: 'Embargos à Arrematação',
+                    embargos_execucao: 'Embargos à Execução',
+                    embargos_terceiros: 'Embargos de Terceiros',
+                    recurso_revista: 'Recurso de Revista',
+                  }).map(([key, label]) => (
+                    <div key={key} className="flex items-center gap-2">
+                      <Label className="text-[10px] flex-1">{label}</Label>
+                      <Checkbox
+                        checked={(form.custas_fixas as any)[key] ?? false}
+                        onCheckedChange={v => setForm(p => ({ ...p, custas_fixas: { ...p.custas_fixas, [key]: !!v } }))}
+                      />
+                    </div>
+                  ))}
+                </div>
 
-      {/* Custas Recolhidas */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm">Custas Recolhidas (Dedução)</CardTitle>
-            <Button variant="outline" size="sm" onClick={() => setRecolhidas(p => [...p, { descricao: '', valor: '', data: '' }])} className="h-7 text-xs">
-              <Plus className="h-3 w-3 mr-1" /> Adicionar
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {recolhidas.length === 0 && <p className="text-[10px] text-muted-foreground text-center py-2">Nenhuma custa recolhida.</p>}
-          {recolhidas.map((r, idx) => (
-            <div key={idx} className="flex items-center gap-2">
-              <Input value={r.descricao} onChange={e => { const n = [...recolhidas]; n[idx] = { ...n[idx], descricao: e.target.value }; setRecolhidas(n); }} className="h-7 text-xs flex-1" placeholder="Descrição" />
-              <Input type="number" step="0.01" value={r.valor} onChange={e => { const n = [...recolhidas]; n[idx] = { ...n[idx], valor: e.target.value }; setRecolhidas(n); }} className="h-7 text-xs w-24" placeholder="R$" />
-              <Input type="date" value={r.data} onChange={e => { const n = [...recolhidas]; n[idx] = { ...n[idx], data: e.target.value }; setRecolhidas(n); }} className="h-7 text-xs w-32" />
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setRecolhidas(p => p.filter((_, i) => i !== idx))}><Trash2 className="h-3 w-3" /></Button>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+                <div className="flex-1 space-y-3">
+                  {/* Autos 5% */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold">Autos 5%</Label>
+                      <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => setForm(p => ({ ...p, autos: [...p.autos, { tipo: '', vencimento: '', valor_bem: '' }] }))}>
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    {form.autos.length > 0 && (
+                      <div className="border border-border rounded overflow-hidden">
+                        <table className="w-full text-[10px]">
+                          <thead><tr className="bg-muted/50 border-b"><th className="p-1.5 text-left">Tipo de Auto *</th><th className="p-1.5 text-left">Vencimento *</th><th className="p-1.5 text-left">Valor do Bem *</th><th className="p-1.5 w-6"></th></tr></thead>
+                          <tbody>
+                            {form.autos.map((a, i) => (
+                              <tr key={i} className="border-b border-border/50">
+                                <td className="p-1"><Input value={a.tipo} onChange={e => { const n = [...form.autos]; n[i] = { ...a, tipo: e.target.value }; setForm(p => ({ ...p, autos: n })); }} className="h-6 text-[10px]" /></td>
+                                <td className="p-1"><Input type="date" value={a.vencimento} onChange={e => { const n = [...form.autos]; n[i] = { ...a, vencimento: e.target.value }; setForm(p => ({ ...p, autos: n })); }} className="h-6 text-[10px]" /></td>
+                                <td className="p-1"><Input type="number" step="0.01" value={a.valor_bem} onChange={e => { const n = [...form.autos]; n[i] = { ...a, valor_bem: e.target.value }; setForm(p => ({ ...p, autos: n })); }} className="h-6 text-[10px]" /></td>
+                                <td className="p-1"><Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setForm(p => ({ ...p, autos: p.autos.filter((_, j) => j !== i) }))}><Trash2 className="h-2.5 w-2.5 text-destructive" /></Button></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
 
-      {/* Isenção */}
-      <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-sm">Isenção e Assistência</CardTitle></CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex items-center gap-2"><Checkbox checked={form.isento} onCheckedChange={v => setForm(p => ({ ...p, isento: !!v }))} /><Label className="text-xs">Isento de Custas (beneficiário da justiça gratuita)</Label></div>
-          <div className="flex items-center gap-2"><Checkbox checked={form.assistencia_judiciaria} onCheckedChange={v => setForm(p => ({ ...p, assistencia_judiciaria: !!v }))} /><Label className="text-xs">Deferir Assistência Judiciária Gratuita (Art. 790, §3º CLT)</Label></div>
+                  {/* Armazenamento 0,1% */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold">Armazenamento 0,1%</Label>
+                      <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => setForm(p => ({ ...p, armazenamento: [...p.armazenamento, { inicio: '', termino: '', valor_bem: '' }] }))}>
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    {form.armazenamento.length > 0 && (
+                      <div className="border border-border rounded overflow-hidden">
+                        <table className="w-full text-[10px]">
+                          <thead><tr className="bg-muted/50 border-b"><th className="p-1.5 text-left">Início *</th><th className="p-1.5 text-left">Término *</th><th className="p-1.5 text-left">Valor do Bem *</th><th className="p-1.5 w-6"></th></tr></thead>
+                          <tbody>
+                            {form.armazenamento.map((a, i) => (
+                              <tr key={i} className="border-b border-border/50">
+                                <td className="p-1"><Input type="date" value={a.inicio} onChange={e => { const n = [...form.armazenamento]; n[i] = { ...a, inicio: e.target.value }; setForm(p => ({ ...p, armazenamento: n })); }} className="h-6 text-[10px]" /></td>
+                                <td className="p-1"><Input type="date" value={a.termino} onChange={e => { const n = [...form.armazenamento]; n[i] = { ...a, termino: e.target.value }; setForm(p => ({ ...p, armazenamento: n })); }} className="h-6 text-[10px]" /></td>
+                                <td className="p-1"><Input type="number" step="0.01" value={a.valor_bem} onChange={e => { const n = [...form.armazenamento]; n[i] = { ...a, valor_bem: e.target.value }; setForm(p => ({ ...p, armazenamento: n })); }} className="h-6 text-[10px]" /></td>
+                                <td className="p-1"><Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setForm(p => ({ ...p, armazenamento: p.armazenamento.filter((_, j) => j !== i) }))}><Trash2 className="h-2.5 w-2.5 text-destructive" /></Button></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="recolhidas" className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold">Custas Recolhidas (Dedução)</Label>
+                <Button variant="outline" size="sm" onClick={() => setRecolhidas(p => [...p, { descricao: '', valor: '', data: '' }])} className="h-7 text-xs">
+                  <Plus className="h-3 w-3 mr-1" /> Adicionar
+                </Button>
+              </div>
+              {recolhidas.length === 0 && <p className="text-[10px] text-muted-foreground py-2">Nenhuma custa recolhida registrada.</p>}
+              {recolhidas.map((r, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <Input value={r.descricao} onChange={e => { const n = [...recolhidas]; n[idx] = { ...n[idx], descricao: e.target.value }; setRecolhidas(n); }} className="h-7 text-xs flex-1" placeholder="Descrição" />
+                  <Input type="number" step="0.01" value={r.valor} onChange={e => { const n = [...recolhidas]; n[idx] = { ...n[idx], valor: e.target.value }; setRecolhidas(n); }} className="h-7 text-xs w-24" placeholder="R$" />
+                  <Input type="date" value={r.data} onChange={e => { const n = [...recolhidas]; n[idx] = { ...n[idx], data: e.target.value }; setRecolhidas(n); }} className="h-7 text-xs w-32" />
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setRecolhidas(p => p.filter((_, i) => i !== idx))}><Trash2 className="h-3 w-3" /></Button>
+                </div>
+              ))}
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>
