@@ -484,9 +484,8 @@ describe("PjeCalcEngine", () => {
       // Total reclamada > líquido reclamante
       expect(result.resumo.total_reclamada).toBeGreaterThan(result.resumo.liquido_reclamante);
 
-      // Líquido = principal_corrigido + juros + fgts + seguro + multa523 - cs - ir
+      // Líquido = principal_corrigido + juros - cs - ir (FGTS, seguro, multas are separate)
       const calculatedLiquido = result.resumo.principal_corrigido + result.resumo.juros_mora
-        + result.resumo.fgts_total + result.resumo.seguro_desemprego + result.resumo.multa_523
         - result.resumo.cs_segurado - result.resumo.ir_retido;
       expect(result.resumo.liquido_reclamante).toBeCloseTo(calculatedLiquido, 1);
     });
