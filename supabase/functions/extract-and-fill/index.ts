@@ -1070,7 +1070,7 @@ async function processDocumentInBackground(
     const fills = await autoFill(supabase, doc.case_id, extracted);
 
     // Update document with results
-    const ocrText = extracted.texto_ocr_completo || "";
+    const extractedOcrText = extracted.texto_ocr_completo || "";
     await supabase.from("documents").update({
       status: "extracted",
       tipo: extracted.tipo_documento || doc.tipo,
