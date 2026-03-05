@@ -757,19 +757,12 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
 
         {/* Main Content Area */}
         <main className="flex-1 min-w-0">
-                );
-              })}
-            </div>
-          </ScrollArea>
-        </div>
-        {/* Module content */}
-        <div className="flex-1 min-w-0">
           <ScrollArea className="h-[650px]">
             <div className="pr-4 pb-8">
               {renderModule()}
             </div>
           </ScrollArea>
-        </div>
+        </main>
       </div>
     </div>
   );
