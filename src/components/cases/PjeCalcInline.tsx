@@ -177,153 +177,13 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
   const syncFromOCR = async () => {
     setSyncing(true);
     try {
-      // Fetch facts AND case data AND employment contract in parallel
-      const [factsRes, caseRes, contractRes] = await Promise.all([
-        supabase.from("facts").select("*").eq("case_id", caseId),
-        supabase.from("cases").select("*").eq("id", caseId).maybeSingle(),
-        supabase.from("employment_contracts").select("*").eq("case_id", caseId).maybeSingle(),
-      ]);
+      const { syncFromValidation } = await import('@/lib/pjecalc/sync-from-validation');
+      const result = await syncFromValidation(caseId);
 
-      const facts = factsRes.data || [];
-      const caseData = caseRes.data;
-      const contractData = contractRes.data;
-
-      // Build fact map (handle duplicate keys by preferring confirmed facts)
-      const factMap: Record<string, string> = {};
-      for (const f of facts) {
-        if (!factMap[f.chave] || f.confirmado) {
-          factMap[f.chave] = f.valor;
-        }
-      }
-
-      // Also pull from case and contract tables directly
-      if (!factMap.data_admissao && contractData?.data_admissao) factMap.data_admissao = contractData.data_admissao;
-      if (!factMap.data_demissao && contractData?.data_demissao) factMap.data_demissao = contractData.data_demissao;
-      if (!factMap.salario_base && contractData?.salario_inicial) factMap.salario_base = String(contractData.salario_inicial);
-      if (!factMap.numero_processo && caseData?.numero_processo) factMap.numero_processo = caseData.numero_processo;
-      if (!factMap.reclamante && caseData?.cliente) factMap.reclamante = caseData.cliente;
-      if (contractData?.funcao && !factMap.cargo) factMap.cargo = contractData.funcao;
-
-      const hasData = Object.keys(factMap).length > 0;
-      if (!hasData) {
+      if (result.syncedFields === 0) {
         toast.info("Nenhum dado encontrado para sincronizar. Faça upload e OCR de documentos primeiro.");
         return;
       }
-
-      const errors: string[] = [];
-
-      // ── Auto-populate Parâmetros ──
-      const autoParams: any = { case_id: caseId };
-      if (factMap.data_admissao) autoParams.data_admissao = factMap.data_admissao;
-      if (factMap.data_demissao) autoParams.data_demissao = factMap.data_demissao;
-      if (factMap.data_ajuizamento) autoParams.data_ajuizamento = factMap.data_ajuizamento;
-      if (factMap.salario_base || factMap.salario_mensal || factMap.ultimo_salario) {
-        const salVal = parseFloat((factMap.salario_base || factMap.salario_mensal || factMap.ultimo_salario).replace(/[^\d.,]/g, '').replace(',', '.'));
-        if (!isNaN(salVal) && salVal > 0) {
-          autoParams.ultima_remuneracao = salVal;
-          autoParams.maior_remuneracao = salVal;
-        }
-      }
-      if (factMap.jornada_contratual || factMap.carga_horaria) {
-        const jornada = parseInt(factMap.jornada_contratual || factMap.carga_horaria);
-        if (jornada && jornada > 0) autoParams.carga_horaria_padrao = jornada;
-      }
-      if (factMap.estado || factMap.uf) autoParams.estado = (factMap.estado || factMap.uf).toUpperCase().trim();
-      if (factMap.municipio || factMap.cidade) autoParams.municipio = factMap.municipio || factMap.cidade;
-
-      if (params?.id) {
-        const { error } = await supabase.from("pjecalc_parametros" as any).update(autoParams).eq("id", params.id);
-        if (error) errors.push(`Parâmetros: ${error.message}`);
-      } else {
-        // Ensure NOT NULL columns have fallback values
-        if (!autoParams.data_admissao) autoParams.data_admissao = new Date().toISOString().slice(0, 10);
-        if (!autoParams.data_ajuizamento) autoParams.data_ajuizamento = new Date().toISOString().slice(0, 10);
-        autoParams.regime_trabalho = 'tempo_integral';
-        autoParams.sabado_dia_util = true;
-        const { error } = await supabase.from("pjecalc_parametros" as any).insert(autoParams);
-        if (error) errors.push(`Parâmetros: ${error.message}`);
-      }
-
-      // ── Auto-populate Dados do Processo ──
-      const processData: any = { case_id: caseId };
-      if (factMap.numero_processo) processData.numero_processo = factMap.numero_processo;
-      if (factMap.reclamante || factMap.nome_reclamante) processData.reclamante_nome = factMap.reclamante || factMap.nome_reclamante;
-      if (factMap.cpf_reclamante || factMap.cpf) processData.reclamante_cpf = factMap.cpf_reclamante || factMap.cpf;
-      if (factMap.reclamada || factMap.nome_reclamada || factMap.empregador) processData.reclamada_nome = factMap.reclamada || factMap.nome_reclamada || factMap.empregador;
-      if (factMap.cnpj_reclamada || factMap.cnpj) processData.reclamada_cnpj = factMap.cnpj_reclamada || factMap.cnpj;
-      if (factMap.vara) processData.vara = factMap.vara;
-      if (factMap.comarca) processData.comarca = factMap.comarca;
-      if (factMap.cargo || factMap.funcao) processData.objeto = factMap.cargo || factMap.funcao;
-
-      if (Object.keys(processData).length > 1) {
-        if (dadosProcesso?.id) {
-          const { error } = await supabase.from("pjecalc_dados_processo" as any).update(processData).eq("id", dadosProcesso.id);
-          if (error) errors.push(`Dados Processo: ${error.message}`);
-        } else {
-          const { error } = await supabase.from("pjecalc_dados_processo" as any).insert(processData);
-          if (error) errors.push(`Dados Processo: ${error.message}`);
-        }
-      }
-
-      // ── Auto-populate Histórico Salarial ──
-      if (autoParams.data_admissao && autoParams.ultima_remuneracao) {
-        const existing = await supabase.from("pjecalc_historico_salarial" as any).select("id").eq("case_id", caseId);
-        if (!existing.data?.length) {
-          const { error } = await supabase.from("pjecalc_historico_salarial" as any).insert({
-            case_id: caseId,
-            nome: 'Salário Base',
-            periodo_inicio: autoParams.data_admissao,
-            periodo_fim: autoParams.data_demissao || new Date().toISOString().slice(0, 10),
-            tipo_valor: 'informado',
-            valor_informado: autoParams.ultima_remuneracao,
-            incidencia_fgts: true,
-            incidencia_cs: true,
-          });
-          if (error) errors.push(`Histórico: ${error.message}`);
-        }
-      }
-
-      // ── Auto-generate verbas if empty (with verba_principal_id linkage) ──
-      const existingVerbas = await supabase.from("pjecalc_verbas" as any).select("id").eq("case_id", caseId);
-      if (!existingVerbas.data?.length && autoParams.data_admissao) {
-        const periodo = { inicio: autoParams.data_admissao, fim: autoParams.data_demissao || new Date().toISOString().slice(0, 10) };
-        // 1. Insert principal first to get its ID
-        const { data: principalData, error: principalError } = await supabase.from("pjecalc_verbas" as any).insert({
-          case_id: caseId, nome: 'Horas Extras 50%', caracteristica: 'comum', ocorrencia_pagamento: 'mensal',
-          tipo: 'principal', multiplicador: 1.5, divisor_informado: autoParams.carga_horaria_padrao || 220,
-          periodo_inicio: periodo.inicio, periodo_fim: periodo.fim, ordem: 0,
-        }).select("id").single();
-        if (principalError) errors.push(`Verba HE: ${principalError.message}`);
-
-        const principalId = (principalData as any)?.id || null;
-        // 2. Insert reflexas linked to principal
-        const reflexas = [
-          { nome: 'RSR s/ Horas Extras', caracteristica: 'comum', ocorrencia_pagamento: 'mensal', tipo: 'reflexa', multiplicador: 1, divisor_informado: 30, ordem: 1 },
-          { nome: '13º Salário', caracteristica: '13_salario', ocorrencia_pagamento: 'dezembro', tipo: 'reflexa', multiplicador: 1, divisor_informado: 12, ordem: 2 },
-          { nome: 'Férias + 1/3', caracteristica: 'ferias', ocorrencia_pagamento: 'periodo_aquisitivo', tipo: 'reflexa', multiplicador: 1.3333, divisor_informado: 12, ordem: 3 },
-        ];
-        for (const ref of reflexas) {
-          const { error } = await supabase.from("pjecalc_verbas" as any).insert({
-            case_id: caseId, ...ref, periodo_inicio: periodo.inicio, periodo_fim: periodo.fim,
-            verba_principal_id: principalId,
-            base_calculo: { historicos: [], verbas: principalId ? [principalId] : [], tabelas: [], proporcionalizar: false, integralizar: false },
-          });
-          if (error) errors.push(`Verba ${ref.nome}: ${error.message}`);
-        }
-      }
-
-      // Update local form state immediately
-      if (autoParams.data_admissao) setFormParams(p => ({
-        ...p,
-        data_admissao: autoParams.data_admissao || p.data_admissao,
-        data_demissao: autoParams.data_demissao || p.data_demissao,
-        data_ajuizamento: autoParams.data_ajuizamento || p.data_ajuizamento,
-        ultima_remuneracao: autoParams.ultima_remuneracao?.toString() || p.ultima_remuneracao,
-        maior_remuneracao: autoParams.maior_remuneracao?.toString() || p.maior_remuneracao,
-        estado: autoParams.estado || p.estado,
-        municipio: autoParams.municipio || p.municipio,
-        carga_horaria_padrao: autoParams.carga_horaria_padrao || p.carga_horaria_padrao,
-      }));
 
       // Invalidate all queries
       await Promise.all([
@@ -334,12 +194,11 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
         queryClient.invalidateQueries({ queryKey: ["employment_contract", caseId] }),
       ]);
 
-      if (errors.length > 0) {
-        toast.warning(`Sincronizado com ${errors.length} aviso(s): ${errors[0]}`);
-        console.warn("Sync errors:", errors);
+      if (result.errors.length > 0) {
+        toast.warning(`Sincronizado com ${result.errors.length} aviso(s): ${result.errors[0]}`);
+        console.warn("Sync errors:", result.errors);
       } else {
-        const syncedFields = Object.keys(factMap).length;
-        toast.success(`${syncedFields} campos sincronizados! Verifique cada módulo.`);
+        toast.success(`${result.syncedFields} campos sincronizados! Verifique cada módulo.`);
       }
     } catch (e) {
       toast.error("Erro ao sincronizar: " + (e as Error).message);
