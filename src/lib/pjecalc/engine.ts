@@ -2576,7 +2576,7 @@ export class PjeCalcEngine {
         const baseJuros = new Decimal(oc.valor_corrigido).minus(csShare);
 
         if (combinacoes_juros.length > 0 && combinacoes_indice.length > 0) {
-          const compDate = oc.competencia.length === 7 ? oc.competencia + '-01' : oc.competencia;
+          const compDate = this.mesSubsequente(oc.competencia) + '-01';
           const breakpoints = new Set<string>();
           breakpoints.add(compDate);
           breakpoints.add(dataLiq);
@@ -2594,23 +2594,27 @@ export class PjeCalcEngine {
             const segFim = datas[i + 1];
             const regimeI = this.getRegimeParaData(combinacoes_indice, segInicio);
             const indiceNorm = normalizeIndice(regimeI?.indice || 'SEM_CORRECAO');
-            // SELIC as correction already includes interest
-            if (indiceNorm === 'SELIC') continue;
             
+            // SELIC as correction or SEM_CORRECAO+SELIC: already folded, skip interest
+            if (indiceNorm === 'SELIC') continue;
             const regimeJ = this.getRegimeParaData(combinacoes_juros, segInicio);
             if (!regimeJ || regimeJ.tipo === 'NENHUM') continue;
+            // ADC 58/59: SEM_CORRECAO + SELIC juros → SELIC was folded into correction
+            if ((indiceNorm === 'SEM_CORRECAO' || indiceNorm === 'NENHUM' || indiceNorm === 'Sem Correção') && regimeJ.tipo === 'SELIC') continue;
 
-            const meses = this.mesesEntre(new Date(segInicio), new Date(segFim));
             if (regimeJ.tipo === 'SELIC') {
-              const fatorS = this.getIndiceCorrecaoDB('SELIC', segInicio.slice(0, 7), segFim.slice(0, 7));
-              if (fatorS !== null) jurosAcc = jurosAcc.plus(baseJuros.times(fatorS - 1));
-              else jurosAcc = jurosAcc.plus(baseJuros.times(0.01).times(meses));
+              const taxaS = this.getJurosSimplesDB('SELIC', segInicio.slice(0, 7), segFim.slice(0, 7));
+              if (taxaS !== null) jurosAcc = jurosAcc.plus(baseJuros.times(taxaS));
             } else if (regimeJ.tipo === 'TAXA_LEGAL') {
-              const fatorTL = this.getIndiceCorrecaoDB('TAXA_LEGAL', segInicio.slice(0, 7), segFim.slice(0, 7));
-              if (fatorTL !== null) jurosAcc = jurosAcc.plus(baseJuros.times(fatorTL - 1));
-              else jurosAcc = jurosAcc.plus(baseJuros.times(0.008).times(meses));
+              const taxaTL = this.getJurosSimplesDB('TAXA_LEGAL', segInicio.slice(0, 7), segFim.slice(0, 7));
+              if (taxaTL !== null) jurosAcc = jurosAcc.plus(baseJuros.times(taxaTL));
+              else {
+                const selicS = this.getJurosSimplesDB('SELIC', segInicio.slice(0, 7), segFim.slice(0, 7));
+                if (selicS !== null) jurosAcc = jurosAcc.plus(baseJuros.times(selicS));
+              }
             } else {
               const taxa = ((regimeJ as any).percentual || 1) / 100;
+              const meses = this.mesesEntre(new Date(segInicio), new Date(segFim));
               jurosAcc = jurosAcc.plus(baseJuros.times(taxa).times(meses));
             }
           }
