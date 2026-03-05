@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { MainLayoutPremium } from "@/components/layout/MainLayoutPremium";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { usePjeCalcData } from "@/hooks/usePjeCalcData";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft, Save, Play, FileText, Calendar, Clock, Users,
@@ -113,8 +114,14 @@ export default function PjeCalcPage() {
   const [expandedFeriasId, setExpandedFeriasId] = useState<string | null>(null);
   const [perfilAcesso, setPerfilAcesso] = useState<PerfilTipo>('perito');
   const [showWizard, setShowWizard] = useState(false);
-  // DATA
+  // DATA — Via unified hook (service layer)
   // =====================================================
+  const {
+    params, faltas, ferias, historicos, verbas, resultado,
+    isLoading: paramsLoading, completude: hookCompletude, invalidate,
+  } = usePjeCalcData(caseId);
+
+  // Case data (from cases table, not pjecalc)
   const { data: caseData } = useQuery({
     queryKey: ["case", caseId],
     queryFn: async () => {
@@ -124,67 +131,10 @@ export default function PjeCalcPage() {
     },
   });
 
-  const { data: params, isLoading: paramsLoading } = useQuery({
-    queryKey: ["pjecalc_parametros", caseId],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("pjecalc_parametros" as any).select("*").eq("case_id", caseId).maybeSingle();
-      if (error) throw error;
-      return data as any;
-    },
-  });
-
-  const { data: contract } = useQuery({
-    queryKey: ["employment_contract", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("employment_contracts").select("*").eq("case_id", caseId).maybeSingle();
-      return data;
-    },
-  });
-
-  const { data: faltas = [] } = useQuery({
-    queryKey: ["pjecalc_faltas", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_faltas" as any).select("*").eq("case_id", caseId).order("data_inicial");
-      return (data || []) as any[];
-    },
-  });
-
-  const { data: ferias = [] } = useQuery({
-    queryKey: ["pjecalc_ferias", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_ferias" as any).select("*").eq("case_id", caseId).order("periodo_aquisitivo_inicio");
-      return (data || []) as any[];
-    },
-  });
-
-  const { data: historicos = [] } = useQuery({
-    queryKey: ["pjecalc_historico", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_historico_salarial" as any).select("*").eq("case_id", caseId).order("periodo_inicio");
-      return (data || []) as any[];
-    },
-  });
-
-  const { data: verbas = [] } = useQuery({
-    queryKey: ["pjecalc_verbas", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_verbas" as any).select("*").eq("case_id", caseId).order("ordem");
-      return (data || []) as any[];
-    },
-  });
-
-  const { data: resultado } = useQuery({
-    queryKey: ["pjecalc_liquidacao", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_liquidacao_resultado" as any).select("*").eq("case_id", caseId).order("created_at", { ascending: false }).limit(1).maybeSingle();
-      return data as any;
-    },
-  });
-
   // =====================================================
-  // Phase 4: Completude indicators
+  // Phase 4: Completude indicators (use hook's completude)
   // =====================================================
-  const completude = calcularCompletude({ params, faltas, ferias, historicos, verbas, resultado });
+  const completude = hookCompletude;
 
   // =====================================================
   // PARÂMETROS - LOCAL STATE
@@ -225,15 +175,8 @@ export default function PjeCalcPage() {
         considerar_feriado_municipal: params.considerar_feriado_municipal || false,
         comentarios: params.comentarios || '',
       });
-    } else if (contract) {
-      setFormParams(prev => ({
-        ...prev,
-        data_admissao: contract.data_admissao || '',
-        data_demissao: contract.data_demissao || '',
-        carga_horaria_padrao: (contract.jornada_contratual as any)?.divisor || 220,
-      }));
     }
-  }, [params, contract]);
+  }, [params]);
 
   // =====================================================
   // SAVE PARAMS (with audit log)
@@ -317,9 +260,9 @@ export default function PjeCalcPage() {
         case 'resumo': return <ModuloResumo caseId={caseId!} />;
         case 'tabelas_regionais': return <ModuloTabelasRegionais caseId={caseId!} estado={formParams.estado} municipio={formParams.municipio} />;
         // Phase 4 modules
-        case 'memoria': return resultado?.resultado ? <MemoriaCalculoExpandida resultado={resultado.resultado} /> : <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Execute a liquidação primeiro.</CardContent></Card>;
+        case 'memoria': return resultado?.resultado ? <MemoriaCalculoExpandida resultado={resultado.resultado as any} /> : <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Execute a liquidação primeiro.</CardContent></Card>;
         case 'comparacao': return <ComparacaoCenarios caseId={caseId!} />;
-        case 'revisao': return <PainelRevisao caseId={caseId!} validacao={null} resultado={resultado?.resultado || null} modulosStatus={completude} />;
+        case 'revisao': return <PainelRevisao caseId={caseId!} validacao={null} resultado={(resultado?.resultado || null) as any} modulosStatus={completude} />;
         case 'rastreabilidade': return renderRastreabilidade();
         case 'auditoria': return <AuditLog caseId={caseId!} />;
         case 'dashboard': return <DashboardProdutividade />;
