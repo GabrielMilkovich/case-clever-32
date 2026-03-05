@@ -565,6 +565,31 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
   // ── HISTÓRICO SALARIAL ──
   const [autoFilling, setAutoFilling] = useState(false);
 
+  // Locale-aware number parser: handles "1.234,56" (BR) and "1,234.56" (US)
+  const parseNumericValue = (value: string | number | null | undefined): number | null => {
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value === 'number') return value;
+    const s = String(value).trim();
+    // Skip if it's a percentage, text description, or non-numeric
+    if (s.includes('%') || /^[a-zA-ZÀ-ú]/.test(s) || s.toLowerCase() === 'variavel' || s.toLowerCase() === 'sim' || s.toLowerCase() === 'não') return null;
+    let cleaned = s.replace(/\s/g, '').replace(/[R$\u20AC]/g, '');
+    const lastDot = cleaned.lastIndexOf('.');
+    const lastComma = cleaned.lastIndexOf(',');
+    if (lastDot === -1 && lastComma === -1) {
+      const num = parseFloat(cleaned);
+      return isNaN(num) ? null : num;
+    }
+    if (lastComma > lastDot) {
+      // BR format: 1.234,56
+      cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+    } else {
+      // US format: 1,234.56
+      cleaned = cleaned.replace(/,/g, '');
+    }
+    const num = parseFloat(cleaned);
+    return isNaN(num) || num <= 0 ? null : num;
+  };
+
   const autoPreencherHistorico = async () => {
     setAutoFilling(true);
     try {
@@ -597,10 +622,11 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
       // Collect bases to create
       const basesToCreate: { nome: string; valor: number; tipo: string; fgts: boolean; cs: boolean; inicio?: string; fim?: string }[] = [];
 
-      // 1. Salário Base from facts/contract
+      // 1. Salário Base from facts/contract (skip if text like "variavel")
       const salStr = factMap.salario_base || factMap.salario_mensal || factMap.ultimo_salario;
-      const salContrato = contract?.salario_inicial;
-      const salVal = salStr ? parseFloat(salStr.replace(/[^\d.,]/g, '').replace(',', '.')) : salContrato;
+      const salFromStr = parseNumericValue(salStr);
+      const salContrato = contract?.salario_inicial ? parseNumericValue(contract.salario_inicial) : null;
+      const salVal = salFromStr || salContrato;
       if (salVal && salVal > 0) {
         basesToCreate.push({ nome: 'Salário Base', valor: salVal, tipo: 'FIXO', fgts: true, cs: true });
       }
@@ -608,8 +634,8 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
       // 2. From employment_contracts.historico_salarial JSON
       if (contract?.historico_salarial && Array.isArray(contract.historico_salarial)) {
         for (const entry of contract.historico_salarial as any[]) {
-          const val = parseFloat(String(entry.valor || entry.salario || 0).replace(/[^\d.,]/g, '').replace(',', '.'));
-          if (val > 0) {
+          const val = parseNumericValue(entry.valor || entry.salario);
+          if (val && val > 0) {
             basesToCreate.push({
               nome: entry.nome || entry.descricao || `Salário ${entry.data_inicio || ''}`,
               valor: val, tipo: 'FIXO', fgts: true, cs: true,
@@ -620,17 +646,17 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
         }
       }
 
-      // 3. Salary-related facts (comissão, adicional, gratificação, etc.)
-      const salaryFactKeys = ['comissao', 'adicional_noturno', 'adicional_periculosidade', 'adicional_insalubridade', 'gratificacao', 'premio', 'dsr', 'media_comissoes', 'media_variaveis'];
+      // 3. Salary-related facts — ONLY if they are monetary values (not percentages or descriptions)
+      const salaryFactKeys = ['comissao', 'adicional_periculosidade', 'adicional_insalubridade', 'gratificacao', 'premio', 'dsr', 'media_comissoes', 'media_variaveis'];
+      // Note: 'adicional_noturno' excluded since it's typically a percentage (20%, 25%), not a BRL value
       for (const key of salaryFactKeys) {
         if (factMap[key]) {
-          const val = parseFloat(factMap[key].replace(/[^\d.,]/g, '').replace(',', '.'));
-          if (val > 0) {
+          const val = parseNumericValue(factMap[key]);
+          if (val && val > 0) {
             const nomeMap: Record<string, string> = {
-              comissao: 'Comissões', adicional_noturno: 'Adicional Noturno',
-              adicional_periculosidade: 'Adicional Periculosidade', adicional_insalubridade: 'Adicional Insalubridade',
-              gratificacao: 'Gratificação', premio: 'Prêmio', dsr: 'DSR',
-              media_comissoes: 'Média Comissões', media_variaveis: 'Média Variáveis',
+              comissao: 'Comissões', adicional_periculosidade: 'Adicional Periculosidade',
+              adicional_insalubridade: 'Adicional Insalubridade', gratificacao: 'Gratificação',
+              premio: 'Prêmio', dsr: 'DSR', media_comissoes: 'Média Comissões', media_variaveis: 'Média Variáveis',
             };
             basesToCreate.push({ nome: nomeMap[key] || key, valor: val, tipo: 'VARIAVEL', fgts: true, cs: true });
           }
@@ -641,8 +667,8 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
       const rubricaMap = new Map<string, { valores: { comp: string; val: number }[]; evidence: string }>();
       for (const item of extItems) {
         const cat = item.target_field || 'outros';
-        const val = parseFloat(String(item.valor || '0').replace(/[^\d.,]/g, '').replace(',', '.'));
-        if (val <= 0) continue;
+        const val = parseNumericValue(item.valor);
+        if (!val || val <= 0) continue;
         if (!rubricaMap.has(cat)) rubricaMap.set(cat, { valores: [], evidence: item.evidence_text || cat });
         rubricaMap.get(cat)!.valores.push({ comp: item.competencia, val });
       }
@@ -652,7 +678,6 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
         salario_base: 'Salário Base (Extraído)', outros: 'Outros (Extraído)',
       };
       for (const [cat, data] of rubricaMap.entries()) {
-        // Don't duplicate if we already have salario_base from facts
         if (cat === 'salario_base' && basesToCreate.some(b => b.nome === 'Salário Base')) continue;
         const avg = data.valores.reduce((s, v) => s + v.val, 0) / data.valores.length;
         basesToCreate.push({ nome: catLabels[cat] || data.evidence, valor: Math.round(avg * 100) / 100, tipo: 'VARIAVEL', fgts: true, cs: true });
