@@ -51,6 +51,31 @@ export function ModuloResumo({ caseId }: Props) {
     },
   });
 
+  // Load additional data for comprehensive report
+  const { data: paramsData } = useQuery({
+    queryKey: ["pjecalc_parametros_report", caseId],
+    queryFn: async () => {
+      const { data } = await supabase.from("pjecalc_parametros" as any).select("*").eq("case_id", caseId).maybeSingle();
+      return data as any;
+    },
+  });
+
+  const { data: correcaoData } = useQuery({
+    queryKey: ["pjecalc_correcao_report", caseId],
+    queryFn: async () => {
+      const { data } = await supabase.from("pjecalc_correcao_config" as any).select("*").eq("case_id", caseId).maybeSingle();
+      return data as any;
+    },
+  });
+
+  const { data: dadosProcessoData } = useQuery({
+    queryKey: ["pjecalc_dados_processo_report", caseId],
+    queryFn: async () => {
+      const { data } = await supabase.from("pjecalc_dados_processo" as any).select("*").eq("case_id", caseId).maybeSingle();
+      return data as any;
+    },
+  });
+
   const { data: resultado } = useQuery({
     queryKey: ["pjecalc_liquidacao", caseId],
     queryFn: async () => {
