@@ -3394,6 +3394,116 @@ export type Database = {
           },
         ]
       }
+      pjecalc_fgts_saldos_saques: {
+        Row: {
+          calculo_id: string
+          case_id: string
+          created_at: string
+          data: string
+          descricao: string | null
+          id: string
+          observacoes: string | null
+          tipo: string
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          calculo_id: string
+          case_id: string
+          created_at?: string
+          data: string
+          descricao?: string | null
+          id?: string
+          observacoes?: string | null
+          tipo?: string
+          updated_at?: string
+          valor?: number
+        }
+        Update: {
+          calculo_id?: string
+          case_id?: string
+          created_at?: string
+          data?: string
+          descricao?: string | null
+          id?: string
+          observacoes?: string | null
+          tipo?: string
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pjecalc_fgts_saldos_saques_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_calculos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_fgts_saldos_saques_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_correcao_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_fgts_saldos_saques_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_cs_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_fgts_saldos_saques_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_custas_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_fgts_saldos_saques_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_dados_processo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_fgts_saldos_saques_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_fgts_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_fgts_saldos_saques_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_honorarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_fgts_saldos_saques_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_ir_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_fgts_saldos_saques_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_multas_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_fgts_saldos_saques_calculo_id_fkey"
+            columns: ["calculo_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_parametros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pjecalc_hist_salarial: {
         Row: {
           calculo_id: string
@@ -3740,6 +3850,36 @@ export type Database = {
           created_at?: string
           id?: string
           taxa_mensal?: number
+          tipo?: string
+        }
+        Relationships: []
+      }
+      pjecalc_observacoes: {
+        Row: {
+          case_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          modulo: string
+          texto: string
+          tipo: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          modulo: string
+          texto: string
+          tipo?: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          modulo?: string
+          texto?: string
           tipo?: string
         }
         Relationships: []
@@ -6751,6 +6891,19 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pjecalc_ir_faixas: {
+        Row: {
+          aliquota: number | null
+          competencia_inicio: string | null
+          deducao_dependente: number | null
+          faixa: number | null
+          id: string | null
+          parcela_deduzir: number | null
+          valor_final: number | null
+          valor_inicial: number | null
+        }
+        Relationships: []
       }
       pjecalc_liquidacao_resultado: {
         Row: {
