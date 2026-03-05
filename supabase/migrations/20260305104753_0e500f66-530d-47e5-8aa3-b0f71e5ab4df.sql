@@ -1,0 +1,1 @@
+DELETE FROM cases WHERE id = '4aa9c170-f0f5-4502-b34d-f7f98d428019';
