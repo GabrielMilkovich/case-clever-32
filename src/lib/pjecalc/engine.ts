@@ -2671,21 +2671,29 @@ export class PjeCalcEngine {
       }
     }
 
-    // PJe-Calc: Bruto = verbas corrigidas + juros + FGTS (corrigido+juros+multa)
-    const brutoTotal = principalCorrigido + jurosMora + fgts.total_fgts;
+    // PJe-Calc: Bruto = verbas corrigidas + juros (FGTS is separate in PJe-Calc's "bruto devido ao reclamante")
+    const brutoTotal = Number(new Decimal(principalCorrigido).plus(jurosMora).toDP(2));
     
-    // Líquido = Bruto - CS segurado - IR - prev privada - pensão + seguro + multas + salário família
-    const liquido = Number(new Decimal(
-      brutoTotal + seguro.total + multa523 + multa467 + salarioFamilia.total
-      - csDescontado - ir.imposto_devido - prevPrivada.valor - pensaoTotal
-    ).toDP(2));
+    // Líquido = Bruto - CS segurado - IR - prev privada - pensão
+    // NOTE: seguro, multas and salário família are NOT added here — they are separate items
+    // This prevents the impossible "líquido > bruto" bug
+    const liquido = Number(new Decimal(brutoTotal)
+      .minus(csDescontado)
+      .minus(ir.imposto_devido)
+      .minus(prevPrivada.valor)
+      .minus(pensaoTotal)
+      .toDP(2));
 
-    // Total Reclamada = líquido + CS segurado (recolher) + CS empregador + honorários + custas + IR
-    const totalReclamada = Number(new Decimal(
-      liquido + csDescontado + cs.total_empregador 
-      + honorarios.sucumbenciais + honorarios.contratuais + custasResult.total
-      + ir.imposto_devido
-    ).toDP(2));
+    // Total Reclamada = líquido + CS segurado (recolher) + CS empregador + honorários + custas + IR + FGTS
+    const totalReclamada = Number(new Decimal(liquido)
+      .plus(csDescontado)
+      .plus(cs.total_empregador)
+      .plus(honorarios.sucumbenciais)
+      .plus(honorarios.contratuais)
+      .plus(custasResult.total)
+      .plus(ir.imposto_devido)
+      .plus(fgts.total_fgts)
+      .toDP(2));
 
     const resumo: PjeResumo = {
       principal_bruto: Number(new Decimal(principalBruto).toDP(2)),
