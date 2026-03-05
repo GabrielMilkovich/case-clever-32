@@ -32,6 +32,14 @@ import {
   type PjeCustasConfig,
   type PjeSeguroConfig,
   type PjeLiquidacaoResult,
+  type PjeIndiceRow,
+  type PjeINSSFaixaRow,
+  type PjeIRFaixaRow,
+  type PjeFeriadoDB,
+  type PjeExcecaoCargaHoraria,
+  type PjePrevidenciaPrivadaConfig,
+  type PjePensaoConfig,
+  type PjeSalarioFamiliaConfig,
 } from './engine';
 import * as svc from './service';
 import type {
@@ -55,7 +63,7 @@ import { gerarReflexosPadrao, type VerbaBase, type ReflexoGerado } from './refle
 // VERSION CONSTANTS
 // =====================================================
 
-const ENGINE_VERSION = '3.0.0';
+const ENGINE_VERSION = '3.1.0';
 const RULESET_VERSION = '2025.03.05';
 
 // =====================================================
@@ -131,29 +139,8 @@ function toEngineFerias(ferias: PjecalcFeriasRow[]): PjeFerias[] {
   }));
 }
 
-function toEngineHistoricos(
-  historicos: PjecalcHistoricoSalarialRow[],
-  ocorrencias: svc.PjecalcCaseData['historicos'] extends (infer _T)[] ? never : never
-): PjeHistoricoSalarial[] {
-  // We'll load ocorrências separately
-  return historicos.map(h => ({
-    id: h.id,
-    nome: h.nome,
-    periodo_inicio: h.periodo_inicio || '',
-    periodo_fim: h.periodo_fim || '',
-    tipo_valor: (h.tipo_valor as 'informado' | 'calculado') || 'informado',
-    valor_informado: h.valor_informado ?? undefined,
-    incidencia_fgts: h.incidencia_fgts ?? true,
-    incidencia_cs: h.incidencia_cs ?? true,
-    fgts_recolhido: false,
-    cs_recolhida: false,
-    ocorrencias: [], // will be populated separately
-  }));
-}
-
 function toEngineVerbas(verbas: PjecalcVerbaRow[]): PjeVerba[] {
   return verbas.map(v => {
-    // Parse base_calculo from DB view (contains historicos IDs and verba_principal_id)
     let bcHistoricos: string[] = [];
     let bcVerbas: string[] = [];
     let bcTabelas: string[] = [];
@@ -169,26 +156,22 @@ function toEngineVerbas(verbas: PjecalcVerbaRow[]): PjeVerba[] {
       if (bc.integralizar) bcIntegralizar = true;
     }
 
-    // Fallback: if no historicos from base_calculo, try hist_salarial_nome
     if (bcHistoricos.length === 0 && v.hist_salarial_nome) {
       bcHistoricos = [v.hist_salarial_nome];
     }
 
-    // Map characteristic to lowercase engine format
     const caracteristicaMap: Record<string, string> = {
       'COMUM': 'comum', '13_SALARIO': '13_salario', 'AVISO_PREVIO': 'aviso_previo', 'FERIAS': 'ferias',
     };
     const rawCaract = (v.caracteristica || 'COMUM').toUpperCase();
     const caracteristica = (caracteristicaMap[rawCaract] || rawCaract.toLowerCase()) as PjeVerba['caracteristica'];
 
-    // Map ocorrencia_pagamento to lowercase
     const ocorrenciaMap: Record<string, string> = {
       'MENSAL': 'mensal', 'DEZEMBRO': 'dezembro', 'PERIODO_AQUISITIVO': 'periodo_aquisitivo', 'DESLIGAMENTO': 'desligamento',
     };
     const rawOcorr = (v.ocorrencia_pagamento || 'MENSAL').toUpperCase();
     const ocorrenciaPagamento = (ocorrenciaMap[rawOcorr] || rawOcorr.toLowerCase()) as PjeVerba['ocorrencia_pagamento'];
 
-    // Use actual incidencias from DB columns instead of hardcoding
     const incidencias = {
       fgts: v.incide_fgts !== false,
       irpf: v.incide_ir !== false,
@@ -303,7 +286,6 @@ function toEngineCorrecaoConfig(
   cfg: PjecalcCorrecaoConfigRow | null,
   atualizacaoConfig: svc.PjecalcAtualizacaoConfigRow[] = [],
 ): PjeCorrecaoConfig {
-  // Parse combination-by-date from pjecalc_atualizacao_config
   let combinacoes_indice: PjeCorrecaoConfig['combinacoes_indice'];
   let combinacoes_juros: PjeCorrecaoConfig['combinacoes_juros'];
 
@@ -325,13 +307,18 @@ function toEngineCorrecaoConfig(
     } catch { /* ignore */ }
   }
 
-  // Also check juros row for additional combination data
   const jurosRow = atualizacaoConfig.find(a => a.tipo === 'juros');
   if (!combinacoes_juros && jurosRow?.regimes) {
     const regimes = jurosRow.regimes as Record<string, unknown>;
     if (Array.isArray(regimes.combinacoes)) {
       combinacoes_juros = regimes.combinacoes;
     }
+  }
+
+  // CRITICAL: data_liquidacao MUST be deterministic — NEVER use new Date()
+  const dataLiq = cfg?.data_liquidacao;
+  if (!dataLiq) {
+    console.error('[ORCHESTRATOR] CRITICAL: data_liquidacao not set in correcaoConfig — calculation will NOT be deterministic');
   }
 
   return {
@@ -342,10 +329,10 @@ function toEngineCorrecaoConfig(
     juros_inicio: (cfg?.juros_inicio as 'ajuizamento' | 'citacao' | 'vencimento') || 'ajuizamento',
     multa_523: cfg?.multa_523 ?? false,
     multa_523_percentual: cfg?.multa_523_percentual ?? 10,
-    data_liquidacao: cfg?.data_liquidacao || new Date().toISOString().slice(0, 10),
+    data_liquidacao: dataLiq || new Date().toISOString().slice(0, 10), // fallback only for safety
     combinacoes_indice,
     combinacoes_juros,
-    juros_apos_deducao_cs: true, // PJe-Calc standard: interest after CS deduction
+    juros_apos_deducao_cs: true,
   };
 }
 
@@ -381,6 +368,134 @@ export interface OrchestratorResult {
 }
 
 // =====================================================
+// DB LOADERS: INSS faixas, IR faixas, feriados
+// =====================================================
+
+async function loadINSSFaixas(): Promise<PjeINSSFaixaRow[]> {
+  try {
+    const rows = await svc.getInssFaixas();
+    if (rows.length === 0) {
+      console.warn('[ORCHESTRATOR] No INSS faixas in DB — using default 2025 tables');
+      return [];
+    }
+    console.log(`[ORCHESTRATOR] Loaded ${rows.length} INSS faixas from DB`);
+    return rows.map(r => ({
+      competencia_inicio: String(r.competencia_inicio || ''),
+      competencia_fim: r.competencia_fim ? String(r.competencia_fim) : null,
+      faixa: Number(r.faixa || 0),
+      valor_ate: Number(r.valor_ate || 0),
+      aliquota: Number(r.aliquota || 0),
+    }));
+  } catch (e) {
+    console.warn('[ORCHESTRATOR] Failed to load INSS faixas:', e);
+    return [];
+  }
+}
+
+async function loadIRFaixas(): Promise<PjeIRFaixaRow[]> {
+  try {
+    const rows = await svc.getIrFaixas();
+    if (rows.length === 0) {
+      console.warn('[ORCHESTRATOR] No IR faixas in DB — using default 2025 tables');
+      return [];
+    }
+    console.log(`[ORCHESTRATOR] Loaded ${rows.length} IR faixas from DB`);
+    return rows.map(r => ({
+      competencia_inicio: String(r.competencia_inicio || ''),
+      competencia_fim: r.competencia_fim ? String(r.competencia_fim) : null,
+      faixa: Number(r.faixa || 0),
+      valor_ate: Number(r.valor_ate || 0),
+      aliquota: Number(r.aliquota || 0),
+      deducao: Number(r.deducao || 0),
+      deducao_dependente: Number(r.deducao_dependente || 0),
+    }));
+  } catch (e) {
+    console.warn('[ORCHESTRATOR] Failed to load IR faixas:', e);
+    return [];
+  }
+}
+
+async function loadFeriados(): Promise<PjeFeriadoDB[]> {
+  try {
+    const rows = await svc.getFeriados();
+    if (rows.length === 0) return [];
+    console.log(`[ORCHESTRATOR] Loaded ${rows.length} feriados from DB`);
+    return rows.map(r => ({
+      data: String(r.data || ''),
+      nome: String(r.nome || ''),
+      tipo: (r.tipo as 'nacional' | 'estadual' | 'municipal' | 'facultativo') || 'nacional',
+      uf: r.uf ? String(r.uf) : undefined,
+      municipio: r.municipio ? String(r.municipio) : undefined,
+    }));
+  } catch (e) {
+    console.warn('[ORCHESTRATOR] Failed to load feriados:', e);
+    return [];
+  }
+}
+
+async function loadPensaoConfig(caseId: string): Promise<PjePensaoConfig> {
+  try {
+    const cfg = await svc.getPensaoConfig(caseId);
+    if (!cfg) return { apurar: false, percentual: 0, base: 'liquido' };
+    return {
+      apurar: !!cfg.apurar,
+      percentual: Number(cfg.percentual || 0),
+      valor_fixo: cfg.valor_fixo ? Number(cfg.valor_fixo) : undefined,
+      base: (cfg.base_incidencia as 'liquido' | 'bruto' | 'bruto_menos_inss') || 'liquido',
+    };
+  } catch { return { apurar: false, percentual: 0, base: 'liquido' }; }
+}
+
+async function loadPrevPrivadaConfig(caseId: string): Promise<PjePrevidenciaPrivadaConfig> {
+  try {
+    const cfg = await svc.getPrevPrivConfig(caseId);
+    if (!cfg) return { apurar: false, percentual: 0, base_calculo: 'diferenca', deduzir_ir: false };
+    return {
+      apurar: !!cfg.apurar,
+      percentual: Number(cfg.percentual_empregado || 0),
+      base_calculo: (cfg.base_calculo as 'diferenca' | 'devido' | 'corrigido') || 'diferenca',
+      deduzir_ir: !!cfg.deduzir_ir,
+    };
+  } catch { return { apurar: false, percentual: 0, base_calculo: 'diferenca', deduzir_ir: false }; }
+}
+
+async function loadSalarioFamiliaConfig(caseId: string): Promise<PjeSalarioFamiliaConfig> {
+  try {
+    const cfg = await svc.getSalarioFamiliaConfig(caseId);
+    if (!cfg) return { apurar: false, numero_filhos: 0 };
+    return {
+      apurar: !!cfg.apurar,
+      numero_filhos: Number(cfg.numero_filhos || 0),
+    };
+  } catch { return { apurar: false, numero_filhos: 0 }; }
+}
+
+async function loadIndicesDB(): Promise<PjeIndiceRow[]> {
+  try {
+    const { data: indicesData } = await supabase
+      .from('pjecalc_correcao_monetaria' as any)
+      .select('indice, competencia, valor, acumulado')
+      .order('indice')
+      .order('competencia');
+    if (indicesData && indicesData.length > 0) {
+      const result = (indicesData as any[]).map(r => ({
+        indice: r.indice,
+        competencia: r.competencia,
+        valor: Number(r.valor),
+        acumulado: Number(r.acumulado),
+      }));
+      console.log(`[ORCHESTRATOR] Loaded ${result.length} correction indices from DB`);
+      return result;
+    }
+    console.warn('[ORCHESTRATOR] No correction indices found in DB — fallback rates will be used');
+    return [];
+  } catch (e) {
+    console.warn('[ORCHESTRATOR] Failed to load correction indices:', e);
+    return [];
+  }
+}
+
+// =====================================================
 // MAIN: executarLiquidacao
 // =====================================================
 
@@ -395,8 +510,26 @@ export async function executarLiquidacao(
     throw new Error('Parâmetros do cálculo não encontrados. Preencha primeiro.');
   }
 
-  // 2. Load historico ocorrencias
-  const histOcorrencias = await svc.getHistoricoOcorrencias(caseId);
+  // 2. Load historico ocorrencias + reference tables IN PARALLEL
+  const [
+    histOcorrencias,
+    indicesDB,
+    faixasINSSDB,
+    faixasIRDB,
+    feriadosDB,
+    pensaoConfig,
+    prevPrivadaConfig,
+    salarioFamiliaConfig,
+  ] = await Promise.all([
+    svc.getHistoricoOcorrencias(caseId),
+    loadIndicesDB(),
+    loadINSSFaixas(),
+    loadIRFaixas(),
+    loadFeriados(),
+    loadPensaoConfig(caseId),
+    loadPrevPrivadaConfig(caseId),
+    loadSalarioFamiliaConfig(caseId),
+  ]);
 
   // 3. Convert to engine types
   const engineParams = toEngineParams(caseData.params);
@@ -432,7 +565,6 @@ export async function executarLiquidacao(
   console.log(`[ORCHESTRATOR] Loaded ${engineVerbas.length} verbas from DB (principals: ${engineVerbas.filter(v => v.tipo === 'principal').length}, reflexas: ${engineVerbas.filter(v => v.tipo === 'reflexa').length})`);
 
   // ── Auto-generate reflexes if not already present ──
-  // Only generate if there are principal verbas without any reflexes linked to them
   const principalVerbas = engineVerbas.filter(v => v.tipo === 'principal');
   const existingReflexas = engineVerbas.filter(v => v.tipo === 'reflexa');
   
@@ -441,7 +573,6 @@ export async function executarLiquidacao(
 
   if (principalsSemReflexo.length > 0) {
     console.log(`[ORCHESTRATOR] Auto-generating reflexes for ${principalsSemReflexo.length} principals without reflexes`);
-    // Build VerbaBase list for reflexo generation
     const verbasBase: VerbaBase[] = principalsSemReflexo.map(v => ({
       id: v.id,
       nome: v.nome,
@@ -455,7 +586,6 @@ export async function executarLiquidacao(
 
     const reflexosGerados = gerarReflexosPadrao(verbasBase);
 
-    // Convert ReflexoGerado → PjeVerba and append
     for (const rg of reflexosGerados) {
       const principalVerba = engineVerbas.find(v => v.id === rg.verba_principal_id);
       if (!principalVerba) continue;
@@ -515,38 +645,28 @@ export async function executarLiquidacao(
 
   const engineSeguro: PjeSeguroConfig = { apurar: false, parcelas: 0, recebeu: false };
 
-  // 3b. Load correction indices from database (CRITICAL for parity)
-  let indicesDB: { indice: string; competencia: string; valor: number; acumulado: number }[] = [];
-  try {
-    const { data: indicesData } = await supabase
-      .from('pjecalc_correcao_monetaria' as any)
-      .select('indice, competencia, valor, acumulado')
-      .order('indice')
-      .order('competencia');
-    if (indicesData && indicesData.length > 0) {
-      indicesDB = (indicesData as any[]).map(r => ({
-        indice: r.indice,
-        competencia: r.competencia,
-        valor: Number(r.valor),
-        acumulado: Number(r.acumulado),
-      }));
-      console.log(`[ORCHESTRATOR] Loaded ${indicesDB.length} correction indices from DB`);
-    } else {
-      console.warn('[ORCHESTRATOR] No correction indices found in DB — fallback rates will be used');
-    }
-  } catch (e) {
-    console.warn('[ORCHESTRATOR] Failed to load correction indices:', e);
-  }
-
-  // 4. Execute engine
+  // 4. Execute engine — ALL 21 constructor params populated
+  console.log(`[ORCHESTRATOR] Engine inputs: ${indicesDB.length} indices, ${faixasINSSDB.length} INSS faixas, ${faixasIRDB.length} IR faixas, ${feriadosDB.length} feriados`);
+  console.log(`[ORCHESTRATOR] CS config: apurar_segurado=${engineCs.apurar_segurado}, FGTS: apurar=${engineFgts.apurar}, data_liquidacao=${engineCorrecao.data_liquidacao}`);
+  
   const engine = new PjeCalcEngine(
     engineParams, engineHistoricos, engineFaltas, engineFerias,
     engineVerbas, engineCartao, engineFgts, engineCs, engineIr,
     engineCorrecao, engineHonorarios, engineCustas, engineSeguro,
-    indicesDB, // ← 14th param: correction indices from DB
+    indicesDB,           // 14: correction indices
+    faixasINSSDB,        // 15: INSS progressive brackets
+    faixasIRDB,          // 16: IR brackets
+    [],                  // 17: excecoesCargas (loaded per case if needed)
+    feriadosDB,          // 18: holidays
+    prevPrivadaConfig,   // 19: previdência privada
+    pensaoConfig,        // 20: pensão alimentícia
+    salarioFamiliaConfig,// 21: salário família
   );
 
   const result = engine.liquidar();
+
+  // Log summary for debugging
+  console.log(`[ORCHESTRATOR] Result: Bruto=${result.resumo.principal_corrigido}, Juros=${result.resumo.juros_mora}, CS_seg=${result.resumo.cs_segurado}, CS_emp=${result.resumo.cs_empregador}, FGTS=${result.resumo.fgts_total}, IR=${result.resumo.ir_retido}, Líquido=${result.resumo.liquido_reclamante}, Total_Reclamada=${result.resumo.total_reclamada}`);
 
   // 5. Generate fingerprint
   const { data: sessionData } = await supabase.auth.getSession();
@@ -555,8 +675,12 @@ export async function executarLiquidacao(
   const fingerprint: EngineExecutionFingerprint = {
     engine_version: ENGINE_VERSION,
     ruleset_version: RULESET_VERSION,
-    tax_table_versions: { inss: '2025.01', irrf: '2025.01', seguro: '2025.01' },
-    index_series_version: 'embedded',
+    tax_table_versions: {
+      inss: faixasINSSDB.length > 0 ? 'db' : '2025.01',
+      irrf: faixasIRDB.length > 0 ? 'db' : '2025.01',
+      seguro: '2025.01',
+    },
+    index_series_version: indicesDB.length > 0 ? `db_${indicesDB.length}` : 'embedded',
     input_hash: simpleHash({
       params: caseData.params,
       faltas: caseData.faltas,
