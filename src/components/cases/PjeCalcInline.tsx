@@ -33,6 +33,7 @@ import { ModuloMultasCLT } from "./pjecalc/ModuloMultasCLT";
 import { ModuloPensaoAlimenticia } from "./pjecalc/ModuloPensaoAlimenticia";
 import { ModuloPrevidenciaPrivada } from "./pjecalc/ModuloPrevidenciaPrivada";
 import { ModuloSalarioFamilia } from "./pjecalc/ModuloSalarioFamilia";
+import { ImportadorFichaFinanceira } from "./pjecalc/ImportadorFichaFinanceira";
 import { calcularCompletude, type ModuleStatus } from "@/lib/pjecalc/completude";
 
   // Module definitions with metadata
@@ -754,6 +755,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Histórico Salarial</h2>
         <div className="flex gap-2">
+          <ImportadorFichaFinanceira caseId={caseId} onImported={() => queryClient.invalidateQueries({ queryKey: ["pjecalc_historico", caseId] })} />
           <Button size="sm" variant="outline" onClick={autoPreencherHistorico} disabled={autoFilling}>
             {autoFilling ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Zap className="h-4 w-4 mr-1" />}
             Auto-Preencher
@@ -770,8 +772,11 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
         <Card className="border-dashed">
           <CardContent className="p-8 text-center space-y-3">
             <DollarSign className="h-8 w-8 mx-auto text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Nenhuma base cadastrada.</p>
-            <p className="text-xs text-muted-foreground">Clique em <strong>"Auto-Preencher"</strong> para buscar automaticamente de fatos, contratos e fichas financeiras importadas.</p>
+            <p className="text-sm font-medium">Nenhuma base cadastrada</p>
+            <p className="text-xs text-muted-foreground">
+              Para preencher automaticamente, use <strong>"Importar Ficha Financeira"</strong> para extrair as rubricas (Comissões, DSR, Prêmios, etc.) com valores mensais.
+              <br />Após importar, o <strong>"Auto-Preencher"</strong> também buscará dados de fatos e contratos.
+            </p>
           </CardContent>
         </Card>
       ) : historicos.map((h: any) => (
