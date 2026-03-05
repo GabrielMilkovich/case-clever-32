@@ -391,7 +391,7 @@ export function gerarRelatorioCompleto(
         <td colspan="3"><strong>Total Depósitos</strong></td>
         <td class="num"><strong>${fmt(result.fgts.total_depositos)}</strong></td>
       </tr>
-      <tr><td colspan="3">Multa FGTS (${pct(result.fgts.multa_percentual || 40)})</td><td class="num">${fmt(result.fgts.multa_valor)}</td></tr>
+      <tr><td colspan="3">Multa FGTS</td><td class="num">${fmt(result.fgts.multa_valor)}</td></tr>
       ${result.fgts.lc110_10 > 0 ? `<tr><td colspan="3">LC 110/2001 (10%)</td><td class="num">${fmt(result.fgts.lc110_10)}</td></tr>` : ''}
       ${result.fgts.lc110_05 > 0 ? `<tr><td colspan="3">LC 110/2001 (0,5%)</td><td class="num">${fmt(result.fgts.lc110_05)}</td></tr>` : ''}
       <tr class="grand-total"><td colspan="3"><strong>TOTAL FGTS</strong></td><td class="num"><strong>${fmt(result.fgts.total_fgts)}</strong></td></tr>
@@ -436,10 +436,6 @@ export function gerarRelatorioCompleto(
     <tr><th>Base de Cálculo</th><td>${fmt(result.imposto_renda.base_calculo)}</td></tr>
     <tr><th>Deduções</th><td>${fmt(result.imposto_renda.deducoes)}</td></tr>
     <tr><th>Meses RRA</th><td>${result.imposto_renda.meses_rra}</td></tr>
-    ${result.imposto_renda.faixas_aplicadas ? result.imposto_renda.faixas_aplicadas.map((f: any) => `
-      <tr><th>Faixa ${f.faixa}: até ${fmt(f.valor_ate)}</th><td>Alíquota ${pct(f.aliquota * 100)} — ${fmt(f.imposto)}</td></tr>
-    `).join('') : ''}
-    <tr class="grand-total"><th style="text-align:left">IRRF DEVIDO</th><td>${fmt(result.imposto_renda.imposto_devido)}</td></tr>
   </table>
   <div class="nota">Rendimentos Recebidos Acumuladamente (RRA): a base é dividida pelo nº de meses, aplicando-se a tabela progressiva proporcional. Fundamento: Art. 12-A, Lei 7.713/88.</div>
   ` : ''}
