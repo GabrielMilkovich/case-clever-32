@@ -2,7 +2,8 @@
  * PJe-Calc — Relatório Completo de Liquidação
  * Formato fiel ao padrão oficial PJe-Calc CSJT (landscape A4)
  * Seções: Resumo, Créditos/Descontos, Débitos Reclamado, Critérios, 
- *         Dados do Cálculo, Faltas/Férias, Cartão de Ponto Diário
+ *         Dados do Cálculo, Histórico Salarial, Faltas/Férias, Cartão de Ponto Diário,
+ *         Memória de Cálculo, FGTS, CS, IR, Honorários/Custas, Assinatura
  */
 import type { PjeLiquidacaoResult } from "./engine";
 
@@ -42,6 +43,16 @@ export interface RelatorioCompletoMeta {
   considerarFeriadosEstaduais?: boolean;
   zerarNegativo?: boolean;
   honorariosNome?: string;
+  /** Histórico salarial para seção de Histórico */
+  historicoSalarial?: Array<{
+    nome: string;
+    periodo_inicio: string;
+    periodo_fim: string;
+    tipo_valor: string;
+    valor_informado?: number;
+    incidencia_fgts?: boolean;
+    incidencia_cs?: boolean;
+  }>;
   /** Faltas do caso para seção de Faltas */
   faltas?: Array<{ inicio: string; fim: string; justificada: boolean; justificativa?: string }>;
   /** Férias do caso */
@@ -78,6 +89,8 @@ export interface RelatorioCompletoMeta {
   }>;
   /** Critérios de cálculo e fundamentação legal */
   criterios?: string[];
+  /** Verbas linkage para hierarquia (verba_id → verba_principal_id) */
+  verbasLinkage?: Record<string, string>;
 }
 
 /* ═══════ CSS ═══════ */
@@ -146,6 +159,7 @@ tr.grand-total { background: #003366; color: #fff; font-weight: 700; }
 tr.grand-total td { border-color: #003366; }
 tr.deduction td { color: #990000; }
 tr.subtotal td { font-weight: 700; border-top: 2px solid #003366; background: #e6edf5; }
+tr.reflexa td { font-size: 7pt; color: #333; }
 
 /* ── Resumo boxes ── */
 .resumo-valores {
@@ -226,43 +240,39 @@ function pageFooter(meta: RelatorioCompletoMeta) {
   </div>`;
 }
 
-/* ═══════ Build HTML ═══════ */
-function buildRelatorioCompletoHTML(
-  result: PjeLiquidacaoResult,
-  meta: RelatorioCompletoMeta
-): string {
-  const nProcesso = meta.processo || '—';
-
-  // ──────────── PÁGINA 1: RESUMO DO CÁLCULO ────────────
-  // Group verbas: principals first, then their reflexes indented (PJe-Calc layout)
+/* ═══════ Hierarchical verba matching ═══════ */
+function buildHierarchicalVerbas(result: PjeLiquidacaoResult, linkage?: Record<string, string>) {
   const principals = result.verbas.filter(v => v.tipo === 'principal');
   const reflexas = result.verbas.filter(v => v.tipo !== 'principal');
 
-  // Build hierarchical rows: principal → reflexes under it
-  let verbasRows = '';
+  let rows = '';
+  const matchedIds = new Set<string>();
+
   for (const p of principals) {
     // Principal row
-    verbasRows += `
+    rows += `
       <tr>
         <td class="left" style="font-weight:600">${p.nome}</td>
+        <td class="num">${fmt(p.total_diferenca)}</td>
         <td class="num">${fmt(p.total_corrigido)}</td>
         <td class="num">${fmt(p.total_juros)}</td>
-        <td class="num">${fmt(p.total_final)}</td>
+        <td class="num" style="font-weight:700">${fmt(p.total_final)}</td>
       </tr>`;
-    // Find reflexes that reference this principal
-    const childReflexas = reflexas.filter(r => {
-      // Match by verba_principal_id or by name convention
-      const verba = result.verbas.find(v => v.verba_id === r.verba_id);
-      if (!verba) return false;
-      // Check verba_principal_id via the engine result metadata
-      const nomeUp = r.nome.toUpperCase();
-      const pNomeUp = p.nome.toUpperCase();
-      return nomeUp.includes(pNomeUp) || nomeUp.endsWith('SOBRE ' + pNomeUp);
+
+    // Find reflexes linked via DB linkage or name convention
+    const children = reflexas.filter(r => {
+      if (linkage && linkage[r.verba_id] === p.verba_id) return true;
+      const nUp = r.nome.toUpperCase();
+      const pUp = p.nome.toUpperCase();
+      return nUp.includes(pUp) || nUp.endsWith('SOBRE ' + pUp);
     });
-    for (const ref of childReflexas) {
-      verbasRows += `
-        <tr>
-          <td class="left" style="padding-left:20px; font-size:7pt; color:#333">${ref.nome}</td>
+
+    for (const ref of children) {
+      matchedIds.add(ref.verba_id);
+      rows += `
+        <tr class="reflexa">
+          <td class="left" style="padding-left:20px;">↳ ${ref.nome}</td>
+          <td class="num">${fmt(ref.total_diferenca)}</td>
           <td class="num">${fmt(ref.total_corrigido)}</td>
           <td class="num">${fmt(ref.total_juros)}</td>
           <td class="num">${fmt(ref.total_final)}</td>
@@ -270,47 +280,34 @@ function buildRelatorioCompletoHTML(
     }
   }
 
-  // Add orphan reflexes (not matched to any principal)
-  const matchedReflexIds = new Set<string>();
-  for (const p of principals) {
-    const pNomeUp = p.nome.toUpperCase();
-    for (const r of reflexas) {
-      const nomeUp = r.nome.toUpperCase();
-      if (nomeUp.includes(pNomeUp) || nomeUp.endsWith('SOBRE ' + pNomeUp)) {
-        matchedReflexIds.add(r.verba_id);
-      }
-    }
-  }
-  const orphanReflexas = reflexas.filter(r => !matchedReflexIds.has(r.verba_id));
-  for (const ref of orphanReflexas) {
-    verbasRows += `
-      <tr>
-        <td class="left" style="padding-left:20px; font-size:7pt; color:#333">${ref.nome}</td>
+  // Orphan reflexes
+  for (const ref of reflexas) {
+    if (matchedIds.has(ref.verba_id)) continue;
+    rows += `
+      <tr class="reflexa">
+        <td class="left" style="padding-left:20px;">↳ ${ref.nome}</td>
+        <td class="num">${fmt(ref.total_diferenca)}</td>
         <td class="num">${fmt(ref.total_corrigido)}</td>
         <td class="num">${fmt(ref.total_juros)}</td>
         <td class="num">${fmt(ref.total_final)}</td>
       </tr>`;
   }
 
+  return rows;
+}
+
+/* ═══════ Build HTML ═══════ */
+function buildRelatorioCompletoHTML(
+  result: PjeLiquidacaoResult,
+  meta: RelatorioCompletoMeta
+): string {
+  const nProcesso = meta.processo || '—';
+  const verbasRows = buildHierarchicalVerbas(result, meta.verbasLinkage);
+
+  const totalDiferenca = result.verbas.reduce((s, v) => s + v.total_diferenca, 0);
   const totalCorrigido = result.verbas.reduce((s, v) => s + v.total_corrigido, 0);
   const totalJuros = result.verbas.reduce((s, v) => s + v.total_juros, 0);
   const totalFinal = result.verbas.reduce((s, v) => s + v.total_final, 0);
-
-  // Add FGTS rows to resumo
-  const fgtsRow = result.fgts.total_fgts > 0 ? `
-    <tr>
-      <td class="left" style="font-weight:600">FGTS 8%</td>
-      <td class="num">${fmt(result.fgts.total_depositos)}</td>
-      <td class="num">—</td>
-      <td class="num">${fmt(result.fgts.total_depositos)}</td>
-    </tr>
-    <tr>
-      <td class="left" style="font-weight:600">MULTA SOBRE FGTS 40%</td>
-      <td class="num">${fmt(result.fgts.multa_valor)}</td>
-      <td class="num">—</td>
-      <td class="num">${fmt(result.fgts.multa_valor)}</td>
-    </tr>
-  ` : '';
 
   const grandTotalCorrigido = totalCorrigido + (result.fgts.total_depositos || 0) + (result.fgts.multa_valor || 0);
   const grandTotalJuros = totalJuros;
@@ -320,14 +317,16 @@ function buildRelatorioCompletoHTML(
     ? ((totalFinal / grandTotalFinal) * 100).toFixed(2) 
     : '0.00';
 
+  // ──────────── PÁGINA 1: RESUMO DO CÁLCULO ────────────
   const page1 = `
   ${pageHeader(meta, 'PLANILHA DE CÁLCULO')}
 
-  <h2>Resumo do Cálculo</h2>
+  <h2>1. Resumo do Cálculo — Bruto Devido ao Reclamante</h2>
   <table>
     <thead>
       <tr>
-        <th style="text-align:left; width:55%">Descrição do Bruto Devido ao Reclamante</th>
+        <th style="text-align:left; width:40%">Descrição</th>
+        <th style="width:15%">Diferença</th>
         <th style="width:15%">Valor Corrigido</th>
         <th style="width:15%">Juros</th>
         <th style="width:15%">Total</th>
@@ -335,9 +334,24 @@ function buildRelatorioCompletoHTML(
     </thead>
     <tbody>
       ${verbasRows}
-      ${fgtsRow}
+      ${result.fgts.total_fgts > 0 ? `
+      <tr>
+        <td class="left" style="font-weight:600">FGTS — Depósitos 8%</td>
+        <td class="num">${fmt(result.fgts.total_depositos)}</td>
+        <td class="num">${fmt(result.fgts.total_depositos)}</td>
+        <td class="num">—</td>
+        <td class="num" style="font-weight:700">${fmt(result.fgts.total_depositos)}</td>
+      </tr>
+      <tr>
+        <td class="left" style="font-weight:600">FGTS — Multa Rescisória 40%</td>
+        <td class="num">${fmt(result.fgts.multa_valor)}</td>
+        <td class="num">${fmt(result.fgts.multa_valor)}</td>
+        <td class="num">—</td>
+        <td class="num" style="font-weight:700">${fmt(result.fgts.multa_valor)}</td>
+      </tr>` : ''}
       <tr class="grand-total">
-        <td class="left">Total</td>
+        <td class="left">TOTAL BRUTO</td>
+        <td class="num">${fmt(totalDiferenca + (result.fgts.total_depositos || 0) + (result.fgts.multa_valor || 0))}</td>
         <td class="num">${fmt(grandTotalCorrigido)}</td>
         <td class="num">${fmt(grandTotalJuros)}</td>
         <td class="num">${fmt(grandTotalFinal)}</td>
@@ -346,49 +360,52 @@ function buildRelatorioCompletoHTML(
   </table>
   <p style="font-size: 7pt; color: #555;">Percentual de Parcelas Remuneratórias e Tributáveis: ${pctRemuneratorio}%</p>
 
-  <!-- Créditos e Descontos -->
-  <h2>Descrição de Créditos e Descontos do Reclamante</h2>
+  <!-- 2. Créditos e Descontos -->
+  <h2>2. Créditos e Descontos do Reclamante</h2>
   <table>
     <thead>
       <tr>
         <th style="text-align:left; width:65%">VERBAS</th>
-        <th style="width:35%">Valor</th>
+        <th style="width:35%">Valor (R$)</th>
       </tr>
     </thead>
     <tbody>
-      ${result.fgts.total_fgts > 0 ? `<tr><td class="left">FGTS</td><td class="num">${fmt(result.fgts.total_fgts)}</td></tr>` : ''}
+      ${result.fgts.total_fgts > 0 ? `<tr><td class="left">FGTS (Depósitos + Multa)</td><td class="num">${fmt(result.fgts.total_fgts)}</td></tr>` : ''}
       <tr><td class="left">Bruto Devido ao Reclamante</td><td class="num">${fmt(grandTotalFinal)}</td></tr>
-      ${result.resumo.cs_segurado > 0 ? `<tr class="deduction"><td class="left">DEDUÇÃO DE CONTRIBUIÇÃO SOCIAL</td><td class="num">(${fmt(result.resumo.cs_segurado)})</td></tr>` : ''}
-      ${result.resumo.ir_retido > 0 ? `<tr class="deduction"><td class="left">IRPF DEVIDO PELO RECLAMANTE</td><td class="num">(${fmt(result.resumo.ir_retido)})</td></tr>` : `<tr><td class="left">IRPF DEVIDO PELO RECLAMANTE</td><td class="num">0,00</td></tr>`}
-      ${(result.resumo.pensao_total || 0) > 0 ? `<tr class="deduction"><td class="left">PENSÃO ALIMENTÍCIA</td><td class="num">(${fmt(result.resumo.pensao_total)})</td></tr>` : ''}
-      ${(result.resumo.previdencia_privada || 0) > 0 ? `<tr class="deduction"><td class="left">PREVIDÊNCIA PRIVADA</td><td class="num">(${fmt(result.resumo.previdencia_privada)})</td></tr>` : ''}
+      ${result.resumo.cs_segurado > 0 ? `<tr class="deduction"><td class="left">(-) CONTRIBUIÇÃO SOCIAL — Cota do Segurado</td><td class="num">(${fmt(result.resumo.cs_segurado)})</td></tr>` : ''}
+      ${result.resumo.ir_retido > 0 ? `<tr class="deduction"><td class="left">(-) IRPF — Art. 12-A, Lei 7.713/88 (RRA)</td><td class="num">(${fmt(result.resumo.ir_retido)})</td></tr>` : `<tr><td class="left">(-) IRPF DEVIDO PELO RECLAMANTE</td><td class="num">0,00</td></tr>`}
+      ${(result.resumo.pensao_total || 0) > 0 ? `<tr class="deduction"><td class="left">(-) PENSÃO ALIMENTÍCIA</td><td class="num">(${fmt(result.resumo.pensao_total)})</td></tr>` : ''}
+      ${(result.resumo.previdencia_privada || 0) > 0 ? `<tr class="deduction"><td class="left">(-) PREVIDÊNCIA PRIVADA</td><td class="num">(${fmt(result.resumo.previdencia_privada)})</td></tr>` : ''}
       <tr class="total-row"><td class="left">Total de Descontos</td><td class="num">(${fmt(result.resumo.cs_segurado + result.resumo.ir_retido + (result.resumo.pensao_total || 0) + (result.resumo.previdencia_privada || 0))})</td></tr>
-      <tr class="grand-total"><td class="left">Líquido Devido ao Reclamante</td><td class="num">${fmt(result.resumo.liquido_reclamante)}</td></tr>
+      <tr class="grand-total"><td class="left">LÍQUIDO DEVIDO AO RECLAMANTE</td><td class="num">${fmt(result.resumo.liquido_reclamante)}</td></tr>
     </tbody>
   </table>
 
-  <!-- Débitos do Reclamado -->
-  <h2>Descrição de Débitos do Reclamado por Credor</h2>
+  <!-- 3. Débitos do Reclamado -->
+  <h2>3. Débitos do Reclamado por Credor</h2>
   <table>
     <thead>
       <tr>
         <th style="text-align:left; width:65%">Descrição</th>
-        <th style="width:35%">Valor</th>
+        <th style="width:35%">Valor (R$)</th>
       </tr>
     </thead>
     <tbody>
       <tr><td class="left">LÍQUIDO DEVIDO AO RECLAMANTE</td><td class="num">${fmt(result.resumo.liquido_reclamante)}</td></tr>
-      ${result.resumo.cs_empregador > 0 ? `<tr><td class="left">CONTRIBUIÇÃO SOCIAL SOBRE SALÁRIOS DEVIDOS</td><td class="num">${fmt(result.resumo.cs_empregador)}</td></tr>` : ''}
-      ${result.resumo.honorarios_sucumbenciais > 0 ? `<tr><td class="left">HONORÁRIOS SUCUMBENCIAIS${meta.honorariosNome ? ' PARA ' + meta.honorariosNome.toUpperCase() : ''}</td><td class="num">${fmt(result.resumo.honorarios_sucumbenciais)}</td></tr>` : ''}
-      ${result.resumo.honorarios_contratuais > 0 ? `<tr><td class="left">HONORÁRIOS CONTRATUAIS${meta.honorariosNome ? ' PARA ' + meta.honorariosNome.toUpperCase() : ''}</td><td class="num">${fmt(result.resumo.honorarios_contratuais)}</td></tr>` : ''}
+      ${result.resumo.cs_empregador > 0 ? `<tr><td class="left">CONTRIBUIÇÃO SOCIAL — Cota Patronal (20% + SAT + Terceiros)</td><td class="num">${fmt(result.resumo.cs_empregador)}</td></tr>` : ''}
+      ${result.resumo.cs_segurado > 0 ? `<tr><td class="left">CONTRIBUIÇÃO SOCIAL — Cota do Segurado (recolher à RFB)</td><td class="num">${fmt(result.resumo.cs_segurado)}</td></tr>` : ''}
+      ${result.resumo.ir_retido > 0 ? `<tr><td class="left">IRPF DEVIDO PELO RECLAMANTE (recolher à RFB)</td><td class="num">${fmt(result.resumo.ir_retido)}</td></tr>` : ''}
+      ${result.resumo.honorarios_sucumbenciais > 0 ? `<tr><td class="left">HONORÁRIOS SUCUMBENCIAIS${meta.honorariosNome ? ' — ' + meta.honorariosNome.toUpperCase() : ''}</td><td class="num">${fmt(result.resumo.honorarios_sucumbenciais)}</td></tr>` : ''}
+      ${result.resumo.honorarios_contratuais > 0 ? `<tr><td class="left">HONORÁRIOS CONTRATUAIS${meta.honorariosNome ? ' — ' + meta.honorariosNome.toUpperCase() : ''}</td><td class="num">${fmt(result.resumo.honorarios_contratuais)}</td></tr>` : ''}
       ${result.resumo.custas > 0 ? `<tr><td class="left">CUSTAS PROCESSUAIS</td><td class="num">${fmt(result.resumo.custas)}</td></tr>` : ''}
-      ${result.resumo.ir_retido > 0 ? `<tr><td class="left">IRPF DEVIDO PELO RECLAMANTE</td><td class="num">${fmt(result.resumo.ir_retido)}</td></tr>` : `<tr><td class="left">IRPF DEVIDO PELO RECLAMANTE</td><td class="num">0,00</td></tr>`}
-      <tr class="grand-total"><td class="left">Total Devido pelo Reclamado</td><td class="num">${fmt(result.resumo.total_reclamada)}</td></tr>
+      ${result.resumo.multa_523 > 0 ? `<tr><td class="left">MULTA ART. 523, §1º CPC</td><td class="num">${fmt(result.resumo.multa_523)}</td></tr>` : ''}
+      ${(result.resumo.multa_467 || 0) > 0 ? `<tr><td class="left">MULTA ART. 467 CLT</td><td class="num">${fmt(result.resumo.multa_467)}</td></tr>` : ''}
+      <tr class="grand-total"><td class="left">TOTAL DEVIDO PELO RECLAMADO</td><td class="num">${fmt(result.resumo.total_reclamada)}</td></tr>
     </tbody>
   </table>
 
-  <!-- Critérios -->
-  <h2>Critério de Cálculo e Fundamentação Legal</h2>
+  <!-- 4. Critérios -->
+  <h2>4. Critério de Cálculo e Fundamentação Legal</h2>
   <div style="font-size: 7.5pt; line-height: 1.5; text-align: justify;">
     <ol style="padding-left: 16px;">
       ${(meta.criterios && meta.criterios.length > 0)
@@ -401,6 +418,18 @@ function buildRelatorioCompletoHTML(
   `;
 
   // ──────────── PÁGINA 2: DADOS DO CÁLCULO ────────────
+  const historicoRows = (meta.historicoSalarial || []).map(h => `
+    <tr>
+      <td class="left">${h.nome}</td>
+      <td class="center">${fmtDate(h.periodo_inicio)}</td>
+      <td class="center">${fmtDate(h.periodo_fim)}</td>
+      <td class="center">${h.tipo_valor === 'informado' ? 'Informado' : 'Calculado'}</td>
+      <td class="num">${h.valor_informado ? fmt(h.valor_informado) : '—'}</td>
+      <td class="center">${h.incidencia_fgts !== false ? 'Sim' : 'Não'}</td>
+      <td class="center">${h.incidencia_cs !== false ? 'Sim' : 'Não'}</td>
+    </tr>
+  `).join('');
+
   const faltasRows = (meta.faltas || []).map(f => `
     <tr>
       <td class="center">${fmtDate(f.inicio)}</td>
@@ -432,20 +461,20 @@ function buildRelatorioCompletoHTML(
   <div class="page-break"></div>
   ${pageHeader(meta, 'PLANILHA DE CÁLCULO')}
 
-  <h2>Dados do Cálculo</h2>
+  <h2>5. Dados do Cálculo</h2>
   <div class="info-grid">
     <div class="info-row"><div class="info-label">Estado</div><div class="info-value">${meta.uf || '—'}</div></div>
     <div class="info-row"><div class="info-label">Município</div><div class="info-value">${meta.municipio || '—'}</div></div>
     <div class="info-row"><div class="info-label">Admissão</div><div class="info-value">${fmtDate(meta.dataAdmissao)}</div></div>
     <div class="info-row"><div class="info-label">Demissão</div><div class="info-value">${fmtDate(meta.dataDemissao)}</div></div>
+    <div class="info-row"><div class="info-label">Função</div><div class="info-value">${meta.funcao || '—'}</div></div>
     <div class="info-row"><div class="info-label">Regime de Trabalho</div><div class="info-value">${meta.regimeTrabalho || 'Tempo Integral'}</div></div>
+    <div class="info-row"><div class="info-label">Carga Horária (Padrão)</div><div class="info-value">${(meta.cargaHoraria || 220).toFixed(2)}</div></div>
+    <div class="info-row"><div class="info-label">Sábado como Dia Útil</div><div class="info-value">${meta.sabadoDiaUtil ? 'Sim' : 'Não'}</div></div>
     <div class="info-row"><div class="info-label">Aplicar Prescrição Quinquenal</div><div class="info-value">${meta.prescricaoQuinquenal ? 'Sim' : 'Não'}</div></div>
-    <div class="info-row"><div class="info-label">Aplicar Prescrição Trintenária</div><div class="info-value">${meta.prescricaoTrintenaria ? 'Sim' : 'Não'}</div></div>
     <div class="info-row"><div class="info-label">Projetar Aviso Prévio Indenizado</div><div class="info-value">${meta.projetarAvisoPrevio !== false ? 'Sim' : 'Não'}</div></div>
     <div class="info-row"><div class="info-label">Considerar Feriados</div><div class="info-value">${meta.considerarFeriados !== false ? 'Sim' : 'Não'}</div></div>
     <div class="info-row"><div class="info-label">Considerar Feriados Estaduais</div><div class="info-value">${meta.considerarFeriadosEstaduais !== false ? 'Sim' : 'Não'}</div></div>
-    <div class="info-row"><div class="info-label">Carga Horária (Padrão)</div><div class="info-value">${(meta.cargaHoraria || 220).toFixed(2)}</div></div>
-    <div class="info-row"><div class="info-label">Sábado como Dia Útil</div><div class="info-value">${meta.sabadoDiaUtil ? 'Sim' : 'Não'}</div></div>
     <div class="info-row"><div class="info-label">Zerar Valor Negativo (Padrão)</div><div class="info-value">${meta.zerarNegativo ? 'Sim' : 'Não'}</div></div>
   </div>
 
@@ -456,7 +485,19 @@ function buildRelatorioCompletoHTML(
     <tbody>${pontosFacRows}</tbody>
   </table>` : ''}
 
-  <h2>Faltas e Férias</h2>
+  ${historicoRows ? `
+  <h2>6. Histórico Salarial</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="text-align:left">Rubrica</th><th>Início</th><th>Fim</th>
+        <th>Tipo</th><th>Valor</th><th>FGTS</th><th>CS</th>
+      </tr>
+    </thead>
+    <tbody>${historicoRows}</tbody>
+  </table>` : ''}
+
+  <h2>7. Faltas e Férias</h2>
 
   <h3>FALTAS</h3>
   ${faltasRows ? `
@@ -506,14 +547,14 @@ function buildRelatorioCompletoHTML(
 
       cartaoPages += `
       <div class="page-break"></div>
-      ${pageHeader(meta, 'Cartão de Ponto Diário')}
-      <h3>OCORRÊNCIAS DO CARTÃO DE PONTO DIÁRIO</h3>
+      ${pageHeader(meta, 'CARTÃO DE PONTO DIÁRIO')}
+      <h3>OCORRÊNCIAS DO CARTÃO DE PONTO DIÁRIO ${i > 0 ? `(continuação ${Math.floor(i/ROWS_PER_PAGE)+1})` : ''}</h3>
       <table>
         <thead>
           <tr>
             <th>Data</th><th>Dia</th><th>Frequência</th>
-            <th>Hs Trabalhadas</th><th>Hs Ext Diárias</th><th>Hs Ext Semanais</th>
-            <th>Hs Ext Diárias em Repousos</th><th>Hs Ext Diárias em Feriados</th>
+            <th>Hs Trab.</th><th>Hs Ext Diárias</th><th>Hs Ext Semanais</th>
+            <th>Hs Ext Repousos</th><th>Hs Ext Feriados</th>
             <th>Hs Interjornadas</th><th>Hs Art 384</th>
           </tr>
         </thead>
@@ -524,7 +565,7 @@ function buildRelatorioCompletoHTML(
     }
   }
 
-  // ──────────── PÁGINA FINAL: MEMÓRIA DE CÁLCULO DETALHADA ────────────
+  // ──────────── MEMÓRIA DE CÁLCULO DETALHADA ────────────
   const memoriaVerbas = result.verbas.map((v, vi) => {
     const ocRows = v.ocorrencias.map(oc => `
       <tr>
@@ -606,7 +647,7 @@ function buildRelatorioCompletoHTML(
     
     <h2>Depósitos de FGTS (8%)</h2>
     <table>
-      <thead><tr><th>Competência</th><th>Base</th><th>Alíquota</th><th>FGTS Devido</th></tr></thead>
+      <thead><tr><th>Competência</th><th>Base de Cálculo</th><th>Alíquota</th><th>FGTS Devido</th></tr></thead>
       <tbody>
         ${fgtsDepRows}
         <tr class="grand-total">
@@ -663,7 +704,7 @@ function buildRelatorioCompletoHTML(
     
     <h2>Contribuição Social — Segurado (Dedução do Reclamante)</h2>
     <p style="font-size: 7pt; color: #555; margin-bottom: 6px; background: #fffde6; padding: 3px 6px; border-left: 3px solid #e6a800;">
-      Apuração progressiva conforme tabelas vigentes em cada competência. Valores deduzidos do crédito do reclamante antes do cálculo dos juros de mora.
+      Apuração progressiva conforme tabelas vigentes em cada competência (Art. 28, Lei 8.212/91). Valores deduzidos do crédito do reclamante.
     </p>
     <table>
       <thead><tr><th>Comp.</th><th>Base</th><th>Alíquota Efetiva</th><th>Valor</th><th>Recolhido</th><th>Diferença</th></tr></thead>
@@ -678,9 +719,9 @@ function buildRelatorioCompletoHTML(
     </table>
 
     ${csEmpRows ? `
-    <h2>Contribuição Social — Empregador (sobre salários devidos)</h2>
+    <h2>Contribuição Social — Empregador</h2>
     <p style="font-size: 7pt; color: #555; margin-bottom: 6px;">
-      Alíquota empresa: 20% · SAT/RAT · Terceiros — conforme Súmula nº 368 do TST, itens IV e V.
+      Conforme Súmula nº 368, itens IV e V, TST. Alíquota: Empresa 20% + SAT/RAT + Terceiros.
     </p>
     <table>
       <thead><tr><th>Comp.</th><th>Empresa (20%)</th><th>SAT/RAT</th><th>Terceiros</th><th>Total</th></tr></thead>
@@ -708,8 +749,10 @@ function buildRelatorioCompletoHTML(
     <h2>Imposto de Renda — Art. 12-A, Lei 7.713/88 (RRA)</h2>
     <div class="info-grid">
       <div class="info-row"><div class="info-label">Base de Cálculo</div><div class="info-value">${fmt(result.imposto_renda.base_calculo)}</div></div>
-      <div class="info-row"><div class="info-label">Deduções</div><div class="info-value">${fmt(result.imposto_renda.deducoes)}</div></div>
+      <div class="info-row"><div class="info-label">Deduções (CS + Dependentes)</div><div class="info-value">${fmt(result.imposto_renda.deducoes)}</div></div>
+      <div class="info-row"><div class="info-label">Base Tributável</div><div class="info-value">${fmt(result.imposto_renda.base_tributavel)}</div></div>
       <div class="info-row"><div class="info-label">Meses RRA</div><div class="info-value">${result.imposto_renda.meses_rra}</div></div>
+      ${result.imposto_renda.ir_13_exclusivo > 0 ? `<div class="info-row"><div class="info-label">IR 13º (Tributação Exclusiva)</div><div class="info-value">${fmt(result.imposto_renda.ir_13_exclusivo)}</div></div>` : ''}
       <div class="info-row" style="font-weight:700; background:#003366; color:#fff;"><div class="info-label" style="background:#003366; color:#fff; border-color:#003366;">IRRF DEVIDO</div><div class="info-value" style="border-color:#003366; color:#fff; background:#003366;">${fmt(result.imposto_renda.imposto_devido)}</div></div>
     </div>
     <p style="font-size: 7pt; color: #555; margin-top: 8px; background: #fffde6; padding: 3px 6px; border-left: 3px solid #e6a800;">
@@ -789,17 +832,10 @@ function buildDefaultCriterios(meta: RelatorioCompletoMeta, result: PjeLiquidaca
   items.push('Prazo do aviso prévio apurado segundo a Lei nº 12.506/2011.');
   items.push('Avos de férias e/ou 13º salário apurados considerando a projeção do prazo do aviso prévio.');
 
-  // Check if result has piecewise correction regimes
-  const hasCombinacao = result.verbas.some(v =>
-    v.ocorrencias.some(oc => (oc as any).regimes_aplicados?.length > 0)
-  );
-
-  // Build correction text from golden snapshot criteria if available
   const correcaoMeta = (meta as any).correcaoCombinacoes as Array<{ indice: string; ate?: string; de?: string }> | undefined;
   const jurosMeta = (meta as any).jurosCombinacoes as Array<{ tipo: string; ate?: string; de?: string }> | undefined;
 
   if (correcaoMeta && correcaoMeta.length > 0) {
-    // Piecewise correction description
     const fmtD = (d?: string) => {
       if (!d) return '';
       const [y, m, day] = d.split('-');

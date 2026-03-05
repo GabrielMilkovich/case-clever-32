@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -8,10 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Play, Loader2, FileBarChart, Printer, FileCode, AlertTriangle, CheckCircle2, Info, XCircle, Lock, Unlock, Copy, MoreVertical, FileText, FileSpreadsheet, ClipboardCheck, GitCompareArrows, Download } from "lucide-react";
+import { Play, Loader2, FileBarChart, Printer, FileCode, AlertTriangle, CheckCircle2, Info, XCircle, Lock, Unlock, Copy, MoreVertical, FileText, FileSpreadsheet, ClipboardCheck, GitCompareArrows, Download, Scale } from "lucide-react";
 import { PainelRevisao } from "./PainelRevisao";
 import { MemoriaCalculoExpandida } from "./MemoriaCalculoExpandida";
 import { ComparacaoCenarios } from "./ComparacaoCenarios";
+import { ComparadorParidade, buildParityData } from "./ComparadorParidade";
 import { calcularCompletude } from "@/lib/pjecalc/completude";
 import * as svc from "@/lib/pjecalc/service";
 import {
@@ -39,7 +40,7 @@ interface Props { caseId: string; }
 export function ModuloResumo({ caseId }: Props) {
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'resumo' | 'memoria' | 'revisao' | 'comparacao'>('resumo');
+  const [activeTab, setActiveTab] = useState<'resumo' | 'memoria' | 'revisao' | 'comparacao' | 'paridade'>('resumo');
   const [liquidando, setLiquidando] = useState(false);
   const [validacao, setValidacao] = useState<PjeValidationResult | null>(null);
   const [operando, setOperando] = useState(false);
@@ -83,6 +84,24 @@ export function ModuloResumo({ caseId }: Props) {
     queryKey: ["pjecalc_verbas", caseId],
     queryFn: () => svc.getVerbas(caseId),
   });
+
+  // Load PJC ground truth for parity comparator
+  const { data: pjcGroundTruth } = useQuery({
+    queryKey: ["pjc_ground_truth", caseId],
+    queryFn: async () => {
+      // Try to load from pjecalc_resultado the ground truth (resumo_verbas stores full result)
+      const { data: calculoRow } = await supabase.from("pjecalc_calculos").select("id").eq("case_id", caseId).maybeSingle();
+      if (!calculoRow) return null;
+      // Check if there's a PJC import with ground truth data
+      const { data: pjcData } = await supabase.from("pjecalc_resultado" as any)
+        .select("resumo_verbas")
+        .eq("calculo_id", (calculoRow as any).id)
+        .maybeSingle();
+      return (pjcData as any)?.resumo_verbas || null;
+    },
+  });
+
+  // parityData is computed below after `res` is derived
 
   const executarLiquidacao = async () => {
     setLiquidando(true);
@@ -437,6 +456,36 @@ export function ModuloResumo({ caseId }: Props) {
 
   const res = (resultado?.resultado as unknown as PjeLiquidacaoResult) || null;
   const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
+
+  // Build parity data when we have engine results + ground truth
+  const parityData = useMemo(() => {
+    if (!res) return null;
+    const mrdResults = new Map<string, number>();
+    for (const v of res.verbas) {
+      mrdResults.set(v.nome, v.total_diferenca);
+    }
+    if (pjcGroundTruth && typeof pjcGroundTruth === 'object' && 'verbas' in (pjcGroundTruth as any)) {
+      try {
+        const gt = pjcGroundTruth as any;
+        const pjcAnalysis = {
+          verbas: (gt.verbas || []).map((v: any) => ({
+            nome: v.nome, tipo: v.tipo,
+            total_devido: v.total_devido || 0, total_pago: v.total_pago || 0,
+            total_diferenca: v.total_diferenca || 0,
+          })),
+          resultado: {
+            liquido_exequente: gt.resumo?.liquido_reclamante || 0,
+            inss_reclamante: gt.resumo?.cs_segurado || 0,
+            inss_reclamado: gt.resumo?.cs_empregador || 0,
+            imposto_renda: gt.resumo?.ir_retido || 0,
+            honorarios: [{ valor: (gt.resumo?.honorarios_sucumbenciais || 0) + (gt.resumo?.honorarios_contratuais || 0) }],
+          },
+        };
+        return buildParityData(pjcAnalysis as any, mrdResults);
+      } catch { /* fallback */ }
+    }
+    return null;
+  }, [res, pjcGroundTruth]);
   const isFechado = resultado?.status === 'fechado';
   const reportMeta = {
     cliente: caseData?.cliente,
@@ -844,6 +893,26 @@ export function ModuloResumo({ caseId }: Props) {
               </CardContent>
             </Card>
           )}
+
+          {/* Comparador de Paridade */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Scale className="h-4 w-4 text-primary" />
+                  Comparador de Paridade
+                </CardTitle>
+                {parityData && (
+                  <Badge variant="outline" className="text-[10px]">
+                    {parityData.verbas.filter(v => v.status === 'ok').length}/{parityData.verbas.length} OK
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ComparadorParidade parityData={parityData} />
+            </CardContent>
+          </Card>
 
           <div className="text-[10px] text-muted-foreground text-right">
             Liquidação em {resultado?.data_liquidacao || '—'} • Engine v{resultado?.engine_version}
