@@ -13,6 +13,7 @@ import { PainelRevisao } from "./PainelRevisao";
 import { MemoriaCalculoExpandida } from "./MemoriaCalculoExpandida";
 import { ComparacaoCenarios } from "./ComparacaoCenarios";
 import { calcularCompletude } from "@/lib/pjecalc/completude";
+import * as svc from "@/lib/pjecalc/service";
 import {
   PjeCalcEngine,
   type PjeParametros, type PjeHistoricoSalarial, type PjeFalta, type PjeFerias,

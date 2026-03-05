@@ -34,8 +34,8 @@ export function ComparacaoCenarios({ caseId }: Props) {
 
   const a = liquidacoes[0]; // mais recente
   const b = liquidacoes[1]; // anterior
-  const resA: PjeLiquidacaoResult | null = a?.resultado;
-  const resB: PjeLiquidacaoResult | null = b?.resultado;
+  const resA = a?.resultado as unknown as PjeLiquidacaoResult | null;
+  const resB = b?.resultado as unknown as PjeLiquidacaoResult | null;
 
   if (!resA || !resB) return null;
 
