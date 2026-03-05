@@ -2516,9 +2516,18 @@ export class PjeCalcEngine {
           const segFim = datas[i + 1];
           const regime = this.getRegimeParaData(combinacoes_indice, segInicio);
           const indice = normalizeIndice(regime?.indice || 'SEM_CORRECAO');
-          if (indice === 'SEM_CORRECAO' || indice === 'NENHUM' || indice === 'Sem Correção') continue;
-          // For SELIC as correction index, still apply the correction factor (SELIC includes interest but in correction-only mode we apply the full factor)
-          const fatorDB = this.getIndiceCorrecaoDB(indice, segInicio.slice(0, 7), segFim.slice(0, 7));
+          if (indice === 'SEM_CORRECAO' || indice === 'NENHUM' || indice === 'Sem Correção') {
+            // ADC 58/59: fold SELIC into correction when correction=SEM_CORRECAO
+            const combinacoes_juros = this.correcaoConfig.combinacoes_juros || [];
+            const regimeJ = this.getRegimeParaData(combinacoes_juros, segInicio);
+            if (regimeJ?.tipo === 'SELIC') {
+              const fatorS = this.getIndiceCorrecaoDB('SELIC', segInicio.slice(0, 7), segFim.slice(0, 7), true);
+              if (fatorS !== null && fatorS > 0) fatorTotal = fatorTotal.times(fatorS);
+            }
+            continue;
+          }
+          // skipSumula381=true because we already applied mesSubsequente
+          const fatorDB = this.getIndiceCorrecaoDB(indice, segInicio.slice(0, 7), segFim.slice(0, 7), true);
           if (fatorDB !== null && fatorDB > 0) {
             fatorTotal = fatorTotal.times(fatorDB);
           } else {
