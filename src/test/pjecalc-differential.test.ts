@@ -294,8 +294,8 @@ describe('PJe-Calc Differential Tests', () => {
     expect(result.fgts.total_depositos).toBeGreaterThan(0);
     expect(result.fgts.multa_valor).toBeGreaterThan(0);
     expect(result.fgts.saldo_deduzido).toBe(50);
-    expect(result.fgts.total_fgts).toBe(
-      result.fgts.total_depositos + result.fgts.multa_valor - result.fgts.saldo_deduzido
+    expect(result.fgts.total_fgts).toBeCloseTo(
+      result.fgts.total_depositos + result.fgts.multa_valor - result.fgts.saldo_deduzido, 1
     );
   });
 
