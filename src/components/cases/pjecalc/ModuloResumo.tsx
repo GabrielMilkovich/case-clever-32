@@ -85,6 +85,56 @@ export function ModuloResumo({ caseId }: Props) {
     queryFn: () => svc.getVerbas(caseId),
   });
 
+  // Load PJC ground truth for parity comparator
+  const { data: pjcGroundTruth } = useQuery({
+    queryKey: ["pjc_ground_truth", caseId],
+    queryFn: async () => {
+      // Try to load from pjecalc_resultado the ground truth (resumo_verbas stores full result)
+      const { data: calculoRow } = await supabase.from("pjecalc_calculos").select("id").eq("case_id", caseId).maybeSingle();
+      if (!calculoRow) return null;
+      // Check if there's a PJC import with ground truth data
+      const { data: pjcData } = await supabase.from("pjecalc_resultado" as any)
+        .select("resumo_verbas")
+        .eq("calculo_id", (calculoRow as any).id)
+        .maybeSingle();
+      return pjcData?.resumo_verbas || null;
+    },
+  });
+
+  // Build parity data when we have engine results
+  const parityData = useMemo(() => {
+    if (!res) return null;
+    // Build a simple self-comparison for now (engine vs engine baseline)
+    // When PJC ground truth is available, this will compare against it
+    const mrdResults = new Map<string, number>();
+    for (const v of res.verbas) {
+      mrdResults.set(v.nome, v.total_diferenca);
+    }
+    // If we have ground truth from a PJC import, use buildParityData
+    if (pjcGroundTruth && typeof pjcGroundTruth === 'object' && 'verbas' in (pjcGroundTruth as any)) {
+      try {
+        const gt = pjcGroundTruth as any;
+        // Build a pseudo PJCAnalysis for comparison
+        const pjcAnalysis = {
+          verbas: (gt.verbas || []).map((v: any) => ({
+            nome: v.nome, tipo: v.tipo,
+            total_devido: v.total_devido || 0, total_pago: v.total_pago || 0,
+            total_diferenca: v.total_diferenca || 0,
+          })),
+          resultado: {
+            liquido_exequente: gt.resumo?.liquido_reclamante || 0,
+            inss_reclamante: gt.resumo?.cs_segurado || 0,
+            inss_reclamado: gt.resumo?.cs_empregador || 0,
+            imposto_renda: gt.resumo?.ir_retido || 0,
+            honorarios: [{ valor: (gt.resumo?.honorarios_sucumbenciais || 0) + (gt.resumo?.honorarios_contratuais || 0) }],
+          },
+        };
+        return buildParityData(pjcAnalysis as any, mrdResults);
+      } catch { /* fallback below */ }
+    }
+    return null;
+  }, [res, pjcGroundTruth]);
+
   const executarLiquidacao = async () => {
     setLiquidando(true);
     setValidacao(null);
