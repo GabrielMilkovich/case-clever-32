@@ -39,9 +39,8 @@ import type {
 // HELPER: typed query wrapper (avoids `as any` everywhere)
 // =====================================================
 
-function fromView(name: string) {
-  // Views aren't in generated types, so we cast once here
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function fromView(name: string): any {
   return supabase.from(name as any);
 }
 
