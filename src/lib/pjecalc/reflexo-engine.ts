@@ -176,6 +176,7 @@ export function gerarReflexosPadrao(
         caracteristica: tmpl.caracteristica,
         ocorrencia_pagamento: tmpl.ocorrencia_pagamento,
         comportamento_reflexo: tmpl.comportamento_reflexo,
+        periodo_media_reflexo: tmpl.periodo_media_reflexo,
         tratamento_fracao_mes: tmpl.tratamento_fracao_mes,
         multiplicador: tmpl.multiplicador,
         divisor_tipo: tmpl.divisor_tipo,
@@ -186,6 +187,7 @@ export function gerarReflexosPadrao(
         incidencias: { ...tmpl.incidencias },
         ordem: vb.ordem + tmpl.ordem_offset,
         base_verbas: [vb.id],
+        integralizar_base: tmpl.integralizar_base,
       });
     }
   }
