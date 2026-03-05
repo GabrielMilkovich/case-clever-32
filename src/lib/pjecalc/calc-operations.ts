@@ -149,6 +149,10 @@ export async function duplicarCalculo(caseId: string, novoCliente?: string): Pro
     'pjecalc_honorarios',
     'pjecalc_custas_config',
     'pjecalc_seguro_config',
+    'pjecalc_multas_config',
+    'pjecalc_pensao_config',
+    'pjecalc_previdencia_privada_config',
+    'pjecalc_salario_familia_config',
   ];
 
   for (const table of configTables) {

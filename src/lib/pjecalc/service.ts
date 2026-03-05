@@ -417,10 +417,12 @@ export async function upsertMultasConfig(caseId: string, payload: Record<string,
 // =====================================================
 
 export async function getPensaoConfig(caseId: string): Promise<Record<string, unknown> | null> {
-  const { data, error } = await fromView('pjecalc_pensao_config')
-    .select('*').eq('case_id', caseId).maybeSingle();
-  if (error) throw error;
-  return data as Record<string, unknown> | null;
+  try {
+    const { data, error } = await fromView('pjecalc_pensao_config')
+      .select('*').eq('case_id', caseId).maybeSingle();
+    if (error) { console.warn('getPensaoConfig:', error.message); return null; }
+    return data as Record<string, unknown> | null;
+  } catch { return null; }
 }
 
 export async function upsertPensaoConfig(caseId: string, payload: Record<string, unknown>): Promise<void> {
@@ -438,10 +440,12 @@ export async function upsertPensaoConfig(caseId: string, payload: Record<string,
 // =====================================================
 
 export async function getPrevPrivConfig(caseId: string): Promise<Record<string, unknown> | null> {
-  const { data, error } = await fromView('pjecalc_previdencia_privada_config')
-    .select('*').eq('case_id', caseId).maybeSingle();
-  if (error) throw error;
-  return data as Record<string, unknown> | null;
+  try {
+    const { data, error } = await fromView('pjecalc_previdencia_privada_config')
+      .select('*').eq('case_id', caseId).maybeSingle();
+    if (error) { console.warn('getPrevPrivConfig:', error.message); return null; }
+    return data as Record<string, unknown> | null;
+  } catch { return null; }
 }
 
 export async function upsertPrevPrivConfig(caseId: string, payload: Record<string, unknown>): Promise<void> {
@@ -459,10 +463,12 @@ export async function upsertPrevPrivConfig(caseId: string, payload: Record<strin
 // =====================================================
 
 export async function getSalarioFamiliaConfig(caseId: string): Promise<Record<string, unknown> | null> {
-  const { data, error } = await fromView('pjecalc_salario_familia_config')
-    .select('*').eq('case_id', caseId).maybeSingle();
-  if (error) throw error;
-  return data as Record<string, unknown> | null;
+  try {
+    const { data, error } = await fromView('pjecalc_salario_familia_config')
+      .select('*').eq('case_id', caseId).maybeSingle();
+    if (error) { console.warn('getSalarioFamiliaConfig:', error.message); return null; }
+    return data as Record<string, unknown> | null;
+  } catch { return null; }
 }
 
 export async function upsertSalarioFamiliaConfig(caseId: string, payload: Record<string, unknown>): Promise<void> {
@@ -480,10 +486,12 @@ export async function upsertSalarioFamiliaConfig(caseId: string, payload: Record
 // =====================================================
 
 export async function getSeguroConfig(caseId: string): Promise<Record<string, unknown> | null> {
-  const { data, error } = await fromView('pjecalc_seguro_config')
-    .select('*').eq('case_id', caseId).maybeSingle();
-  if (error) throw error;
-  return data as Record<string, unknown> | null;
+  try {
+    const { data, error } = await fromView('pjecalc_seguro_config')
+      .select('*').eq('case_id', caseId).maybeSingle();
+    if (error) { console.warn('getSeguroConfig:', error.message); return null; }
+    return data as Record<string, unknown> | null;
+  } catch { return null; }
 }
 
 export async function upsertSeguroConfig(caseId: string, payload: Record<string, unknown>): Promise<void> {
