@@ -1242,10 +1242,14 @@ export class PjeCalcEngine {
   // Retorna fator acumulado entre competência e liquidação
   // =====================================================
 
-  private getIndiceCorrecaoDB(nomeIndice: string, compOrigem: string, compDestino: string): number | null {
+  /**
+   * Returns COMPOUND correction factor (ratio of accumulated indices).
+   * Used for CORRECTION (not interest).
+   * Optionally skips Súmula 381 shift when caller already applied it.
+   */
+  private getIndiceCorrecaoDB(nomeIndice: string, compOrigem: string, compDestino: string, skipSumula381: boolean = false): number | null {
     if (this.indicesDB.length === 0) return null;
 
-    // Filtrar por índice
     const indices = this.indicesDB
       .filter(i => i.indice === nomeIndice)
       .sort((a, b) => (a.competencia || '').localeCompare(b.competencia || ''));
@@ -1253,11 +1257,10 @@ export class PjeCalcEngine {
     if (indices.length === 0) return null;
 
     // Súmula 381 TST: correção acumula a partir do mês SUBSEQUENTE ao vencimento
-    // So if compOrigem is "2016-05", we lookup from "2016-06"
-    const origemSubsequente = this.mesSubsequente(compOrigem);
+    // Skip this shift when the caller has already applied mesSubsequente
+    const compLookup = skipSumula381 ? compOrigem : this.mesSubsequente(compOrigem);
 
-    // Buscar acumulado na competência de origem (subsequente) 
-    const idxOrigem = indices.find(i => i.competencia.slice(0, 7) >= origemSubsequente) 
+    const idxOrigem = indices.find(i => i.competencia.slice(0, 7) >= compLookup) 
       || indices[0];
     const idxDestinoArr = indices.filter(i => i.competencia.slice(0, 7) <= compDestino);
     const idxDestino = idxDestinoArr.length > 0 ? idxDestinoArr[idxDestinoArr.length - 1] : indices[indices.length - 1];
@@ -1266,6 +1269,33 @@ export class PjeCalcEngine {
     if (Number(idxOrigem.acumulado) === 0) return null;
 
     return Number(idxDestino.acumulado) / Number(idxOrigem.acumulado);
+  }
+
+  /**
+   * Returns SIMPLE interest rate (sum of monthly % / 100) for a period.
+   * PJe-Calc uses simple juros de mora: sum of monthly rates × corrected value.
+   * This avoids compound accumulation which inflates interest.
+   */
+  private getJurosSimplesDB(nomeIndice: string, compOrigem: string, compDestino: string): number | null {
+    if (this.indicesDB.length === 0) return null;
+
+    const indices = this.indicesDB
+      .filter(i => i.indice === nomeIndice)
+      .sort((a, b) => (a.competencia || '').localeCompare(b.competencia || ''));
+
+    if (indices.length === 0) return null;
+
+    // Sum monthly 'valor' (percentage points) from compOrigem to compDestino
+    const filtered = indices.filter(i => {
+      const c = i.competencia.slice(0, 7);
+      return c >= compOrigem.slice(0, 7) && c <= compDestino.slice(0, 7);
+    });
+
+    if (filtered.length === 0) return null;
+
+    // Sum the monthly percentage values and convert to decimal
+    const totalPct = filtered.reduce((sum, i) => sum + Number(i.valor), 0);
+    return totalPct / 100; // Convert from percentage to decimal (e.g., 45.3% → 0.453)
   }
 
   /** Returns YYYY-MM for the month after the given competência */
