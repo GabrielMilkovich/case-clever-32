@@ -1252,11 +1252,12 @@ export class PjeCalcEngine {
 
     if (indices.length === 0) return null;
 
-    // Buscar acumulado na competência de origem
-    const origemDate = compOrigem + '-01';
-    const destinoDate = compDestino + '-01';
+    // Súmula 381 TST: correção acumula a partir do mês SUBSEQUENTE ao vencimento
+    // So if compOrigem is "2016-05", we lookup from "2016-06"
+    const origemSubsequente = this.mesSubsequente(compOrigem);
 
-    const idxOrigem = indices.find(i => i.competencia.slice(0, 7) >= compOrigem) 
+    // Buscar acumulado na competência de origem (subsequente) 
+    const idxOrigem = indices.find(i => i.competencia.slice(0, 7) >= origemSubsequente) 
       || indices[0];
     const idxDestinoArr = indices.filter(i => i.competencia.slice(0, 7) <= compDestino);
     const idxDestino = idxDestinoArr.length > 0 ? idxDestinoArr[idxDestinoArr.length - 1] : indices[indices.length - 1];
@@ -1265,6 +1266,13 @@ export class PjeCalcEngine {
     if (Number(idxOrigem.acumulado) === 0) return null;
 
     return Number(idxDestino.acumulado) / Number(idxOrigem.acumulado);
+  }
+
+  /** Returns YYYY-MM for the month after the given competência */
+  private mesSubsequente(comp: string): string {
+    const [ano, mes] = comp.split('-').map(Number);
+    if (mes === 12) return `${ano + 1}-01`;
+    return `${ano}-${String(mes + 1).padStart(2, '0')}`;
   }
 
   // =====================================================
