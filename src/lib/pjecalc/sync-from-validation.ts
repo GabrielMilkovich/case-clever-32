@@ -220,7 +220,6 @@ async function autoConfigureModules(caseId: string, params: any, factMap: Record
       apurar_empresa: true,
       apurar_sat: true,
       apurar_terceiros: true,
-      aliquota_empregador_tipo: "atividade",
       aliquota_sat_fixa: 2,
       aliquota_terceiros_fixa: 5.8,
     }, errors, "CS Config"),
