@@ -440,7 +440,20 @@ async function extractStructured(
   lovableApiKey: string
 ): Promise<any> {
   let lastError: Error | null = null;
-  const models = ["openai/gpt-5", "openai/gpt-5-mini"];
+  // Cascade: try Google Gemini first (cheaper/faster), then OpenAI as fallback
+  const models = [
+    "google/gemini-2.5-flash",
+    "google/gemini-2.5-pro",
+    "google/gemini-3-flash-preview",
+    "openai/gpt-5-mini",
+    "openai/gpt-5",
+  ];
+
+  // Truncate OCR text if too large (>200k chars) to avoid token limits
+  const maxChars = 200000;
+  const truncatedOcr = ocrText.length > maxChars
+    ? ocrText.substring(0, maxChars) + "\n\n[... TEXTO TRUNCADO ...]"
+    : ocrText;
 
   for (const model of models) {
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -458,7 +471,7 @@ async function extractStructured(
               { role: "system", content: SYSTEM_PROMPT },
               {
                 role: "user",
-                content: `Analise o texto abaixo extraído por OCR de um documento trabalhista e extraia ABSOLUTAMENTE TODOS os dados usando a função extrair_dados_documento. Não omita nenhuma informação.\n\n--- TEXTO DO DOCUMENTO ---\n${ocrText}\n--- FIM DO TEXTO ---`
+                content: `Analise o texto abaixo extraído por OCR de um documento trabalhista e extraia ABSOLUTAMENTE TODOS os dados usando a função extrair_dados_documento. Não omita nenhuma informação.\n\n--- TEXTO DO DOCUMENTO ---\n${truncatedOcr}\n--- FIM DO TEXTO ---`
               },
             ],
             tools: EXTRACTION_TOOLS,
@@ -471,6 +484,12 @@ async function extractStructured(
         if (!response.ok) {
           const errText = await response.text();
           console.error(`[EXTRACT] ${model} ${response.status}:`, errText.substring(0, 200));
+          // 402 = no credits — skip directly to next model, no retries
+          if (response.status === 402) {
+            console.warn(`[EXTRACT] ${model} returned 402 (no credits), skipping to next model`);
+            lastError = new Error(`Créditos insuficientes (${model})`);
+            break;
+          }
           if (response.status === 429) { await delay(RETRY_DELAY_MS * attempt * 3); continue; }
           if (response.status >= 500) { await delay(RETRY_DELAY_MS * attempt); continue; }
           lastError = new Error(`API ${response.status}`);
@@ -481,31 +500,43 @@ async function extractStructured(
         const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
 
         if (toolCall?.function?.arguments) {
-          const extracted = JSON.parse(toolCall.function.arguments);
-          // Ensure OCR text is preserved
-          if (!extracted.texto_ocr_completo) extracted.texto_ocr_completo = ocrText;
-          console.log(`[EXTRACT] SUCCESS with ${model}: tipo=${extracted.tipo_documento}, rubricas=${extracted.rubricas?.length || 0}`);
-          return extracted;
+          try {
+            const extracted = JSON.parse(toolCall.function.arguments);
+            if (!extracted.texto_ocr_completo) extracted.texto_ocr_completo = ocrText;
+            console.log(`[EXTRACT] SUCCESS with ${model}: tipo=${extracted.tipo_documento}, rubricas=${extracted.rubricas?.length || 0}`);
+            return extracted;
+          } catch (parseErr) {
+            console.error(`[EXTRACT] JSON parse error from ${model}:`, parseErr);
+            lastError = new Error("Erro ao interpretar resposta do modelo");
+            continue;
+          }
         }
 
+        // Fallback: try to extract JSON from content
         const content = data.choices?.[0]?.message?.content || "";
         const jsonMatch = content.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          if (!parsed.texto_ocr_completo) parsed.texto_ocr_completo = ocrText;
-          return parsed;
+          try {
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (!parsed.texto_ocr_completo) parsed.texto_ocr_completo = ocrText;
+            console.log(`[EXTRACT] SUCCESS (content fallback) with ${model}`);
+            return parsed;
+          } catch {
+            // ignore parse error, try next attempt
+          }
         }
 
-        lastError = new Error("No structured data returned");
+        lastError = new Error("Modelo não retornou dados estruturados");
         continue;
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
+        console.error(`[EXTRACT] ${model} exception:`, lastError.message);
         await delay(RETRY_DELAY_MS * attempt);
       }
     }
     console.warn(`[EXTRACT] Model ${model} exhausted, trying next...`);
   }
-  throw new Error(`Structured extraction failed: ${lastError?.message}`);
+  throw new Error(`Extração falhou em todos os modelos. Último erro: ${lastError?.message}`);
 }
 
 // =====================================================
