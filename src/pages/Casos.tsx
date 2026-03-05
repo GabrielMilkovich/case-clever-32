@@ -16,6 +16,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { seedAdvancedTestCase } from "@/lib/test-case-seed";
 import { seedCasoMarcelo } from "@/lib/test-case-seed-marcelo";
+import { seedCasoMaria } from "@/lib/test-case-seed-maria";
 import { toast } from "sonner";
 
 interface CaseWithMetrics {
@@ -48,6 +49,7 @@ export default function Casos() {
   const [seedingTest, setSeedingTest] = useState(false);
 
   const [seedingMarcelo, setSeedingMarcelo] = useState(false);
+  const [seedingMaria, setSeedingMaria] = useState(false);
 
   const handleSeedTestCase = async () => {
     setSeedingTest(true);
@@ -76,6 +78,20 @@ export default function Casos() {
       toast.error("Erro ao criar caso: " + err.message);
     } finally {
       setSeedingMarcelo(false);
+    }
+  };
+
+  const handleSeedMaria = async () => {
+    setSeedingMaria(true);
+    try {
+      const caseId = await seedCasoMaria();
+      toast.success("Caso Maria Madalena (Via Varejo) criado! Pronto para liquidar.");
+      queryClient.invalidateQueries({ queryKey: ["cases-with-metrics"] });
+      navigate(`/casos/${caseId}`);
+    } catch (err: any) {
+      toast.error("Erro ao criar caso: " + err.message);
+    } finally {
+      setSeedingMaria(false);
     }
   };
 
@@ -226,6 +242,15 @@ export default function Casos() {
           </div>
           <div className="flex gap-2">
             <Button 
+              variant="outline" size="sm" 
+              onClick={handleSeedMaria}
+              disabled={seedingMaria}
+              className="gap-1.5 h-9 text-sm"
+            >
+              <FlaskConical className="h-4 w-4" />
+              {seedingMaria ? "Criando..." : "Caso Maria (Comissionista)"}
+            </Button>
+            <Button
               variant="outline" size="sm" 
               onClick={handleSeedTestCase}
               disabled={seedingTest}
