@@ -83,39 +83,39 @@ export function ModuloResumo({ caseId }: Props) {
     setLiquidando(true);
     setValidacao(null);
     try {
-      // Load all module data in parallel
-      const [paramsRes, histRes, faltasRes, feriasRes, verbasRes, cartaoRes] = await Promise.all([
-        supabase.from("pjecalc_parametros" as any).select("*").eq("case_id", caseId).maybeSingle(),
-        supabase.from("pjecalc_historico_salarial" as any).select("*").eq("case_id", caseId).order("periodo_inicio"),
-        supabase.from("pjecalc_faltas" as any).select("*").eq("case_id", caseId),
-        supabase.from("pjecalc_ferias" as any).select("*").eq("case_id", caseId),
-        supabase.from("pjecalc_verbas" as any).select("*").eq("case_id", caseId).order("ordem"),
-        supabase.from("pjecalc_cartao_ponto" as any).select("*").eq("case_id", caseId).order("competencia"),
+      // Load all module data in parallel via service layer
+      const [paramsRes, histData, faltasData, feriasData, verbasData, cartaoData] = await Promise.all([
+        svc.getParametros(caseId),
+        svc.getHistoricoSalarial(caseId),
+        svc.getFaltas(caseId),
+        svc.getFerias(caseId),
+        svc.getVerbas(caseId),
+        svc.getCartaoPonto(caseId),
       ]);
 
       // Load config tables in parallel
-      const [fgtsData, csData, irData, correcaoData, honorariosData, custasData, seguroData] = await Promise.all([
-        supabase.from("pjecalc_fgts_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
-        supabase.from("pjecalc_cs_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
-        supabase.from("pjecalc_ir_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
-        supabase.from("pjecalc_correcao_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
-        supabase.from("pjecalc_honorarios" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
-        supabase.from("pjecalc_custas_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
-        supabase.from("pjecalc_seguro_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
+      const [fgtsData, csData, irData, correcaoDataLocal, honorariosData, custasData, seguroData] = await Promise.all([
+        svc.getFgtsConfig(caseId).then(r => (r || {}) as Record<string, unknown>),
+        svc.getCsConfig(caseId).then(r => (r || {}) as Record<string, unknown>),
+        svc.getIrConfig(caseId).then(r => (r || {}) as Record<string, unknown>),
+        svc.getCorrecaoConfig(caseId).then(r => (r || {}) as Record<string, unknown>),
+        svc.getHonorarios(caseId).then(r => (r || {}) as Record<string, unknown>),
+        svc.getCustasConfig(caseId).then(r => (r || {}) as Record<string, unknown>),
+        svc.getSeguroConfig(caseId).then(r => (r || {}) as Record<string, unknown>),
       ]);
 
       // ── Fase 1: Carregar dados do banco (séries históricas e tabelas versionadas) ──
-      const [indicesRes, inssFaixasRes, irFaixasRes, dadosProcessoRes,
-             prevPrivadaData, pensaoData, sfData, feriadosRes, multasData] = await Promise.all([
-        supabase.from("pjecalc_correcao_monetaria" as any).select("*").order("competencia"),
-        supabase.from("pjecalc_inss_faixas" as any).select("*").order("competencia_inicio,faixa"),
-        supabase.from("pjecalc_ir_faixas" as any).select("*").order("competencia_inicio,faixa"),
-        supabase.from("pjecalc_dados_processo" as any).select("*").eq("case_id", caseId).maybeSingle(),
-        supabase.from("pjecalc_previdencia_privada_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
-        supabase.from("pjecalc_pensao_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
-        supabase.from("pjecalc_salario_familia_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
-        supabase.from("pjecalc_feriados" as any).select("*"),
-        supabase.from("pjecalc_multas_config" as any).select("*").eq("case_id", caseId).maybeSingle().then(r => (r.data || {}) as any),
+      const [indicesData, inssFaixasData, irFaixasData, dadosProcessoLocal,
+             prevPrivadaData, pensaoData, sfData, feriadosData, multasData] = await Promise.all([
+        svc.getIndicesCorrecao(),
+        svc.getInssFaixas(),
+        svc.getIrFaixas(),
+        svc.getDadosProcesso(caseId),
+        svc.getPrevPrivConfig(caseId).then(r => (r || {}) as Record<string, unknown>),
+        svc.getPensaoConfig(caseId).then(r => (r || {}) as Record<string, unknown>),
+        svc.getSalarioFamiliaConfig(caseId).then(r => (r || {}) as Record<string, unknown>),
+        svc.getFeriados(),
+        svc.getMultasConfig(caseId).then(r => (r || {}) as Record<string, unknown>),
       ]);
 
       if (!paramsRes.data) throw new Error("Configure os Parâmetros primeiro.");
