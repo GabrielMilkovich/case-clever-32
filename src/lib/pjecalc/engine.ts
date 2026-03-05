@@ -1505,6 +1505,9 @@ export class PjeCalcEngine {
         const compDate = oc.competencia.length === 7 ? oc.competencia + '-01' : oc.competencia;
 
         // Build breakpoints from competência to liquidação
+        // Súmula 381: correction starts from mês subsequente ao vencimento
+        const compDateSubsequente = this.mesSubsequente(oc.competencia) + '-01';
+        const compDate = compDateSubsequente;
         const breakpoints = new Set<string>();
         breakpoints.add(compDate);
         breakpoints.add(dataLiq);
@@ -2399,7 +2402,8 @@ export class PjeCalcEngine {
       let totalCorrigido = 0;
       for (const oc of vr.ocorrencias) {
         if (oc.diferenca === 0) continue;
-        const compDate = oc.competencia.length === 7 ? oc.competencia + '-01' : oc.competencia;
+        // Súmula 381: correction starts from mês subsequente ao vencimento
+        const compDate = this.mesSubsequente(oc.competencia) + '-01';
         const breakpoints = new Set<string>();
         breakpoints.add(compDate);
         breakpoints.add(dataLiq);
