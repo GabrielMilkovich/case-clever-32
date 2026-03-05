@@ -515,11 +515,35 @@ export async function executarLiquidacao(
 
   const engineSeguro: PjeSeguroConfig = { apurar: false, parcelas: 0, recebeu: false };
 
+  // 3b. Load correction indices from database (CRITICAL for parity)
+  let indicesDB: { indice: string; competencia: string; valor: number; acumulado: number }[] = [];
+  try {
+    const { data: indicesData } = await supabase
+      .from('pjecalc_correcao_monetaria' as any)
+      .select('indice, competencia, valor, acumulado')
+      .order('indice')
+      .order('competencia');
+    if (indicesData && indicesData.length > 0) {
+      indicesDB = (indicesData as any[]).map(r => ({
+        indice: r.indice,
+        competencia: r.competencia,
+        valor: Number(r.valor),
+        acumulado: Number(r.acumulado),
+      }));
+      console.log(`[ORCHESTRATOR] Loaded ${indicesDB.length} correction indices from DB`);
+    } else {
+      console.warn('[ORCHESTRATOR] No correction indices found in DB — fallback rates will be used');
+    }
+  } catch (e) {
+    console.warn('[ORCHESTRATOR] Failed to load correction indices:', e);
+  }
+
   // 4. Execute engine
   const engine = new PjeCalcEngine(
     engineParams, engineHistoricos, engineFaltas, engineFerias,
     engineVerbas, engineCartao, engineFgts, engineCs, engineIr,
     engineCorrecao, engineHonorarios, engineCustas, engineSeguro,
+    indicesDB, // ← 14th param: correction indices from DB
   );
 
   const result = engine.liquidar();

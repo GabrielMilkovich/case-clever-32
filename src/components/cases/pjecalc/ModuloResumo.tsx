@@ -12,7 +12,7 @@ import { Play, Loader2, FileBarChart, Printer, FileCode, AlertTriangle, CheckCir
 import { PainelRevisao } from "./PainelRevisao";
 import { MemoriaCalculoExpandida } from "./MemoriaCalculoExpandida";
 import { ComparacaoCenarios } from "./ComparacaoCenarios";
-import { ComparadorParidade, buildParityData } from "./ComparadorParidade";
+import { ComparadorParidade, buildParityData, buildParityDataFromGolden } from "./ComparadorParidade";
 import { calcularCompletude } from "@/lib/pjecalc/completude";
 import * as svc from "@/lib/pjecalc/service";
 import {
@@ -297,6 +297,7 @@ export function ModuloResumo({ caseId }: Props) {
         data_liquidacao: correcaoDataLocal.data_liquidacao || new Date().toISOString().slice(0, 10),
         combinacoes_indice: combinacoesIndice,
         combinacoes_juros: combinacoesJuros,
+        juros_apos_deducao_cs: true, // PJe-Calc Criterion 8: juros após dedução CS
       } as PjeCorrecaoConfig;
 
       const honorariosConfig = {
@@ -471,35 +472,10 @@ export function ModuloResumo({ caseId }: Props) {
   const res = (resultado?.resultado as unknown as PjeLiquidacaoResult) || null;
   const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
 
-  // Build parity data when we have engine results + ground truth
+  // Build parity data using Golden Snapshot as ground truth
   const parityData = useMemo(() => {
-    if (!res) return null;
-    const mrdResults = new Map<string, number>();
-    for (const v of res.verbas) {
-      mrdResults.set(v.nome, v.total_diferenca);
-    }
-    if (pjcGroundTruth && typeof pjcGroundTruth === 'object' && 'verbas' in (pjcGroundTruth as any)) {
-      try {
-        const gt = pjcGroundTruth as any;
-        const pjcAnalysis = {
-          verbas: (gt.verbas || []).map((v: any) => ({
-            nome: v.nome, tipo: v.tipo,
-            total_devido: v.total_devido || 0, total_pago: v.total_pago || 0,
-            total_diferenca: v.total_diferenca || 0,
-          })),
-          resultado: {
-            liquido_exequente: gt.resumo?.liquido_reclamante || 0,
-            inss_reclamante: gt.resumo?.cs_segurado || 0,
-            inss_reclamado: gt.resumo?.cs_empregador || 0,
-            imposto_renda: gt.resumo?.ir_retido || 0,
-            honorarios: [{ valor: (gt.resumo?.honorarios_sucumbenciais || 0) + (gt.resumo?.honorarios_contratuais || 0) }],
-          },
-        };
-        return buildParityData(pjcAnalysis as any, mrdResults);
-      } catch { /* fallback */ }
-    }
-    return null;
-  }, [res, pjcGroundTruth]);
+    return buildParityDataFromGolden(res);
+  }, [res]);
   const isFechado = resultado?.status === 'fechado';
   const reportMeta = {
     cliente: caseData?.cliente,
@@ -787,35 +763,49 @@ export function ModuloResumo({ caseId }: Props) {
               <table className="w-full text-xs">
                 <tbody>
                   {[
-                    ['Principal Bruto', res.resumo.principal_bruto],
+                    ['Principal Bruto (nominal)', res.resumo.principal_bruto],
                     ['(+) Correção Monetária', res.resumo.principal_corrigido - res.resumo.principal_bruto],
                     ['(+) Juros de Mora', res.resumo.juros_mora],
-                    ['(+) FGTS (depósitos + multa)', res.resumo.fgts_total],
-                    ['(-) CS Segurado', -res.resumo.cs_segurado],
+                    ['= BRUTO DEVIDO AO RECLAMANTE', res.resumo.principal_corrigido + res.resumo.juros_mora],
+                    ['(-) Contribuição Social Segurado', -res.resumo.cs_segurado],
                     ['(-) IRRF (Art. 12-A RRA)', -res.resumo.ir_retido],
-                    ...(res.resumo.seguro_desemprego > 0 ? [['(+) Seguro-Desemprego (indenização)', res.resumo.seguro_desemprego]] : []),
-                    ...((res.resumo.salario_familia || 0) > 0 ? [['(+) Salário-Família (Art. 65, Lei 8.213/91)', res.resumo.salario_familia]] : []),
-                    ...(res.resumo.multa_523 > 0 ? [['(+) Multa Art. 523, §1º CPC', res.resumo.multa_523]] : []),
-                    ...((res.resumo.multa_467 || 0) > 0 ? [['(+) Multa Art. 467 CLT', res.resumo.multa_467]] : []),
-                    ...(res.resumo.honorarios_sucumbenciais > 0 ? [['(+) Honorários Sucumbenciais', res.resumo.honorarios_sucumbenciais]] : []),
-                    ...(res.resumo.honorarios_contratuais > 0 ? [['(+) Honorários Contratuais', res.resumo.honorarios_contratuais]] : []),
-                    ...(res.resumo.custas > 0 ? [['(+) Custas Processuais', res.resumo.custas]] : []),
                     ...((res.resumo.previdencia_privada || 0) > 0 ? [['(-) Previdência Privada', -res.resumo.previdencia_privada]] : []),
                     ...((res.resumo.pensao_total || 0) > 0 ? [['(-) Pensão Alimentícia', -res.resumo.pensao_total]] : []),
-                  ].map(([label, value]) => (
-                    <tr key={label as string} className="border-b border-border/30">
+                  ].map(([label, value]) => {
+                    const isBrutoLine = (label as string).startsWith('= BRUTO');
+                    return (
+                    <tr key={label as string} className={`border-b border-border/30 ${isBrutoLine ? 'font-semibold bg-muted/30' : ''}`}>
                       <td className="py-2 text-muted-foreground">{label}</td>
                       <td className="py-2 text-right font-mono font-medium">{fmt(value as number)}</td>
                     </tr>
-                  ))}
+                    );
+                  })}
                   <tr className="border-t-2 border-primary/30 font-bold">
                     <td className="py-2">LÍQUIDO RECLAMANTE</td>
                     <td className="py-2 text-right font-mono text-[hsl(var(--success))]">{fmt(res.resumo.liquido_reclamante)}</td>
                   </tr>
+                  {res.resumo.fgts_total > 0 && (
+                    <tr className="border-b border-border/30">
+                      <td className="py-2 text-muted-foreground">FGTS (depósitos + multa)</td>
+                      <td className="py-2 text-right font-mono font-medium">{fmt(res.resumo.fgts_total)}</td>
+                    </tr>
+                  )}
                   <tr className="font-bold">
                     <td className="py-2">CS EMPREGADOR</td>
                     <td className="py-2 text-right font-mono">{fmt(res.resumo.cs_empregador)}</td>
                   </tr>
+                  {res.resumo.honorarios_sucumbenciais > 0 && (
+                    <tr className="border-b border-border/30">
+                      <td className="py-2 text-muted-foreground">Honorários Sucumbenciais</td>
+                      <td className="py-2 text-right font-mono">{fmt(res.resumo.honorarios_sucumbenciais)}</td>
+                    </tr>
+                  )}
+                  {res.resumo.custas > 0 && (
+                    <tr className="border-b border-border/30">
+                      <td className="py-2 text-muted-foreground">Custas Processuais</td>
+                      <td className="py-2 text-right font-mono">{fmt(res.resumo.custas)}</td>
+                    </tr>
+                  )}
                   <tr className="border-t-2 border-destructive/30 font-bold">
                     <td className="py-2">TOTAL RECLAMADA</td>
                     <td className="py-2 text-right font-mono text-destructive">{fmt(res.resumo.total_reclamada)}</td>
