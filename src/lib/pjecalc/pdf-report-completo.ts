@@ -33,10 +33,10 @@ export interface RelatorioCompletoMeta {
   jurosInicio?: string;
 }
 
-export function gerarRelatorioCompleto(
+function buildRelatorioCompletoHTML(
   result: PjeLiquidacaoResult,
   meta: RelatorioCompletoMeta
-) {
+): string {
   const hoje = new Date().toLocaleDateString("pt-BR");
   const horaGeracao = new Date().toLocaleString("pt-BR");
   const nProcesso = meta.processo || '—';
@@ -128,7 +128,7 @@ export function gerarRelatorioCompleto(
     </tr>
   `).join("");
 
-  const html = `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -474,12 +474,41 @@ export function gerarRelatorioCompleto(
   </div>
 </body>
 </html>`;
+}
 
+export function gerarRelatorioCompleto(
+  result: PjeLiquidacaoResult,
+  meta: RelatorioCompletoMeta
+) {
+  const html = buildRelatorioCompletoHTML(result, meta);
   const win = window.open("", "_blank");
   if (win) {
     win.document.write(html);
     win.document.close();
-    // Auto-trigger print dialog for PDF export
     setTimeout(() => win.print(), 600);
   }
+}
+
+/**
+ * Gera o HTML do relatório e faz download como arquivo .html
+ * O usuário pode abrir no navegador e imprimir como PDF.
+ */
+export function downloadRelatorioCompleto(
+  result: PjeLiquidacaoResult,
+  meta: RelatorioCompletoMeta
+) {
+  // Re-use the same generation logic by calling the internal builder
+  const html = buildRelatorioCompletoHTML(result, meta);
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const nomeArquivo = meta.processo
+    ? `relatorio-liquidacao-${meta.processo.replace(/[^a-zA-Z0-9.-]/g, "_")}.html`
+    : `relatorio-liquidacao-${Date.now()}.html`;
+  a.download = nomeArquivo;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }

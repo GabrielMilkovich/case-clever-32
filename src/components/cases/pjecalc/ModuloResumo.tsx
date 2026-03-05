@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Play, Loader2, FileBarChart, Printer, FileCode, AlertTriangle, CheckCircle2, Info, XCircle, Lock, Unlock, Copy, MoreVertical, FileText, FileSpreadsheet, ClipboardCheck, GitCompareArrows } from "lucide-react";
+import { Play, Loader2, FileBarChart, Printer, FileCode, AlertTriangle, CheckCircle2, Info, XCircle, Lock, Unlock, Copy, MoreVertical, FileText, FileSpreadsheet, ClipboardCheck, GitCompareArrows, Download } from "lucide-react";
 import { PainelRevisao } from "./PainelRevisao";
 import { MemoriaCalculoExpandida } from "./MemoriaCalculoExpandida";
 import { ComparacaoCenarios } from "./ComparacaoCenarios";
@@ -29,7 +29,7 @@ import { gerarRelatorioMemoriaCalculo } from "@/lib/pjecalc/pdf-report-memoria";
 import { gerarRelatorioDiferenca } from "@/lib/pjecalc/pdf-report-diferenca";
 import { gerarRelatorioCriteriosLegais } from "@/lib/pjecalc/relatorio-criterios";
 import { gerarRelatorioConsolidado } from "@/lib/pjecalc/pdf-report-consolidado";
-import { gerarRelatorioCompleto } from "@/lib/pjecalc/pdf-report-completo";
+import { gerarRelatorioCompleto, downloadRelatorioCompleto } from "@/lib/pjecalc/pdf-report-completo";
 import { downloadXML } from "@/lib/pjecalc/xml-export";
 import { fecharCalculo, reabrirCalculo, duplicarCalculo } from "@/lib/pjecalc/calc-operations";
 
@@ -530,6 +530,10 @@ export function ModuloResumo({ caseId }: Props) {
               {/* Primary Export Button */}
               <Button size="sm" onClick={() => gerarRelatorioCompleto(res, reportMetaCompleto)} className="bg-primary text-primary-foreground">
                 <FileBarChart className="h-4 w-4 mr-1" /> Exportar PDF
+              </Button>
+              {/* Download Button */}
+              <Button size="sm" variant="outline" onClick={() => downloadRelatorioCompleto(res, reportMetaCompleto)}>
+                <Download className="h-4 w-4 mr-1" /> Download PDF
               </Button>
 
               {/* Reports dropdown */}
