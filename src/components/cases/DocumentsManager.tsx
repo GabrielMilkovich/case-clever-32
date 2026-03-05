@@ -307,7 +307,7 @@ export function DocumentsManager({
   // Extrair dados e preencher automaticamente os campos do cálculo
   const extractAndFill = useCallback(async (documentId: string) => {
     setProcessingDocId(documentId);
-    toast.info("🤖 Extraindo dados com IA e preenchendo campos do cálculo...");
+    toast.info("🤖 Extraindo dados com IA e preenchendo TODOS os campos do cálculo...");
 
     try {
       const { data, error } = await supabase.functions.invoke("extract-and-fill", {
@@ -319,14 +319,26 @@ export function DocumentsManager({
       const fills = data.auto_fill || [];
       const rubricas = data.rubricas_extraidas || 0;
       const tipo = data.tipo_documento || "documento";
+      const dados = data.dados_extraidos || {};
+
+      const detalhes = [
+        dados.tem_contrato && "contrato",
+        dados.tem_rubricas && `${rubricas} rubricas`,
+        dados.tem_trct && "TRCT",
+        dados.tem_cartao_ponto && "cartão de ponto",
+        dados.tem_ferias && "férias",
+        dados.tem_fgts && "FGTS",
+        dados.tem_sentenca && "sentença",
+      ].filter(Boolean).join(", ");
 
       toast.success(
-        `✅ ${tipo} extraído! ${rubricas} rubricas encontradas. Campos preenchidos: ${fills.join(", ") || "nenhum"}`,
-        { duration: 8000 }
+        `✅ ${tipo} processado! Dados extraídos: ${detalhes || "nenhum"}. Campos preenchidos: ${fills.length}`,
+        { duration: 10000 }
       );
       
-      // Invalidate pjecalc data to refresh the calculation page
+      // Invalidate ALL queries to refresh everything
       queryClient.invalidateQueries({ queryKey: ['pjecalc_case_data'] });
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
       onDocumentsChange();
     } catch (err) {
       console.error("Extract and fill error:", err);
