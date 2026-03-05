@@ -573,7 +573,7 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
         supabase.from("facts").select("*").eq("case_id", caseId),
         supabase.from("employment_contracts").select("*").eq("case_id", caseId).maybeSingle(),
         supabase.from("extractions").select("*").eq("case_id", caseId).in("status", ["validado", "pendente"]),
-        supabase.from("extracao_item").select("*").eq("case_id", caseId).eq("target_table", "pjecalc_hist_salarial").in("status", ["AUTO", "APROVADO"]),
+        supabase.from("extracao_item").select("*").eq("case_id", caseId).eq("target_table", "pjecalc_hist_salarial").in("status", ["AUTO", "CONFIRMADO"]),
       ]);
 
       const facts = factsRes.data || [];
@@ -706,9 +706,9 @@ export function PjeCalcInline({ caseId }: PjeCalcInlineProps) {
         const nomeBusca = catLabels[cat] || data.evidence;
         const { data: histData } = await supabase.from("pjecalc_historico_salarial" as any)
           .select("id").eq("case_id", caseId).eq("nome", nomeBusca).maybeSingle();
-        if (histData?.id && data.valores.length > 0) {
+        if ((histData as any)?.id && data.valores.length > 0) {
           const ocorrencias = data.valores.map(v => ({
-            historico_id: histData.id, case_id: caseId,
+            historico_id: (histData as any).id, case_id: caseId,
             competencia: v.comp, valor: v.val, tipo: 'informado',
           }));
           await supabase.from("pjecalc_historico_ocorrencias" as any).insert(ocorrencias);
