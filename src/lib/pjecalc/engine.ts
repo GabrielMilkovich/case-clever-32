@@ -1229,7 +1229,7 @@ export class PjeCalcEngine {
     // Filtrar por índice
     const indices = this.indicesDB
       .filter(i => i.indice === nomeIndice)
-      .sort((a, b) => a.competencia.localeCompare(b.competencia));
+      .sort((a, b) => (a.competencia || '').localeCompare(b.competencia || ''));
 
     if (indices.length === 0) return null;
 
@@ -2083,7 +2083,7 @@ export class PjeCalcEngine {
 
     // ── Histórico gaps ──
     if (this.historicos.length > 1) {
-      const sorted = [...this.historicos].sort((a, b) => a.periodo_inicio.localeCompare(b.periodo_inicio));
+      const sorted = [...this.historicos].sort((a, b) => (a.periodo_inicio || '').localeCompare(b.periodo_inicio || ''));
       for (let i = 1; i < sorted.length; i++) {
         const prevFim = new Date(sorted[i - 1].periodo_fim);
         const curInicio = new Date(sorted[i].periodo_inicio);
