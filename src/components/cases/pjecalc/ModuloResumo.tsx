@@ -175,7 +175,13 @@ export function ModuloResumo({ caseId }: Props) {
 
       const verbas: PjeVerba[] = (verbasRes.data || []).map((v: any) => ({
         ...v,
-        base_calculo: v.base_calculo || { historicos: [], verbas: [], tabelas: ['ultima_remuneracao'], proporcionalizar: false, integralizar: false },
+        base_calculo: {
+          historicos: v.base_calculo?.historicos || [],
+          verbas: v.base_calculo?.verbas || [],
+          tabelas: v.base_calculo?.tabelas || ['ultima_remuneracao'],
+          proporcionalizar: v.base_calculo?.proporcionalizar ?? false,
+          integralizar: v.base_calculo?.integralizar ?? false,
+        },
         exclusoes: v.exclusoes || { faltas_justificadas: false, faltas_nao_justificadas: true, ferias_gozadas: false },
         incidencias: v.incidencias || { fgts: true, irpf: true, contribuicao_social: true, previdencia_privada: false, pensao_alimenticia: false },
         juros_ajuizamento: v.juros_ajuizamento || 'ocorrencias_vencidas',
