@@ -775,6 +775,7 @@ function buildRelatorioCompletoHTML(
   ${page2}
   ${cartaoPages}
   ${memoriaPage}
+  ${fgtsPage}
   ${csPage}
   ${irPage}
   ${assinaturaPage}
