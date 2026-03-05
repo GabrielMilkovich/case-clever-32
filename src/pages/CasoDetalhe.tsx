@@ -179,7 +179,7 @@ export default function CasoDetalhe() {
   const { data: pjecalcLiquidacao } = useQuery({
     queryKey: ["pjecalc_liquidacao", id],
     queryFn: async () => {
-      const { default: svc } = await import("@/lib/pjecalc/service");
+      const svc = await import("@/lib/pjecalc/service");
       return svc.getResultado(id!);
     },
   });
