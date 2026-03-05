@@ -106,7 +106,7 @@ export async function seedGoldenMariaMadalena(caseId: string): Promise<{ ok: boo
       regime_trabalho: 'tempo_integral',
       sabado_dia_util: snap.meta.sabado_dia_util,
       considerar_feriado_estadual: snap.meta.considerar_feriados_estaduais,
-      considerar_feriado_municipal: false,
+      considerar_feriado_municipal: true,
       prescricao_quinquenal: snap.meta.prescricao_quinquenal,
       prescricao_fgts: false,
       limitar_avos_periodo: snap.meta.limitar_avos_periodo,
