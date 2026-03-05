@@ -306,9 +306,67 @@ PARA CARTÃO DE PONTO:
 O campo texto_ocr_completo DEVE conter o texto integral do documento.`;
 
 // =====================================================
-// STAGE 1: Mistral OCR — extract raw text from document image
+// STAGE 1: Mistral OCR — extract raw text from document
+// Supports PDFs via /v1/ocr API and images via chat API
 // =====================================================
-async function mistralOCR(
+
+// OCR for PDFs using dedicated Mistral OCR API (/v1/ocr)
+async function mistralOcrPdf(
+  documentUrl: string,
+  mistralApiKey: string
+): Promise<string> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    console.log(`[OCR] Mistral OCR API attempt ${attempt} (PDF via URL)`);
+    try {
+      const response = await fetch("https://api.mistral.ai/v1/ocr", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${mistralApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "mistral-ocr-latest",
+          document: {
+            type: "document_url",
+            document_url: documentUrl,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error(`[OCR] Mistral OCR API ${response.status}:`, errText.substring(0, 300));
+        if (response.status === 429) {
+          await delay(RETRY_DELAY_MS * attempt * 3);
+          continue;
+        }
+        lastError = new Error(`Mistral OCR API ${response.status}`);
+        if (response.status >= 500) { await delay(RETRY_DELAY_MS * attempt); continue; }
+        break;
+      }
+
+      const data = await response.json();
+      // OCR API returns { pages: [{ markdown: "..." }, ...] }
+      const pages = data.pages || [];
+      const fullText = pages.map((p: any) => p.markdown || p.text || "").join("\n\n---PAGE BREAK---\n\n");
+      if (fullText.length > 50) {
+        console.log(`[OCR] Mistral OCR API success: ${fullText.length} chars, ${pages.length} pages`);
+        return fullText;
+      }
+      lastError = new Error("OCR returned too little text");
+      continue;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      await delay(RETRY_DELAY_MS * attempt);
+    }
+  }
+  throw new Error(`Mistral OCR failed: ${lastError?.message}`);
+}
+
+// OCR for images using Mistral chat API
+async function mistralOcrImage(
   base64Data: string,
   mimeType: string,
   mistralApiKey: string
@@ -316,7 +374,7 @@ async function mistralOCR(
   let lastError: Error | null = null;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    console.log(`[OCR] Mistral attempt ${attempt}`);
+    console.log(`[OCR] Mistral chat attempt ${attempt} (image)`);
     try {
       const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
         method: "POST",
@@ -1025,24 +1083,6 @@ async function processDocumentInBackground(
   supabase: any
 ) {
   try {
-    // Download file
-    let fileBuffer: ArrayBuffer | null = null;
-    for (let dl = 0; dl < 3; dl++) {
-      try {
-        const resp = await fetch(fileUrl);
-        if (!resp.ok) throw new Error(`Download ${resp.status}`);
-        fileBuffer = await resp.arrayBuffer();
-        break;
-      } catch (err) {
-        if (dl === 2) throw err;
-        await delay(1000);
-      }
-    }
-
-    if (!fileBuffer || fileBuffer.byteLength === 0) {
-      throw new Error("Empty file downloaded");
-    }
-
     // Detect MIME type
     let mimeType = doc.mime_type || "application/pdf";
     if (!mimeType || mimeType === "application/octet-stream") {
@@ -1053,14 +1093,36 @@ async function processDocumentInBackground(
       else mimeType = "application/pdf";
     }
 
-    const base64Data = arrayBufferToBase64(fileBuffer);
-    console.log(`[EXTRACT] File: ${fileBuffer.byteLength} bytes, base64: ${base64Data.length} chars`);
+    const isPdf = mimeType === "application/pdf";
+    let ocrText: string;
 
-    // Free the buffer to reduce memory
-    fileBuffer = null;
-
-    // Stage 1: Mistral OCR — extract raw text
-    const ocrText = await mistralOCR(base64Data, mimeType, MISTRAL_API_KEY);
+    if (isPdf) {
+      // PDFs: use Mistral OCR API (/v1/ocr) with the signed URL directly — no download needed
+      console.log(`[EXTRACT] Using Mistral OCR API for PDF: ${doc.file_name}`);
+      ocrText = await mistralOcrPdf(fileUrl, MISTRAL_API_KEY);
+    } else {
+      // Images: download and use chat API with base64
+      console.log(`[EXTRACT] Using Mistral chat API for image: ${doc.file_name}`);
+      let fileBuffer: ArrayBuffer | null = null;
+      for (let dl = 0; dl < 3; dl++) {
+        try {
+          const resp = await fetch(fileUrl);
+          if (!resp.ok) throw new Error(`Download ${resp.status}`);
+          fileBuffer = await resp.arrayBuffer();
+          break;
+        } catch (err) {
+          if (dl === 2) throw err;
+          await delay(1000);
+        }
+      }
+      if (!fileBuffer || fileBuffer.byteLength === 0) {
+        throw new Error("Empty file downloaded");
+      }
+      const base64Data = arrayBufferToBase64(fileBuffer);
+      console.log(`[EXTRACT] File: ${fileBuffer.byteLength} bytes, base64: ${base64Data.length} chars`);
+      fileBuffer = null;
+      ocrText = await mistralOcrImage(base64Data, mimeType, MISTRAL_API_KEY);
+    }
     console.log(`[EXTRACT] OCR complete: ${ocrText.length} chars`);
 
     // Stage 2: OpenAI structured extraction from OCR text
