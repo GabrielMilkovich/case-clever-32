@@ -268,6 +268,7 @@ export interface PjecalcVerbaInsert {
   valor_informado_devido?: number | null;
   valor_informado_pago?: number | null;
   incidencias?: Record<string, boolean>;
+  base_calculo?: Record<string, unknown>;
 }
 
 // =====================================================
@@ -362,6 +363,7 @@ export interface PjecalcLiquidacaoResultadoInsert {
 // =====================================================
 
 export interface PjecalcCartaoPontoRow {
+  id: string;
   case_id: string;
   competencia: string;
   dias_uteis: number;
