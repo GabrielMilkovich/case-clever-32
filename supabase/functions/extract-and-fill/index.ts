@@ -1082,8 +1082,8 @@ async function processDocumentInBackground(
       metadata: {
         ...(doc.metadata || {}),
         extraction_completed_at: new Date().toISOString(),
-        text_length: ocrText.length,
-        extracted_text_preview: ocrText.substring(0, 500),
+        text_length: extractedOcrText.length,
+        extracted_text_preview: extractedOcrText.substring(0, 500),
         tipo_detectado: extracted.tipo_documento,
         rubricas_extraidas: extracted.rubricas?.length || 0,
         auto_fill_fields: fills,
@@ -1096,7 +1096,7 @@ async function processDocumentInBackground(
     }).eq("id", document_id);
 
     // Store extracted text as chunks for search
-    if (ocrText.length > 100) {
+    if (extractedOcrText.length > 100) {
       await supabase.from("document_chunks").delete().eq("document_id", document_id);
       await supabase.from("doc_chunks").delete().eq("document_id", document_id);
 
@@ -1106,12 +1106,12 @@ async function processDocumentInBackground(
       let start = 0;
       let idx = 0;
 
-      while (start < ocrText.length) {
-        const end = Math.min(start + chunkSize, ocrText.length);
+      while (start < extractedOcrText.length) {
+        const end = Math.min(start + chunkSize, extractedOcrText.length);
         chunks.push({
           case_id: doc.case_id,
           document_id,
-          content: ocrText.substring(start, end),
+          content: extractedOcrText.substring(start, end),
           page_number: 1,
           chunk_index: idx,
           doc_type: extracted.tipo_documento || doc.tipo || "outro",
@@ -1119,7 +1119,7 @@ async function processDocumentInBackground(
         });
         idx++;
         start = end - overlap;
-        if (start >= ocrText.length) break;
+        if (start >= extractedOcrText.length) break;
       }
 
       if (chunks.length > 0) {
