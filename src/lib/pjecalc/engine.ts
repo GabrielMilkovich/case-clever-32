@@ -1780,7 +1780,6 @@ export class PjeCalcEngine {
       
       // Use combination-by-date if available
       if (this.correcaoConfig.combinacoes_indice?.length) {
-        // Súmula 381: FGTS correction also starts from mês subsequente
         const compDateFgts = this.mesSubsequente(compClean) + '-01';
         const breakpoints = new Set<string>();
         breakpoints.add(compDateFgts);
@@ -1788,17 +1787,35 @@ export class PjeCalcEngine {
         for (const ci of this.correcaoConfig.combinacoes_indice) {
           if (ci.de && ci.de > compDateFgts && ci.de <= this.correcaoConfig.data_liquidacao) breakpoints.add(ci.de);
         }
+        if (this.correcaoConfig.combinacoes_juros) {
+          for (const cj of this.correcaoConfig.combinacoes_juros) {
+            if (cj.de && cj.de > compDateFgts && cj.de <= this.correcaoConfig.data_liquidacao) breakpoints.add(cj.de);
+          }
+        }
         const datas = Array.from(breakpoints).sort();
         let fatorTotal = new Decimal(1);
+        const segmentosFolded = new Set<number>();
+        const normalMap: Record<string, string> = { 'IPCA-E': 'IPCA-E', 'IPCAE': 'IPCA-E', 'IPCA': 'IPCA', 'SELIC': 'SELIC', 'TR': 'TR', 'TRD': 'TR' };
+
         for (let i = 0; i < datas.length - 1; i++) {
           const segInicio = datas[i];
           const segFim = datas[i + 1];
           const regime = this.getRegimeParaData(this.correcaoConfig.combinacoes_indice, segInicio);
           const indice = regime?.indice || 'SEM_CORRECAO';
-          if (indice === 'SEM_CORRECAO' || indice === 'Sem Correção' || indice === 'NENHUM') continue;
-          const normalMap: Record<string, string> = { 'IPCA-E': 'IPCA-E', 'IPCAE': 'IPCA-E', 'IPCA': 'IPCA', 'SELIC': 'SELIC', 'TR': 'TR', 'TRD': 'TR' };
           const indiceNorm = normalMap[indice] || indice;
-          const fatorDB = this.getIndiceCorrecaoDB(indiceNorm, segInicio.slice(0, 7), segFim.slice(0, 7));
+
+          if (indice === 'SEM_CORRECAO' || indice === 'Sem Correção' || indice === 'NENHUM') {
+            // ADC 58/59: fold SELIC into correction
+            const regimeJ = this.correcaoConfig.combinacoes_juros ? this.getRegimeParaData(this.correcaoConfig.combinacoes_juros, segInicio) : null;
+            if (regimeJ?.tipo === 'SELIC') {
+              const fatorS = this.getIndiceCorrecaoDB('SELIC', segInicio.slice(0, 7), segFim.slice(0, 7), true);
+              if (fatorS !== null && fatorS > 0) { fatorTotal = fatorTotal.times(fatorS); segmentosFolded.add(i); }
+            }
+            continue;
+          }
+          if (indiceNorm === 'SELIC') { segmentosFolded.add(i); }
+
+          const fatorDB = this.getIndiceCorrecaoDB(indiceNorm, segInicio.slice(0, 7), segFim.slice(0, 7), true);
           if (fatorDB !== null && fatorDB > 0) {
             fatorTotal = fatorTotal.times(fatorDB);
           } else {
@@ -1810,29 +1827,29 @@ export class PjeCalcEngine {
         }
         fatorCorrecao = fatorTotal.toDP(6).toNumber();
         
-        // Interest for FGTS
+        // Interest for FGTS - simple rates, skip folded segments
         if (this.correcaoConfig.combinacoes_juros?.length) {
           const valorCorrigido = new Decimal(dep.valor).times(fatorCorrecao);
           let jurosAcc = new Decimal(0);
           for (let i = 0; i < datas.length - 1; i++) {
+            if (segmentosFolded.has(i)) continue;
             const segInicio = datas[i];
             const segFim = datas[i + 1];
             const regimeJ = this.getRegimeParaData(this.correcaoConfig.combinacoes_juros, segInicio);
             if (!regimeJ || regimeJ.tipo === 'NENHUM') continue;
-            const regimeI = this.getRegimeParaData(this.correcaoConfig.combinacoes_indice!, segInicio);
-            const indiceI = regimeI?.indice || '';
-            if (indiceI === 'SELIC') continue; // SELIC already includes interest
-            const meses = this.mesesEntre(new Date(segInicio), new Date(segFim));
             if (regimeJ.tipo === 'SELIC') {
-              const fatorS = this.getIndiceCorrecaoDB('SELIC', segInicio.slice(0, 7), segFim.slice(0, 7));
-              if (fatorS !== null) jurosAcc = jurosAcc.plus(valorCorrigido.times(fatorS - 1));
-              else jurosAcc = jurosAcc.plus(valorCorrigido.times(0.01).times(meses));
+              const taxaS = this.getJurosSimplesDB('SELIC', segInicio.slice(0, 7), segFim.slice(0, 7));
+              if (taxaS !== null) jurosAcc = jurosAcc.plus(valorCorrigido.times(taxaS));
             } else if (regimeJ.tipo === 'TAXA_LEGAL') {
-              const fatorTL = this.getIndiceCorrecaoDB('TAXA_LEGAL', segInicio.slice(0, 7), segFim.slice(0, 7));
-              if (fatorTL !== null) jurosAcc = jurosAcc.plus(valorCorrigido.times(fatorTL - 1));
-              else jurosAcc = jurosAcc.plus(valorCorrigido.times(0.008).times(meses));
+              const taxaTL = this.getJurosSimplesDB('TAXA_LEGAL', segInicio.slice(0, 7), segFim.slice(0, 7));
+              if (taxaTL !== null) jurosAcc = jurosAcc.plus(valorCorrigido.times(taxaTL));
+              else {
+                const selicS = this.getJurosSimplesDB('SELIC', segInicio.slice(0, 7), segFim.slice(0, 7));
+                if (selicS !== null) jurosAcc = jurosAcc.plus(valorCorrigido.times(selicS));
+              }
             } else {
               const taxa = ((regimeJ as any).percentual || 1) / 100;
+              const meses = this.mesesEntre(new Date(segInicio), new Date(segFim));
               jurosAcc = jurosAcc.plus(valorCorrigido.times(taxa).times(meses));
             }
           }
