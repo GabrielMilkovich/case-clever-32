@@ -312,6 +312,19 @@ export interface PjeIRConfig {
   dependentes: number;
 }
 
+export interface PjeCombinacaoIndice {
+  de?: string;   // YYYY-MM-DD
+  ate?: string;  // YYYY-MM-DD
+  indice: string; // IPCAE | IPCA | SELIC | SEM_CORRECAO | TR
+}
+
+export interface PjeCombinacaoJuros {
+  de?: string;
+  ate?: string;
+  tipo: string; // TRD_SIMPLES | SELIC | TAXA_LEGAL | NENHUM
+  percentual?: number;
+}
+
 export interface PjeCorrecaoConfig {
   indice: string;
   epoca: 'mensal' | 'fixo';
@@ -324,6 +337,12 @@ export interface PjeCorrecaoConfig {
   multa_467?: boolean;
   multa_467_percentual?: number;
   data_liquidacao: string;
+  /** Combination-by-date regime (3-phase correction like ADC 58/59) */
+  combinacoes_indice?: PjeCombinacaoIndice[];
+  /** Combination-by-date interest regime */
+  combinacoes_juros?: PjeCombinacaoJuros[];
+  /** Apply interest after deducting CS from reclamante */
+  juros_apos_deducao_cs?: boolean;
 }
 
 export interface PjeHonorariosConfig {
@@ -1332,6 +1351,13 @@ export class PjeCalcEngine {
   aplicarCorrecaoJuros(verbaResults: PjeVerbaResult[]): void {
     if (this.correcaoConfig.juros_tipo === 'nenhum' && this.correcaoConfig.indice === 'nenhum') return;
 
+    // ═══ COMBINATION-BY-DATE MODE (3-phase correction like PJe-Calc) ═══
+    if (this.correcaoConfig.combinacoes_indice?.length) {
+      this.aplicarCorrecaoCombinacao(verbaResults);
+      return;
+    }
+
+    // ═══ LEGACY MODE (single index + simple interest) ═══
     const dataLiq = new Date(this.correcaoConfig.data_liquidacao);
     const compLiq = this.correcaoConfig.data_liquidacao.slice(0, 7);
     const dataAjuiz = this.params.data_ajuizamento ? new Date(this.params.data_ajuizamento) : null;
@@ -1339,7 +1365,6 @@ export class PjeCalcEngine {
       ? new Date(this.params.data_citacao) 
       : dataAjuiz ? new Date(dataAjuiz.getTime() + 60 * 24 * 60 * 60 * 1000) : null;
 
-    // Determinar se usamos ADC 58/59 (transição automática)
     const usarADC5859 = this.correcaoConfig.indice === 'IPCA-E' || this.correcaoConfig.indice === 'SELIC';
 
     for (const vr of verbaResults) {
@@ -1357,46 +1382,30 @@ export class PjeCalcEngine {
         let juros = 0;
 
         if (usarADC5859 && dataCitacao) {
-          // ═══ ADC 58/59: Transição automática IPCA-E → SELIC ═══
           if (dataComp >= dataCitacao) {
-            // Período pós-citação: SELIC (engloba correção + juros)
             const fatorDB = this.getIndiceCorrecaoDB('SELIC', oc.competencia, compLiq);
             if (fatorDB !== null) {
               indiceCorrecao = fatorDB;
             } else {
-              // Fallback: ~1% a.m.
               const meses = this.mesesEntre(dataComp, dataLiq);
               indiceCorrecao = Math.pow(1.01, meses);
             }
-            // SELIC já engloba juros, não aplicar separadamente
           } else {
-            // Período pré-judicial: IPCA-E até citação + SELIC da citação à liquidação
             const compCitacao = dataCitacao.toISOString().slice(0, 7);
-            
-            // Trecho 1: competência → citação com IPCA-E
             const fatorIPCA = this.getIndiceCorrecaoDB('IPCA-E', oc.competencia, compCitacao);
             let fator1: number;
-            if (fatorIPCA !== null) {
-              fator1 = fatorIPCA;
-            } else {
+            if (fatorIPCA !== null) { fator1 = fatorIPCA; } else {
               const meses1 = this.mesesEntre(dataComp, dataCitacao);
               fator1 = Math.pow(1.0045, meses1);
             }
-
-            // Trecho 2: citação → liquidação com SELIC
             const fatorSELIC = this.getIndiceCorrecaoDB('SELIC', compCitacao, compLiq);
             let fator2: number;
-            if (fatorSELIC !== null) {
-              fator2 = fatorSELIC;
-            } else {
+            if (fatorSELIC !== null) { fator2 = fatorSELIC; } else {
               const meses2 = this.mesesEntre(dataCitacao, dataLiq);
               fator2 = Math.pow(1.01, meses2);
             }
-
             indiceCorrecao = fator1 * fator2;
 
-            // Juros de mora entre ajuizamento e citação (1% a.m. pro rata die - Art. 39 Lei 8.177/91)
-            // Somente quando o índice principal NÃO é SELIC (SELIC já engloba juros)
             if (this.correcaoConfig.indice !== 'SELIC' && dataAjuiz && dataCitacao > dataAjuiz) {
               const mesesJurosPreCitacao = this.mesesEntre(dataAjuiz, dataCitacao);
               const taxaMensal = (this.correcaoConfig.juros_percentual || 1) / 100;
@@ -1405,46 +1414,30 @@ export class PjeCalcEngine {
             }
           }
         } else {
-          // ═══ Modo manual (índice escolhido pelo usuário) ═══
           const mesesCorrecao = this.mesesEntre(dataComp, dataLiq);
-          
-          // Tentar buscar do banco primeiro
           const fatorDB = this.getIndiceCorrecaoDB(this.correcaoConfig.indice, oc.competencia, compLiq);
           if (fatorDB !== null) {
             indiceCorrecao = fatorDB;
           } else {
-            // Fallback com taxas aproximadas
             const taxas: Record<string, number> = {
-              'IPCA-E': 1.0045,
-              'SELIC': 1.01,
-              'TR': 1.0001,
-              'INPC': 1.004,
-              'IGP-M': 1.005,
+              'IPCA-E': 1.0045, 'SELIC': 1.01, 'TR': 1.0001, 'INPC': 1.004, 'IGP-M': 1.005,
             };
             const taxaMensal = taxas[this.correcaoConfig.indice] || 1.004;
             indiceCorrecao = Math.pow(taxaMensal, mesesCorrecao);
           }
 
-          // Juros de mora (quando índice não é SELIC)
           if (this.correcaoConfig.indice !== 'SELIC') {
             const valorCorrigido = Number(new Decimal(oc.diferenca).times(indiceCorrecao).toDP(2));
-            
             if (this.correcaoConfig.juros_tipo === 'simples_mensal') {
               let dataInicioJuros: Date;
-              if (this.correcaoConfig.juros_inicio === 'vencimento') {
-                dataInicioJuros = dataComp;
-              } else if (this.correcaoConfig.juros_inicio === 'citacao' && dataCitacao) {
-                dataInicioJuros = dataCitacao;
-              } else if (dataAjuiz) {
-                dataInicioJuros = dataAjuiz;
-              } else {
-                dataInicioJuros = dataComp;
-              }
+              if (this.correcaoConfig.juros_inicio === 'vencimento') dataInicioJuros = dataComp;
+              else if (this.correcaoConfig.juros_inicio === 'citacao' && dataCitacao) dataInicioJuros = dataCitacao;
+              else if (dataAjuiz) dataInicioJuros = dataAjuiz;
+              else dataInicioJuros = dataComp;
               const mesesJuros = this.mesesEntre(dataInicioJuros, dataLiq);
               const taxaMensal = (this.correcaoConfig.juros_percentual || 1) / 100;
               juros = Number(new Decimal(valorCorrigido).times(taxaMensal).times(mesesJuros).toDP(2));
             } else if ((this.correcaoConfig.juros_tipo as string) === 'composto') {
-              // Juros compostos
               let dataInicioJuros: Date;
               if (this.correcaoConfig.juros_inicio === 'vencimento') dataInicioJuros = dataComp;
               else if (this.correcaoConfig.juros_inicio === 'citacao' && dataCitacao) dataInicioJuros = dataCitacao;
@@ -1462,12 +1455,10 @@ export class PjeCalcEngine {
         }
 
         const valorCorrigido = Number(new Decimal(oc.diferenca).times(indiceCorrecao).toDP(2));
-
         oc.indice_correcao = Number(new Decimal(indiceCorrecao).toDP(6));
         oc.valor_corrigido = valorCorrigido;
         oc.juros = juros;
         oc.valor_final = Number(new Decimal(valorCorrigido + juros).toDP(2));
-        
         totalCorrigido += valorCorrigido;
         totalJuros += juros;
         totalFinal += valorCorrigido + juros;
@@ -1477,6 +1468,147 @@ export class PjeCalcEngine {
       vr.total_juros = Number(new Decimal(totalJuros).toDP(2));
       vr.total_final = Number(new Decimal(totalFinal).toDP(2));
     }
+  }
+
+  // =====================================================
+  // CORREÇÃO POR COMBINAÇÃO DE DATAS (3-phase PJe-Calc)
+  // Uses correction-by-date engine for precise multi-regime
+  // =====================================================
+
+  private aplicarCorrecaoCombinacao(verbaResults: PjeVerbaResult[]): void {
+    const combinacoes_indice = this.correcaoConfig.combinacoes_indice!;
+    const combinacoes_juros = this.correcaoConfig.combinacoes_juros || [];
+    const dataLiq = this.correcaoConfig.data_liquidacao;
+
+    // Map IPCA-E → IPCAE for index lookup compatibility
+    const normalizeIndice = (ind: string): string => {
+      const map: Record<string, string> = { 'IPCA-E': 'IPCA-E', 'IPCAE': 'IPCA-E', 'IPCA': 'IPCA', 'SELIC': 'SELIC', 'TR': 'TR', 'TRD': 'TR', 'INPC': 'INPC', 'IGP-M': 'IGP-M' };
+      return map[ind] || ind;
+    };
+
+    for (const vr of verbaResults) {
+      let totalCorrigido = 0;
+      let totalJuros = 0;
+      let totalFinal = 0;
+
+      for (const oc of vr.ocorrencias) {
+        if (oc.diferenca === 0) continue;
+
+        const compDate = oc.competencia.length === 7 ? oc.competencia + '-01' : oc.competencia;
+
+        // Build breakpoints from competência to liquidação
+        const breakpoints = new Set<string>();
+        breakpoints.add(compDate);
+        breakpoints.add(dataLiq);
+        for (const ci of combinacoes_indice) {
+          if (ci.de && ci.de > compDate && ci.de <= dataLiq) breakpoints.add(ci.de);
+        }
+        for (const cj of combinacoes_juros) {
+          if (cj.de && cj.de > compDate && cj.de <= dataLiq) breakpoints.add(cj.de);
+        }
+        const datas = Array.from(breakpoints).sort();
+
+        // Calculate correction factor segment-by-segment
+        let fatorTotal = new Decimal(1);
+        const regimesUsados: string[] = [];
+
+        for (let i = 0; i < datas.length - 1; i++) {
+          const segInicio = datas[i];
+          const segFim = datas[i + 1];
+          const regime = this.getRegimeParaData(combinacoes_indice, segInicio);
+          const indice = normalizeIndice(regime?.indice || 'SEM_CORRECAO');
+
+          if (indice === 'SEM_CORRECAO' || indice === 'NENHUM' || indice === 'Sem Correção') {
+            regimesUsados.push(`${indice}(${segInicio}→${segFim})`);
+            continue;
+          }
+
+          const fatorDB = this.getIndiceCorrecaoDB(indice, segInicio.slice(0, 7), segFim.slice(0, 7));
+          if (fatorDB !== null && fatorDB > 0) {
+            fatorTotal = fatorTotal.times(fatorDB);
+          } else {
+            // Fallback
+            const taxas: Record<string, number> = { 'IPCA-E': 0.0045, 'IPCA': 0.004, 'SELIC': 0.01, 'TR': 0.0001, 'INPC': 0.004, 'IGP-M': 0.005, 'TAXA_LEGAL': 0.008 };
+            const taxa = taxas[indice] || 0.004;
+            const meses = this.mesesEntre(new Date(segInicio), new Date(segFim));
+            fatorTotal = fatorTotal.times(Math.pow(1 + taxa, meses));
+          }
+          regimesUsados.push(`${indice}(${segInicio}→${segFim})`);
+        }
+
+        const valorCorrigido = new Decimal(oc.diferenca).times(fatorTotal);
+
+        // Calculate interest segment-by-segment
+        let jurosTotal = new Decimal(0);
+
+        for (let i = 0; i < datas.length - 1; i++) {
+          const segInicio = datas[i];
+          const segFim = datas[i + 1];
+          const regimeIndice = this.getRegimeParaData(combinacoes_indice, segInicio);
+          const indiceNorm = normalizeIndice(regimeIndice?.indice || 'SEM_CORRECAO');
+          const regimeJuros = this.getRegimeParaData(combinacoes_juros, segInicio);
+
+          // SELIC as correction index already includes interest
+          if (indiceNorm === 'SELIC') continue;
+          if (!regimeJuros || regimeJuros.tipo === 'NENHUM') continue;
+
+          if (regimeJuros.tipo === 'SELIC') {
+            const fatorSelic = this.getIndiceCorrecaoDB('SELIC', segInicio.slice(0, 7), segFim.slice(0, 7));
+            if (fatorSelic !== null) {
+              jurosTotal = jurosTotal.plus(valorCorrigido.times(fatorSelic - 1));
+            } else {
+              const meses = this.mesesEntre(new Date(segInicio), new Date(segFim));
+              jurosTotal = jurosTotal.plus(valorCorrigido.times(0.01).times(meses));
+            }
+          } else if (regimeJuros.tipo === 'TAXA_LEGAL') {
+            const fatorTL = this.getIndiceCorrecaoDB('TAXA_LEGAL', segInicio.slice(0, 7), segFim.slice(0, 7));
+            if (fatorTL !== null) {
+              jurosTotal = jurosTotal.plus(valorCorrigido.times(fatorTL - 1));
+            } else {
+              const meses = this.mesesEntre(new Date(segInicio), new Date(segFim));
+              jurosTotal = jurosTotal.plus(valorCorrigido.times(0.008).times(meses));
+            }
+          } else {
+            // TRD_SIMPLES or other simple monthly interest
+            const meses = this.mesesEntre(new Date(segInicio), new Date(segFim));
+            const taxa = (regimeJuros.percentual || 1) / 100;
+            jurosTotal = jurosTotal.plus(valorCorrigido.times(taxa).times(meses));
+          }
+        }
+
+        const valorFinal = valorCorrigido.plus(jurosTotal);
+
+        oc.indice_correcao = fatorTotal.toDP(6).toNumber();
+        oc.valor_corrigido = valorCorrigido.toDP(2).toNumber();
+        oc.juros = jurosTotal.toDP(2).toNumber();
+        oc.valor_final = valorFinal.toDP(2).toNumber();
+
+        totalCorrigido += oc.valor_corrigido;
+        totalJuros += oc.juros;
+        totalFinal += oc.valor_final;
+      }
+
+      vr.total_corrigido = Number(new Decimal(totalCorrigido).toDP(2));
+      vr.total_juros = Number(new Decimal(totalJuros).toDP(2));
+      vr.total_final = Number(new Decimal(totalFinal).toDP(2));
+    }
+  }
+
+  private getRegimeParaData<T extends { de?: string; ate?: string }>(combinacoes: T[], data: string): T | null {
+    const sorted = [...combinacoes].sort((a, b) => {
+      const aDate = a.de || '0000-01-01';
+      const bDate = b.de || '0000-01-01';
+      return bDate.localeCompare(aDate);
+    });
+    for (const c of sorted) {
+      const cDe = c.de || '0000-01-01';
+      const cAte = c.ate || '9999-12-31';
+      if (data >= cDe && data <= cAte) return c;
+    }
+    for (const c of sorted) {
+      if ((c.de || '0000-01-01') <= data) return c;
+    }
+    return combinacoes[0] || null;
   }
 
   private mesesEntre(d1: Date, d2: Date): number {

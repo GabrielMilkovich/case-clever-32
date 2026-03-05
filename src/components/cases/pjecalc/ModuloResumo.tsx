@@ -227,6 +227,27 @@ export function ModuloResumo({ caseId }: Props) {
         dependentes: d(irData, 'dependentes', 0),
       } as PjeIRConfig;
 
+      // Load combination-by-date data from pjecalc_atualizacao_config
+      let combinacoesIndice: any[] | undefined;
+      let combinacoesJuros: any[] | undefined;
+      {
+        const { data: calculoRow2 } = await supabase.from("pjecalc_calculos").select("id").eq("case_id", caseId).maybeSingle();
+        if (calculoRow2) {
+          const { data: atConfigs } = await supabase.from("pjecalc_atualizacao_config" as any)
+            .select("*").eq("calculo_id", (calculoRow2 as any).id);
+          if (atConfigs) {
+            for (const ac of atConfigs as any[]) {
+              if (ac.tipo === 'correcao' && ac.combinacoes_indice) {
+                try { combinacoesIndice = JSON.parse(ac.combinacoes_indice); } catch {}
+                if (!combinacoesJuros && ac.combinacoes_juros) {
+                  try { combinacoesJuros = JSON.parse(ac.combinacoes_juros); } catch {}
+                }
+              }
+            }
+          }
+        }
+      }
+
       const correcaoConfigLocal = {
         indice: correcaoDataLocal.indice || 'IPCA-E', epoca: correcaoDataLocal.epoca || 'mensal',
         data_fixa: correcaoDataLocal.data_fixa,
@@ -236,6 +257,8 @@ export function ModuloResumo({ caseId }: Props) {
         multa_523: correcaoDataLocal.multa_523 ?? false, multa_523_percentual: correcaoDataLocal.multa_523_percentual ?? 10,
         multa_467: d(multasData, 'apurar_467', false), multa_467_percentual: d(multasData, 'percentual_467', 50),
         data_liquidacao: correcaoDataLocal.data_liquidacao || new Date().toISOString().slice(0, 10),
+        combinacoes_indice: combinacoesIndice,
+        combinacoes_juros: combinacoesJuros,
       } as PjeCorrecaoConfig;
 
       const honorariosConfig = {
