@@ -49,6 +49,7 @@ import type {
   PjecalcHonorariosRow,
   PjecalcCustasConfigRow,
 } from './types';
+import { gerarReflexosPadrao, type VerbaBase, type ReflexoGerado } from './reflexo-engine';
 
 // =====================================================
 // VERSION CONSTANTS
