@@ -2871,6 +2871,11 @@ export type Database = {
           considera_feriado_estadual: boolean | null
           considera_feriado_municipal: boolean | null
           created_at: string | null
+          cs_aliquota_empresa: number | null
+          cs_aliquota_sat: number | null
+          cs_aliquota_terceiros: number | null
+          cs_cobrar_reclamante: boolean | null
+          cs_sobre_salarios_pagos: boolean | null
           custas_limite: number | null
           custas_percentual: number | null
           data_admissao: string | null
@@ -2920,6 +2925,11 @@ export type Database = {
           considera_feriado_estadual?: boolean | null
           considera_feriado_municipal?: boolean | null
           created_at?: string | null
+          cs_aliquota_empresa?: number | null
+          cs_aliquota_sat?: number | null
+          cs_aliquota_terceiros?: number | null
+          cs_cobrar_reclamante?: boolean | null
+          cs_sobre_salarios_pagos?: boolean | null
           custas_limite?: number | null
           custas_percentual?: number | null
           data_admissao?: string | null
@@ -2969,6 +2979,11 @@ export type Database = {
           considera_feriado_estadual?: boolean | null
           considera_feriado_municipal?: boolean | null
           created_at?: string | null
+          cs_aliquota_empresa?: number | null
+          cs_aliquota_sat?: number | null
+          cs_aliquota_terceiros?: number | null
+          cs_cobrar_reclamante?: boolean | null
+          cs_sobre_salarios_pagos?: boolean | null
           custas_limite?: number | null
           custas_percentual?: number | null
           data_admissao?: string | null
@@ -6030,22 +6045,37 @@ export type Database = {
       }
       pjecalc_cs_config: {
         Row: {
+          aliquota_empresa: number | null
+          aliquota_sat: number | null
+          aliquota_terceiros: number | null
           case_id: string | null
+          cobrar_reclamante: boolean | null
           created_at: string | null
+          cs_sobre_salarios_pagos: boolean | null
           habilitado: boolean | null
           id: string | null
           regime: string | null
         }
         Insert: {
+          aliquota_empresa?: never
+          aliquota_sat?: never
+          aliquota_terceiros?: never
           case_id?: string | null
+          cobrar_reclamante?: never
           created_at?: string | null
+          cs_sobre_salarios_pagos?: never
           habilitado?: never
           id?: string | null
           regime?: never
         }
         Update: {
+          aliquota_empresa?: never
+          aliquota_sat?: never
+          aliquota_terceiros?: never
           case_id?: string | null
+          cobrar_reclamante?: never
           created_at?: string | null
+          cs_sobre_salarios_pagos?: never
           habilitado?: never
           id?: string | null
           regime?: never
