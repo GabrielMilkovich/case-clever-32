@@ -483,3 +483,27 @@ export function gerarRelatorioCompleto(
     setTimeout(() => win.print(), 600);
   }
 }
+
+/**
+ * Gera o HTML do relatório e faz download como arquivo .html
+ * O usuário pode abrir no navegador e imprimir como PDF.
+ */
+export function downloadRelatorioCompleto(
+  result: PjeLiquidacaoResult,
+  meta: RelatorioCompletoMeta
+) {
+  // Re-use the same generation logic by calling the internal builder
+  const html = buildRelatorioCompletoHTML(result, meta);
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const nomeArquivo = meta.processo
+    ? `relatorio-liquidacao-${meta.processo.replace(/[^a-zA-Z0-9.-]/g, "_")}.html`
+    : `relatorio-liquidacao-${Date.now()}.html`;
+  a.download = nomeArquivo;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
