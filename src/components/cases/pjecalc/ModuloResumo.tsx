@@ -474,6 +474,20 @@ export function ModuloResumo({ caseId }: Props) {
     dataLiquidacao: resultado?.data_liquidacao,
     engineVersion: resultado?.engine_version,
   };
+  const reportMetaCompleto = {
+    ...reportMeta,
+    reclamado: dadosProcessoData?.reclamado || '',
+    vara: dadosProcessoData?.vara || caseData?.tribunal || '',
+    perito: dadosProcessoData?.perito || '',
+    dataAdmissao: paramsData?.data_admissao || '',
+    dataDemissao: paramsData?.data_demissao || '',
+    dataAjuizamento: paramsData?.data_ajuizamento || '',
+    funcao: dadosProcessoData?.funcao || '',
+    indiceCorrecao: correcaoData?.indice || 'IPCA-E',
+    jurosTipo: correcaoData?.juros_tipo || 'simples_mensal',
+    jurosPercentual: correcaoData?.juros_percentual ?? 1,
+    jurosInicio: correcaoData?.juros_inicio || 'ajuizamento',
+  };
 
   const handleFechar = async () => {
     if (!resultado?.id) return;
