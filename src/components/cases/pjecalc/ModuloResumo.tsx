@@ -12,9 +12,7 @@ import { Play, Loader2, FileBarChart, Printer, FileCode, AlertTriangle, CheckCir
 import { PainelRevisao } from "./PainelRevisao";
 import { MemoriaCalculoExpandida } from "./MemoriaCalculoExpandida";
 import { ComparacaoCenarios } from "./ComparacaoCenarios";
-import { ComparadorParidade, buildParityData, type ParityData } from "./ComparadorParidade";
-import { MemoriaCalculoExpandida } from "./MemoriaCalculoExpandida";
-import { ComparacaoCenarios } from "./ComparacaoCenarios";
+import { ComparadorParidade, buildParityData } from "./ComparadorParidade";
 import { calcularCompletude } from "@/lib/pjecalc/completude";
 import * as svc from "@/lib/pjecalc/service";
 import {
