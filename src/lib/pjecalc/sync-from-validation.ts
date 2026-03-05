@@ -12,8 +12,8 @@ export interface SyncResult {
 export async function syncFromValidation(caseId: string): Promise<SyncResult> {
   const errors: string[] = [];
 
-  // Fetch facts, case, contract, existing params in parallel
-  const [factsRes, caseRes, contractRes, paramsRes, dpRes, existingHistRes, existingVerbasRes] = await Promise.all([
+  // Fetch facts, case, contract, existing params, extraction items in parallel
+  const [factsRes, caseRes, contractRes, paramsRes, dpRes, existingHistRes, existingVerbasRes, extractionItemsRes, extractionsRes] = await Promise.all([
     supabase.from("facts").select("*").eq("case_id", caseId),
     supabase.from("cases").select("*").eq("id", caseId).maybeSingle(),
     supabase.from("employment_contracts").select("*").eq("case_id", caseId).maybeSingle(),
@@ -21,6 +21,8 @@ export async function syncFromValidation(caseId: string): Promise<SyncResult> {
     supabase.from("pjecalc_dados_processo" as any).select("*").eq("case_id", caseId).maybeSingle(),
     supabase.from("pjecalc_historico_salarial" as any).select("id").eq("case_id", caseId),
     supabase.from("pjecalc_verbas" as any).select("id").eq("case_id", caseId),
+    supabase.from("extracao_item" as any).select("*").eq("case_id", caseId).in("status", ["AUTO", "APROVADO"]),
+    supabase.from("extractions").select("*").eq("case_id", caseId).in("status", ["validado", "pendente"]),
   ]);
 
   const facts = factsRes.data || [];
