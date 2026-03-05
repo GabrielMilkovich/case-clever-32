@@ -7,11 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Save, Loader2, Search, Building2 } from "lucide-react";
 import { GradeCSOcorrencias } from "./GradeCSOcorrencias";
 import { CNAE_ALIQUOTAS_COMUNS, type PjeCNAEAliquotas } from "@/lib/pjecalc/engine";
+import * as svc from "@/lib/pjecalc/service";
 
 interface Props { caseId: string; }
 
@@ -23,10 +23,7 @@ export function ModuloCS({ caseId }: Props) {
 
   const { data } = useQuery({
     queryKey: ["pjecalc_cs_config", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_cs_config" as any).select("*").eq("case_id", caseId).maybeSingle();
-      return data as any;
-    },
+    queryFn: () => svc.getCsConfig(caseId),
   });
 
   const [form, setForm] = useState({
@@ -40,21 +37,22 @@ export function ModuloCS({ caseId }: Props) {
 
   useEffect(() => {
     if (data) {
-      const periodos = data.periodos_simples || [];
+      const d = data as Record<string, unknown>;
+      const periodos = (d.periodos_simples as Array<{inicio: string; fim: string}>) || [];
       setForm({
-        apurar_segurado: data.apurar_segurado ?? true, cobrar_reclamante: data.cobrar_reclamante ?? true,
-        cs_sobre_salarios_pagos: data.cs_sobre_salarios_pagos ?? false,
-        aliquota_segurado_tipo: data.aliquota_segurado_tipo || 'empregado',
-        aliquota_segurado_fixa: data.aliquota_segurado_fixa?.toString() || '',
-        limitar_teto: data.limitar_teto ?? true, apurar_empresa: data.apurar_empresa ?? true,
-        apurar_sat: data.apurar_sat ?? true, apurar_terceiros: data.apurar_terceiros ?? true,
-        aliquota_empresa_fixa: data.aliquota_empresa_fixa?.toString() || '20',
-        aliquota_sat_fixa: data.aliquota_sat_fixa?.toString() || '2',
-        aliquota_terceiros_fixa: data.aliquota_terceiros_fixa?.toString() || '5.8',
+        apurar_segurado: (d.apurar_segurado as boolean) ?? true, cobrar_reclamante: (d.cobrar_reclamante as boolean) ?? true,
+        cs_sobre_salarios_pagos: (d.cs_sobre_salarios_pagos as boolean) ?? false,
+        aliquota_segurado_tipo: (d.aliquota_segurado_tipo as string) || 'empregado',
+        aliquota_segurado_fixa: d.aliquota_segurado_fixa?.toString() || '',
+        limitar_teto: (d.limitar_teto as boolean) ?? true, apurar_empresa: (d.apurar_empresa as boolean) ?? true,
+        apurar_sat: (d.apurar_sat as boolean) ?? true, apurar_terceiros: (d.apurar_terceiros as boolean) ?? true,
+        aliquota_empresa_fixa: d.aliquota_empresa_fixa?.toString() || '20',
+        aliquota_sat_fixa: d.aliquota_sat_fixa?.toString() || '2',
+        aliquota_terceiros_fixa: d.aliquota_terceiros_fixa?.toString() || '5.8',
         simples_nacional: periodos.length > 0,
         simples_inicio: periodos[0]?.inicio || '',
         simples_fim: periodos[0]?.fim || '',
-        cnae: data.cnae || '',
+        cnae: (d.cnae as string) || '',
       });
     }
   }, [data]);
@@ -62,18 +60,11 @@ export function ModuloCS({ caseId }: Props) {
   const filteredCNAE = useMemo(() => {
     if (!cnaeSearch) return CNAE_ALIQUOTAS_COMUNS;
     const s = cnaeSearch.toLowerCase();
-    return CNAE_ALIQUOTAS_COMUNS.filter(c =>
-      c.cnae.includes(s) || c.descricao.toLowerCase().includes(s)
-    );
+    return CNAE_ALIQUOTAS_COMUNS.filter(c => c.cnae.includes(s) || c.descricao.toLowerCase().includes(s));
   }, [cnaeSearch]);
 
   const applyCNAE = (cnae: PjeCNAEAliquotas) => {
-    setForm(p => ({
-      ...p,
-      cnae: cnae.cnae,
-      aliquota_sat_fixa: cnae.sat_rat.toString(),
-      aliquota_terceiros_fixa: cnae.terceiros.toString(),
-    }));
+    setForm(p => ({ ...p, cnae: cnae.cnae, aliquota_sat_fixa: cnae.sat_rat.toString(), aliquota_terceiros_fixa: cnae.terceiros.toString() }));
     setShowCNAE(false);
     toast.success(`CNAE ${cnae.cnae} aplicado — SAT/RAT: ${cnae.sat_rat}%, Terceiros: ${cnae.terceiros}%`);
   };
@@ -83,7 +74,7 @@ export function ModuloCS({ caseId }: Props) {
     try {
       const periodos_simples = form.simples_nacional && form.simples_inicio && form.simples_fim
         ? [{ inicio: form.simples_inicio, fim: form.simples_fim }] : [];
-      const payload = {
+      await svc.upsertCsConfig({
         case_id: caseId, apurar_segurado: form.apurar_segurado, cobrar_reclamante: form.cobrar_reclamante,
         cs_sobre_salarios_pagos: form.cs_sobre_salarios_pagos, aliquota_segurado_tipo: form.aliquota_segurado_tipo,
         aliquota_segurado_fixa: form.aliquota_segurado_fixa ? parseFloat(form.aliquota_segurado_fixa) : null,
@@ -92,12 +83,10 @@ export function ModuloCS({ caseId }: Props) {
         aliquota_empresa_fixa: parseFloat(form.aliquota_empresa_fixa) || 20,
         aliquota_sat_fixa: parseFloat(form.aliquota_sat_fixa) || 2,
         aliquota_terceiros_fixa: parseFloat(form.aliquota_terceiros_fixa) || 5.8,
-        periodos_simples,
-        cnae: form.cnae || null,
-      };
-      if (data?.id) await supabase.from("pjecalc_cs_config" as any).update(payload).eq("id", data.id);
-      else await supabase.from("pjecalc_cs_config" as any).insert(payload);
+        periodos_simples, cnae: form.cnae || null,
+      } as any);
       qc.invalidateQueries({ queryKey: ["pjecalc_cs_config", caseId] });
+      qc.invalidateQueries({ queryKey: ["pjecalc_case_data", caseId] });
       toast.success("Contribuição Social configurada!");
     } catch (e) { toast.error((e as Error).message); }
     finally { setSaving(false); }
@@ -180,7 +169,6 @@ export function ModuloCS({ caseId }: Props) {
       </Card>
       <GradeCSOcorrencias caseId={caseId} />
 
-      {/* CNAE Lookup Dialog */}
       <Dialog open={showCNAE} onOpenChange={setShowCNAE}>
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>Buscar CNAE — Atividade Econômica</DialogTitle></DialogHeader>

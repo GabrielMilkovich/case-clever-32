@@ -6,11 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Save, Loader2 } from "lucide-react";
 import { FGTSSaldosSaques } from "./FGTSSaldosSaques";
 import { GradeFGTSOcorrencias } from "./GradeFGTSOcorrencias";
+import * as svc from "@/lib/pjecalc/service";
 
 interface Props { caseId: string; }
 
@@ -20,10 +20,7 @@ export function ModuloFGTS({ caseId }: Props) {
 
   const { data } = useQuery({
     queryKey: ["pjecalc_fgts_config", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_fgts_config" as any).select("*").eq("case_id", caseId).maybeSingle();
-      return data as any;
-    },
+    queryFn: () => svc.getFgtsConfig(caseId),
   });
 
   const [form, setForm] = useState({
@@ -34,26 +31,28 @@ export function ModuloFGTS({ caseId }: Props) {
   });
 
   useEffect(() => {
-    if (data) setForm({
-      apurar: data.apurar ?? true, destino: data.destino || 'pagar_reclamante',
-      compor_principal: data.compor_principal ?? true, multa_apurar: data.multa_apurar ?? true,
-      multa_tipo: data.multa_tipo || 'calculada', multa_percentual: data.multa_percentual ?? 40,
-      multa_base: data.multa_base || 'devido', multa_valor_informado: data.multa_valor_informado?.toString() || '',
-      deduzir_saldo: data.deduzir_saldo ?? false, lc110_10: data.lc110_10 ?? false, lc110_05: data.lc110_05 ?? false,
-    });
+    if (data) {
+      const d = data as Record<string, unknown>;
+      setForm({
+        apurar: (d.apurar as boolean) ?? true, destino: (d.destino as string) || 'pagar_reclamante',
+        compor_principal: (d.compor_principal as boolean) ?? true, multa_apurar: (d.multa_apurar as boolean) ?? true,
+        multa_tipo: (d.multa_tipo as string) || 'calculada', multa_percentual: (d.multa_percentual as number) ?? 40,
+        multa_base: (d.multa_base as string) || 'devido', multa_valor_informado: d.multa_valor_informado?.toString() || '',
+        deduzir_saldo: (d.deduzir_saldo as boolean) ?? false, lc110_10: (d.lc110_10 as boolean) ?? false, lc110_05: (d.lc110_05 as boolean) ?? false,
+      });
+    }
   }, [data]);
 
   const save = async () => {
     setSaving(true);
     try {
-      const payload = {
+      await svc.upsertFgtsConfig({
         case_id: caseId, ...form,
         multa_percentual: Number(form.multa_percentual),
         multa_valor_informado: form.multa_valor_informado ? parseFloat(form.multa_valor_informado) : null,
-      };
-      if (data?.id) await supabase.from("pjecalc_fgts_config" as any).update(payload).eq("id", data.id);
-      else await supabase.from("pjecalc_fgts_config" as any).insert(payload);
+      } as any);
       qc.invalidateQueries({ queryKey: ["pjecalc_fgts_config", caseId] });
+      qc.invalidateQueries({ queryKey: ["pjecalc_case_data", caseId] });
       toast.success("FGTS configurado!");
     } catch (e) { toast.error((e as Error).message); }
     finally { setSaving(false); }
@@ -107,7 +106,6 @@ export function ModuloFGTS({ caseId }: Props) {
         </CardContent>
       </Card>
       <FGTSSaldosSaques caseId={caseId} />
-      {/* Grade editável de ocorrências FGTS */}
       <GradeFGTSOcorrencias caseId={caseId} />
     </div>
   );

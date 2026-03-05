@@ -7,34 +7,24 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Save, Loader2, Plus, Trash2, Info } from "lucide-react";
+import { Save, Loader2, Plus, Trash2 } from "lucide-react";
+import * as svc from "@/lib/pjecalc/service";
 
 const INDICES = [
-  { value: 'IPCA-E', label: 'IPCA-E' },
-  { value: 'SELIC', label: 'SELIC (Receita Federal)' },
-  { value: 'TR', label: 'TR' },
-  { value: 'INPC', label: 'INPC' },
-  { value: 'IGP-M', label: 'IGP-M' },
-  { value: 'IGP-DI', label: 'IGP-DI' },
-  { value: 'IPCA', label: 'IPCA' },
-  { value: 'IPC-FIPE', label: 'IPC-FIPE' },
-  { value: 'TJLP', label: 'TJLP' },
-  { value: 'TLP', label: 'TLP' },
-  { value: 'FACDT', label: 'FACDT' },
+  { value: 'IPCA-E', label: 'IPCA-E' }, { value: 'SELIC', label: 'SELIC (Receita Federal)' },
+  { value: 'TR', label: 'TR' }, { value: 'INPC', label: 'INPC' }, { value: 'IGP-M', label: 'IGP-M' },
+  { value: 'IGP-DI', label: 'IGP-DI' }, { value: 'IPCA', label: 'IPCA' }, { value: 'IPC-FIPE', label: 'IPC-FIPE' },
+  { value: 'TJLP', label: 'TJLP' }, { value: 'TLP', label: 'TLP' }, { value: 'FACDT', label: 'FACDT' },
   { value: 'SEM_CORRECAO', label: 'Sem Correção' },
 ];
 
 const TABELAS_JUROS = [
-  { value: 'TRD_SIMPLES', label: 'TRD Juros Simples' },
-  { value: 'SELIC_RF', label: 'SELIC (Receita Federal)' },
-  { value: 'TAXA_LEGAL', label: 'Taxa Legal' },
-  { value: 'SEM_JUROS', label: 'Sem Juros' },
+  { value: 'TRD_SIMPLES', label: 'TRD Juros Simples' }, { value: 'SELIC_RF', label: 'SELIC (Receita Federal)' },
+  { value: 'TAXA_LEGAL', label: 'Taxa Legal' }, { value: 'SEM_JUROS', label: 'Sem Juros' },
 ];
 
 interface CombItem { indice: string; a_partir_de: string; }
-
 interface Props { caseId: string; }
 
 export function ModuloCorrecao({ caseId }: Props) {
@@ -43,46 +33,35 @@ export function ModuloCorrecao({ caseId }: Props) {
 
   const { data } = useQuery({
     queryKey: ["pjecalc_correcao_config", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_correcao_config" as any).select("*").eq("case_id", caseId).maybeSingle();
-      return data as any;
-    },
+    queryFn: () => svc.getCorrecaoConfig(caseId),
   });
 
   const [form, setForm] = useState({
-    indice: 'IPCA-E',
-    combinar_indice: true,
-    combinacoes_indice: [] as CombItem[],
-    ignorar_taxa_negativa: true,
-    juros_pre_judicial: true,
-    tabela_juros: 'TRD_SIMPLES',
-    combinar_juros: true,
-    combinacoes_juros: [] as CombItem[],
+    indice: 'IPCA-E', combinar_indice: true, combinacoes_indice: [] as CombItem[],
+    ignorar_taxa_negativa: true, juros_pre_judicial: true, tabela_juros: 'TRD_SIMPLES',
+    combinar_juros: true, combinacoes_juros: [] as CombItem[],
     data_liquidacao: new Date().toISOString().slice(0, 10),
   });
 
   useEffect(() => {
     if (data) {
+      const d = data as Record<string, unknown>;
       let combIndice: CombItem[] = [];
       let combJuros: CombItem[] = [];
-      try { combIndice = data.combinacoes_indice ? JSON.parse(data.combinacoes_indice) : []; } catch {}
-      try { combJuros = data.combinacoes_juros ? JSON.parse(data.combinacoes_juros) : []; } catch {}
-
-      // Migrate old format
-      if (combIndice.length === 0 && Array.isArray(data.combinacoes_indice)) {
-        combIndice = (data.combinacoes_indice as any[]).map((c: any) => ({ indice: c.indice || c.ate, a_partir_de: c.ate || '' }));
+      try { combIndice = d.combinacoes_indice ? JSON.parse(d.combinacoes_indice as string) : []; } catch {}
+      try { combJuros = d.combinacoes_juros ? JSON.parse(d.combinacoes_juros as string) : []; } catch {}
+      if (combIndice.length === 0 && Array.isArray(d.combinacoes_indice)) {
+        combIndice = (d.combinacoes_indice as Array<Record<string, string>>).map(c => ({ indice: c.indice || c.ate, a_partir_de: c.ate || '' }));
       }
-
       setForm({
-        indice: data.indice || 'IPCA-E',
-        combinar_indice: combIndice.length > 0 || data.transicao_adc58,
+        indice: (d.indice as string) || 'IPCA-E',
+        combinar_indice: combIndice.length > 0 || !!(d.transicao_adc58),
         combinacoes_indice: combIndice.length > 0 ? combIndice : [{ indice: 'SEM_CORRECAO', a_partir_de: '' }, { indice: 'IPCA', a_partir_de: '' }],
-        ignorar_taxa_negativa: true,
-        juros_pre_judicial: true,
-        tabela_juros: data.juros_tipo === 'selic' ? 'TRD_SIMPLES' : 'TRD_SIMPLES',
+        ignorar_taxa_negativa: true, juros_pre_judicial: true,
+        tabela_juros: 'TRD_SIMPLES',
         combinar_juros: combJuros.length > 0,
         combinacoes_juros: combJuros.length > 0 ? combJuros : [{ indice: 'SELIC_RF', a_partir_de: '' }, { indice: 'TAXA_LEGAL', a_partir_de: '' }],
-        data_liquidacao: data.data_liquidacao || new Date().toISOString().slice(0, 10),
+        data_liquidacao: (d.data_liquidacao as string) || new Date().toISOString().slice(0, 10),
       });
     }
   }, [data]);
@@ -90,74 +69,39 @@ export function ModuloCorrecao({ caseId }: Props) {
   const save = async () => {
     setSaving(true);
     try {
-      const payload = {
-        case_id: caseId,
-        indice: form.indice,
-        indice_pos_citacao: 'SELIC',
-        transicao_adc58: form.combinar_indice,
-        epoca: 'mensal',
+      await svc.upsertCorrecaoConfig({
+        case_id: caseId, indice: form.indice, indice_pos_citacao: 'SELIC',
+        transicao_adc58: form.combinar_indice, epoca: 'mensal',
         juros_tipo: form.tabela_juros === 'SELIC_RF' ? 'selic' : 'simples_mensal',
-        juros_percentual: 1,
-        juros_inicio: 'ajuizamento',
-        juros_pro_rata: true,
-        multa_523: false,
-        multa_523_percentual: 10,
-        multa_467: false,
-        multa_467_percentual: 50,
-        data_liquidacao: form.data_liquidacao,
-        data_citacao: null,
-        data_fixa: null,
+        juros_percentual: 1, juros_inicio: 'ajuizamento', juros_pro_rata: true,
+        multa_523: false, multa_523_percentual: 10, multa_467: false, multa_467_percentual: 50,
+        data_liquidacao: form.data_liquidacao, data_citacao: null, data_fixa: null,
         combinacoes_indice: JSON.stringify(form.combinacoes_indice),
         combinacoes_juros: JSON.stringify(form.combinacoes_juros),
-      };
-      if (data?.id) await supabase.from("pjecalc_correcao_config" as any).update(payload).eq("id", data.id);
-      else await supabase.from("pjecalc_correcao_config" as any).insert(payload);
+      } as any);
       qc.invalidateQueries({ queryKey: ["pjecalc_correcao_config", caseId] });
+      qc.invalidateQueries({ queryKey: ["pjecalc_case_data", caseId] });
       toast.success("Correção/Juros configurados!");
     } catch (e) { toast.error((e as Error).message); }
     finally { setSaving(false); }
   };
 
-  const CombTable = ({ items, onChange, options, label }: {
-    items: CombItem[];
-    onChange: (items: CombItem[]) => void;
-    options: { value: string; label: string }[];
-    label: string;
-  }) => (
+  const CombTable = ({ items, onChange, options, label }: { items: CombItem[]; onChange: (items: CombItem[]) => void; options: { value: string; label: string }[]; label: string; }) => (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <Label className="text-[10px] font-medium">{label}</Label>
-        <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => onChange([...items, { indice: options[0].value, a_partir_de: '' }])}>
-          <Plus className="h-3 w-3" />
-        </Button>
+        <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => onChange([...items, { indice: options[0].value, a_partir_de: '' }])}><Plus className="h-3 w-3" /></Button>
       </div>
       {items.length > 0 && (
         <div className="border border-border rounded overflow-hidden">
           <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-muted/50 border-b">
-                <th className="p-1.5 text-left font-medium w-8">Ação</th>
-                <th className="p-1.5 text-left font-medium">Índice</th>
-                <th className="p-1.5 text-left font-medium">A partir de</th>
-              </tr>
-            </thead>
+            <thead><tr className="bg-muted/50 border-b"><th className="p-1.5 text-left font-medium w-8">Ação</th><th className="p-1.5 text-left font-medium">Índice</th><th className="p-1.5 text-left font-medium">A partir de</th></tr></thead>
             <tbody>
               {items.map((item, idx) => (
                 <tr key={idx} className="border-b border-border/50">
-                  <td className="p-1">
-                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onChange(items.filter((_, i) => i !== idx))}>
-                      <Trash2 className="h-3 w-3 text-destructive" />
-                    </Button>
-                  </td>
-                  <td className="p-1">
-                    <Select value={item.indice} onValueChange={v => { const n = [...items]; n[idx] = { ...n[idx], indice: v }; onChange(n); }}>
-                      <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>{options.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </td>
-                  <td className="p-1">
-                    <Input type="date" value={item.a_partir_de} onChange={e => { const n = [...items]; n[idx] = { ...n[idx], a_partir_de: e.target.value }; onChange(n); }} className="h-7 text-xs" />
-                  </td>
+                  <td className="p-1"><Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onChange(items.filter((_, i) => i !== idx))}><Trash2 className="h-3 w-3 text-destructive" /></Button></td>
+                  <td className="p-1"><Select value={item.indice} onValueChange={v => { const n = [...items]; n[idx] = { ...n[idx], indice: v }; onChange(n); }}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent>{options.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent></Select></td>
+                  <td className="p-1"><Input type="date" value={item.a_partir_de} onChange={e => { const n = [...items]; n[idx] = { ...n[idx], a_partir_de: e.target.value }; onChange(n); }} className="h-7 text-xs" /></td>
                 </tr>
               ))}
             </tbody>
@@ -175,7 +119,6 @@ export function ModuloCorrecao({ caseId }: Props) {
           {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />} Salvar
         </Button>
       </div>
-
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-sm">Dados de Correção, Juros e Multa</CardTitle></CardHeader>
         <CardContent>
@@ -184,75 +127,24 @@ export function ModuloCorrecao({ caseId }: Props) {
               <TabsTrigger value="gerais" className="text-xs h-7">Dados Gerais</TabsTrigger>
               <TabsTrigger value="especificos" className="text-xs h-7">Dados Específicos</TabsTrigger>
             </TabsList>
-
             <TabsContent value="gerais" className="space-y-3">
               <div><Label className="text-xs">Data da Liquidação</Label><Input type="date" value={form.data_liquidacao} onChange={e => setForm(p => ({ ...p, data_liquidacao: e.target.value }))} className="mt-1 h-8 text-xs w-48" /></div>
             </TabsContent>
-
             <TabsContent value="especificos">
               <div className="flex gap-6">
-                {/* Left: Correção Monetária */}
                 <div className="flex-1 space-y-3">
                   <Label className="text-xs font-semibold">Correção Monetária</Label>
-
-                  <div>
-                    <Label className="text-[10px] font-medium">Índice Trabalhista</Label>
-                    <Select value={form.indice} onValueChange={v => setForm(p => ({ ...p, indice: v }))}>
-                      <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>{INDICES.map(i => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Checkbox checked={form.combinar_indice} onCheckedChange={v => setForm(p => ({ ...p, combinar_indice: !!v }))} />
-                    <Label className="text-xs font-medium">Combinar com Outro Índice</Label>
-                  </div>
-
-                  {form.combinar_indice && (
-                    <CombTable
-                      items={form.combinacoes_indice}
-                      onChange={items => setForm(p => ({ ...p, combinacoes_indice: items }))}
-                      options={INDICES}
-                      label="Outro Índice Trabalhista *  /  A partir de *"
-                    />
-                  )}
-
-                  <div className="flex items-center gap-2 pt-2">
-                    <Checkbox checked={form.ignorar_taxa_negativa} onCheckedChange={v => setForm(p => ({ ...p, ignorar_taxa_negativa: !!v }))} />
-                    <Label className="text-xs">Ignorar Taxa Negativa para Índice(s) selecionado(s)</Label>
-                  </div>
+                  <div><Label className="text-[10px] font-medium">Índice Trabalhista</Label><Select value={form.indice} onValueChange={v => setForm(p => ({ ...p, indice: v }))}><SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent>{INDICES.map(i => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent></Select></div>
+                  <div className="flex items-center gap-2"><Checkbox checked={form.combinar_indice} onCheckedChange={v => setForm(p => ({ ...p, combinar_indice: !!v }))} /><Label className="text-xs font-medium">Combinar com Outro Índice</Label></div>
+                  {form.combinar_indice && <CombTable items={form.combinacoes_indice} onChange={items => setForm(p => ({ ...p, combinacoes_indice: items }))} options={INDICES} label="Outro Índice Trabalhista *  /  A partir de *" />}
+                  <div className="flex items-center gap-2 pt-2"><Checkbox checked={form.ignorar_taxa_negativa} onCheckedChange={v => setForm(p => ({ ...p, ignorar_taxa_negativa: !!v }))} /><Label className="text-xs">Ignorar Taxa Negativa para Índice(s) selecionado(s)</Label></div>
                 </div>
-
-                {/* Right: Juros de Mora */}
                 <div className="flex-1 space-y-3">
                   <Label className="text-xs font-semibold">Juros de Mora</Label>
-
-                  <div className="flex items-center gap-2">
-                    <Checkbox checked={form.juros_pre_judicial} onCheckedChange={v => setForm(p => ({ ...p, juros_pre_judicial: !!v }))} />
-                    <Label className="text-xs font-medium">Aplicar Juros na Fase Pré-Judicial</Label>
-                  </div>
-
-                  <div>
-                    <Label className="text-[10px] font-medium">Tabela de Juros</Label>
-                    <Select value={form.tabela_juros} onValueChange={v => setForm(p => ({ ...p, tabela_juros: v }))}>
-                      <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>{TABELAS_JUROS.map(j => <SelectItem key={j.value} value={j.value}>{j.label}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Checkbox checked={form.combinar_juros} onCheckedChange={v => setForm(p => ({ ...p, combinar_juros: !!v }))} />
-                    <Label className="text-xs font-medium">Combinar com Outra Tabela de Juros</Label>
-                  </div>
-
-                  {form.combinar_juros && (
-                    <CombTable
-                      items={form.combinacoes_juros}
-                      onChange={items => setForm(p => ({ ...p, combinacoes_juros: items }))}
-                      options={[...TABELAS_JUROS, ...INDICES.filter(i => i.value === 'SELIC')]}
-                      label="Tabela Juros *  /  A partir de *"
-                    />
-                  )}
+                  <div className="flex items-center gap-2"><Checkbox checked={form.juros_pre_judicial} onCheckedChange={v => setForm(p => ({ ...p, juros_pre_judicial: !!v }))} /><Label className="text-xs font-medium">Aplicar Juros na Fase Pré-Judicial</Label></div>
+                  <div><Label className="text-[10px] font-medium">Tabela de Juros</Label><Select value={form.tabela_juros} onValueChange={v => setForm(p => ({ ...p, tabela_juros: v }))}><SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent>{TABELAS_JUROS.map(j => <SelectItem key={j.value} value={j.value}>{j.label}</SelectItem>)}</SelectContent></Select></div>
+                  <div className="flex items-center gap-2"><Checkbox checked={form.combinar_juros} onCheckedChange={v => setForm(p => ({ ...p, combinar_juros: !!v }))} /><Label className="text-xs font-medium">Combinar com Outra Tabela de Juros</Label></div>
+                  {form.combinar_juros && <CombTable items={form.combinacoes_juros} onChange={items => setForm(p => ({ ...p, combinacoes_juros: items }))} options={[...TABELAS_JUROS, ...INDICES.filter(i => i.value === 'SELIC')]} label="Tabela Juros *  /  A partir de *" />}
                 </div>
               </div>
             </TabsContent>
