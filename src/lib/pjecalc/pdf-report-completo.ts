@@ -250,13 +250,13 @@ function buildRelatorioCompletoHTML(
   // Add FGTS rows to resumo
   const fgtsRow = result.fgts.total_fgts > 0 ? `
     <tr>
-      <td class="left">FGTS ${(result.fgts.aliquota_padrao || 0.08) * 100}%</td>
+      <td class="left">FGTS 8%</td>
       <td class="num">${fmt(result.fgts.total_depositos)}</td>
       <td class="num">—</td>
       <td class="num">${fmt(result.fgts.total_depositos)}</td>
     </tr>
     <tr>
-      <td class="left">MULTA SOBRE FGTS ${(result.fgts.multa_percentual || 0.4) * 100}%</td>
+      <td class="left">MULTA SOBRE FGTS 40%</td>
       <td class="num">${fmt(result.fgts.multa_valor)}</td>
       <td class="num">—</td>
       <td class="num">${fmt(result.fgts.multa_valor)}</td>
