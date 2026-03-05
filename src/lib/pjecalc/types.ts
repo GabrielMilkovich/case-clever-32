@@ -408,6 +408,11 @@ export interface PjecalcCsConfigRow {
   case_id: string;
   habilitado: boolean;
   regime: string;
+  aliquota_empresa?: number;
+  aliquota_sat?: number;
+  aliquota_terceiros?: number;
+  cobrar_reclamante?: boolean;
+  cs_sobre_salarios_pagos?: boolean;
   created_at: string;
 }
 
