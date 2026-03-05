@@ -5743,6 +5743,63 @@ export type Database = {
         }
         Relationships: []
       }
+      sentenca_rulesets: {
+        Row: {
+          apply_days: string[] | null
+          ativo: boolean
+          case_id: string
+          created_at: string
+          date_range_end: string | null
+          date_range_start: string | null
+          id: string
+          nome: string
+          rules: Json
+          texto_sentenca: string | null
+          updated_at: string
+        }
+        Insert: {
+          apply_days?: string[] | null
+          ativo?: boolean
+          case_id: string
+          created_at?: string
+          date_range_end?: string | null
+          date_range_start?: string | null
+          id?: string
+          nome?: string
+          rules?: Json
+          texto_sentenca?: string | null
+          updated_at?: string
+        }
+        Update: {
+          apply_days?: string[] | null
+          ativo?: boolean
+          case_id?: string
+          created_at?: string
+          date_range_end?: string | null
+          date_range_start?: string | null
+          id?: string
+          nome?: string
+          rules?: Json
+          texto_sentenca?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sentenca_rulesets_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "sentenca_rulesets_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tax_tables: {
         Row: {
           criado_em: string | null
@@ -5879,6 +5936,66 @@ export type Database = {
             columns: ["snapshot_id"]
             isOneToOne: false
             referencedRelation: "calc_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      worktime_adjustments: {
+        Row: {
+          adjusted_json: Json
+          applied_rules: string[] | null
+          case_id: string
+          created_at: string
+          data: string
+          extras_diarias: number | null
+          flags: string[] | null
+          horas_trabalhadas_ajustadas: number | null
+          horas_trabalhadas_original: number | null
+          id: string
+          original_json: Json
+          ponto_diario_id: string | null
+        }
+        Insert: {
+          adjusted_json?: Json
+          applied_rules?: string[] | null
+          case_id: string
+          created_at?: string
+          data: string
+          extras_diarias?: number | null
+          flags?: string[] | null
+          horas_trabalhadas_ajustadas?: number | null
+          horas_trabalhadas_original?: number | null
+          id?: string
+          original_json?: Json
+          ponto_diario_id?: string | null
+        }
+        Update: {
+          adjusted_json?: Json
+          applied_rules?: string[] | null
+          case_id?: string
+          created_at?: string
+          data?: string
+          extras_diarias?: number | null
+          flags?: string[] | null
+          horas_trabalhadas_ajustadas?: number | null
+          horas_trabalhadas_original?: number | null
+          id?: string
+          original_json?: Json
+          ponto_diario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worktime_adjustments_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_processing_stats"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "worktime_adjustments_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
             referencedColumns: ["id"]
           },
         ]
