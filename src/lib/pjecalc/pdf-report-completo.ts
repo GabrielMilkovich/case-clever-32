@@ -128,7 +128,7 @@ function buildRelatorioCompletoHTML(
     </tr>
   `).join("");
 
-  const html = `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -474,12 +474,17 @@ function buildRelatorioCompletoHTML(
   </div>
 </body>
 </html>`;
+}
 
+export function gerarRelatorioCompleto(
+  result: PjeLiquidacaoResult,
+  meta: RelatorioCompletoMeta
+) {
+  const html = buildRelatorioCompletoHTML(result, meta);
   const win = window.open("", "_blank");
   if (win) {
     win.document.write(html);
     win.document.close();
-    // Auto-trigger print dialog for PDF export
     setTimeout(() => win.print(), 600);
   }
 }
