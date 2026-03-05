@@ -1549,14 +1549,14 @@ export type Database = {
           {
             foreignKeyName: "employment_contracts_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "employment_contracts_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },

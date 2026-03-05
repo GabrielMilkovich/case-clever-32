@@ -1,1 +1,0 @@
-UPDATE documents SET status = 'uploaded', error_message = NULL WHERE status IN ('extracting', 'failed', 'ocr_running');
