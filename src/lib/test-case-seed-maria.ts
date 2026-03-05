@@ -327,33 +327,31 @@ export async function seedCasoMaria(): Promise<string> {
       }
     }
 
-    // 9. FGTS config — upsert
+    // 9. FGTS config — upsert (view columns: habilitado, percentual_deposito, percentual_multa)
     const { data: existFgts } = await supabase.from("pjecalc_fgts_config" as any).select("id").eq("case_id", caseId).maybeSingle();
     if (existFgts) {
-      await supabase.from("pjecalc_fgts_config" as any).update({ apurar: true, multa_apurar: true, multa_percentual: 40, multa_tipo: "sobre_depositos", deduzir_saldo: false }).eq("case_id", caseId);
+      await supabase.from("pjecalc_fgts_config" as any).update({ habilitado: true, percentual_deposito: 8, percentual_multa: 40 }).eq("case_id", caseId);
     } else {
-      await supabase.from("pjecalc_fgts_config" as any).insert({ case_id: caseId, apurar: true, multa_apurar: true, multa_percentual: 40, multa_tipo: "sobre_depositos", deduzir_saldo: false });
+      await supabase.from("pjecalc_fgts_config" as any).insert({ case_id: caseId, habilitado: true, percentual_deposito: 8, percentual_multa: 40 });
     }
 
-    // 10. CS config — upsert
-    const csPayload = { apurar_segurado: true, cobrar_reclamante: true, cs_sobre_salarios_pagos: false, aliquota_segurado_tipo: "empregado", limitar_teto: true, apurar_empresa: true, apurar_sat: true, apurar_terceiros: true, aliquota_empregador_tipo: "atividade", aliquota_sat_fixa: 2, aliquota_terceiros_fixa: 5.8 };
+    // 10. CS config — upsert (view columns: habilitado, regime)
     const { data: existCs } = await supabase.from("pjecalc_cs_config" as any).select("id").eq("case_id", caseId).maybeSingle();
     if (existCs) {
-      await supabase.from("pjecalc_cs_config" as any).update(csPayload).eq("case_id", caseId);
+      await supabase.from("pjecalc_cs_config" as any).update({ habilitado: true, regime: "CLT" }).eq("case_id", caseId);
     } else {
-      await supabase.from("pjecalc_cs_config" as any).insert({ case_id: caseId, ...csPayload });
+      await supabase.from("pjecalc_cs_config" as any).insert({ case_id: caseId, habilitado: true, regime: "CLT" });
     }
 
-    // 11. IR config — upsert
-    const irPayload = { apurar: true, incidir_sobre_juros: false, cobrar_reclamado: false, tributacao_exclusiva_13: true, tributacao_separada_ferias: true, deduzir_cs: true, deduzir_prev_privada: false, deduzir_pensao: false, deduzir_honorarios: false, aposentado_65: false, dependentes: 0 };
+    // 11. IR config — upsert (view columns: habilitado, metodo, dependentes)
     const { data: existIr } = await supabase.from("pjecalc_ir_config" as any).select("id").eq("case_id", caseId).maybeSingle();
     if (existIr) {
-      await supabase.from("pjecalc_ir_config" as any).update(irPayload).eq("case_id", caseId);
+      await supabase.from("pjecalc_ir_config" as any).update({ habilitado: true, metodo: "progressivo", dependentes: 0 }).eq("case_id", caseId);
     } else {
-      await supabase.from("pjecalc_ir_config" as any).insert({ case_id: caseId, ...irPayload });
+      await supabase.from("pjecalc_ir_config" as any).insert({ case_id: caseId, habilitado: true, metodo: "progressivo", dependentes: 0 });
     }
 
-    // 12. Correção monetária — upsert with proper indice and data_citacao
+    // 12. Correção monetária — upsert
     const correcaoPayload = { indice: "IPCA-E", epoca: "mensal", juros_tipo: "simples_mensal", juros_percentual: 1, juros_inicio: "ajuizamento", multa_523: false, multa_523_percentual: 0, data_liquidacao: new Date().toISOString().slice(0, 10), data_citacao: "2025-03-20" };
     const { data: existCorrecao } = await supabase.from("pjecalc_correcao_config" as any).select("id").eq("case_id", caseId).maybeSingle();
     if (existCorrecao) {
@@ -362,20 +360,20 @@ export async function seedCasoMaria(): Promise<string> {
       await supabase.from("pjecalc_correcao_config" as any).insert({ case_id: caseId, ...correcaoPayload });
     }
 
-    // 13. Honorários — upsert
+    // 13. Honorários — upsert (view columns: percentual, sobre)
     const { data: existHon } = await supabase.from("pjecalc_honorarios" as any).select("id").eq("case_id", caseId).maybeSingle();
     if (existHon) {
-      await supabase.from("pjecalc_honorarios" as any).update({ apurar_sucumbenciais: true, percentual_sucumbenciais: 15, base_sucumbenciais: "condenacao" }).eq("case_id", caseId);
+      await supabase.from("pjecalc_honorarios" as any).update({ percentual: 15, sobre: "condenacao" }).eq("case_id", caseId);
     } else {
-      await supabase.from("pjecalc_honorarios" as any).insert({ case_id: caseId, apurar_sucumbenciais: true, percentual_sucumbenciais: 15, base_sucumbenciais: "condenacao" });
+      await supabase.from("pjecalc_honorarios" as any).insert({ case_id: caseId, percentual: 15, sobre: "condenacao" });
     }
 
-    // 14. Multas CLT — upsert
+    // 14. Multas CLT — upsert (view columns: multa_477, multa_467)
     const { data: existMultas } = await supabase.from("pjecalc_multas_config" as any).select("id").eq("case_id", caseId).maybeSingle();
     if (existMultas) {
-      await supabase.from("pjecalc_multas_config" as any).update({ apurar_477: true, apurar_467: false }).eq("case_id", caseId);
+      await supabase.from("pjecalc_multas_config" as any).update({ multa_477: true, multa_467: false }).eq("case_id", caseId);
     } else {
-      await supabase.from("pjecalc_multas_config" as any).insert({ case_id: caseId, apurar_477: true, apurar_467: false });
+      await supabase.from("pjecalc_multas_config" as any).insert({ case_id: caseId, multa_477: true, multa_467: false });
     }
 
     // 15. Dados do processo — upsert
