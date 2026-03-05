@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { supabase } from "@/integrations/supabase/client";
+import * as svc from "@/lib/pjecalc/service";
 import { toast } from "sonner";
 import { Plus, Trash2, Loader2, Calculator, Upload, Download } from "lucide-react";
 import { parseCartaoPontoCSV, gerarCSVModelo } from "@/lib/pjecalc/csv-import";
@@ -18,20 +18,17 @@ export function ModuloCartaoPonto({ caseId, dataAdmissao, dataDemissao }: Props)
 
   const { data: registros = [] } = useQuery({
     queryKey: ["pjecalc_cartao_ponto", caseId],
-    queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_cartao_ponto" as any).select("*").eq("case_id", caseId).order("competencia");
-      return (data || []) as any[];
-    },
+    queryFn: () => svc.getCartaoPonto(caseId),
   });
 
   const gerarCompetencias = async () => {
     if (!dataAdmissao || !dataDemissao) { toast.error("Preencha datas nos Parâmetros."); return; }
     setGenerating(true);
     try {
-      await supabase.from("pjecalc_cartao_ponto" as any).delete().eq("case_id", caseId);
+      await svc.deleteCartaoPonto(caseId);
       const start = new Date(dataAdmissao + "T00:00:00");
       const end = new Date(dataDemissao + "T00:00:00");
-      const rows: any[] = [];
+      const rows: Record<string, unknown>[] = [];
       const cur = new Date(start.getFullYear(), start.getMonth(), 1);
       while (cur <= end) {
         rows.push({
@@ -41,15 +38,15 @@ export function ModuloCartaoPonto({ caseId, dataAdmissao, dataDemissao }: Props)
         });
         cur.setMonth(cur.getMonth() + 1);
       }
-      if (rows.length > 0) await supabase.from("pjecalc_cartao_ponto" as any).insert(rows);
+      await svc.insertCartaoPontoBatch(rows);
       qc.invalidateQueries({ queryKey: ["pjecalc_cartao_ponto", caseId] });
       toast.success(`${rows.length} competências geradas`);
     } catch (e) { toast.error((e as Error).message); }
     finally { setGenerating(false); }
   };
 
-  const updateField = async (id: string, field: string, value: any) => {
-    await supabase.from("pjecalc_cartao_ponto" as any).update({ [field]: value }).eq("id", id);
+  const updateField = async (id: string, field: string, value: unknown) => {
+    await svc.updateCartaoPonto(id, { [field]: value });
   };
 
   const handleCSVImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -63,10 +60,9 @@ export function ModuloCartaoPonto({ caseId, dataAdmissao, dataDemissao }: Props)
         toast.error(`Erros no CSV: ${errors.slice(0, 3).join("; ")}`);
       }
       if (rows.length === 0) { toast.error("Nenhuma linha válida encontrada."); return; }
-      // Delete existing and insert
-      await supabase.from("pjecalc_cartao_ponto" as any).delete().eq("case_id", caseId);
+      await svc.deleteCartaoPonto(caseId);
       const dbRows = rows.map(r => ({ case_id: caseId, ...r }));
-      await supabase.from("pjecalc_cartao_ponto" as any).insert(dbRows);
+      await svc.insertCartaoPontoBatch(dbRows);
       qc.invalidateQueries({ queryKey: ["pjecalc_cartao_ponto", caseId] });
       toast.success(`${rows.length} competências importadas do CSV`);
     } catch (err) { toast.error((err as Error).message); }
@@ -121,16 +117,16 @@ export function ModuloCartaoPonto({ caseId, dataAdmissao, dataDemissao }: Props)
               </tr>
             </thead>
             <tbody>
-              {registros.map((r: any) => (
+              {registros.map((r) => (
                 <tr key={r.id} className="border-b border-border/50 hover:bg-muted/20">
                   <td className="p-2 font-mono font-medium">{r.competencia}</td>
-                  {["dias_uteis","dias_trabalhados","horas_extras_50","horas_extras_100","horas_noturnas","intervalo_suprimido","dsr_horas"].map(field => (
+                  {(["dias_uteis","dias_trabalhados","horas_extras_50","horas_extras_100","horas_noturnas","intervalo_suprimido","dsr_horas"] as const).map(field => (
                     <td key={field} className="p-1 text-center">
                       <Input type="number" step="0.01" defaultValue={r[field] || 0} className="h-7 text-xs w-16 text-center mx-auto" onBlur={e => updateField(r.id, field, parseFloat(e.target.value) || 0)} />
                     </td>
                   ))}
                   <td className="p-1">
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={async () => { await supabase.from("pjecalc_cartao_ponto" as any).delete().eq("id", r.id); qc.invalidateQueries({ queryKey: ["pjecalc_cartao_ponto", caseId] }); }}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={async () => { await svc.deleteCartaoPontoById(r.id); qc.invalidateQueries({ queryKey: ["pjecalc_cartao_ponto", caseId] }); }}>
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </td>

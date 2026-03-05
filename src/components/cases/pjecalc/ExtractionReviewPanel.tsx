@@ -19,6 +19,7 @@ import {
   ChevronDown, ChevronUp, Filter, CheckCircle2,
   Clock, Loader2
 } from "lucide-react";
+import type { Database } from "@/integrations/supabase/types";
 
 interface Props {
   caseId: string;
@@ -26,7 +27,7 @@ interface Props {
   onConfirmAll?: () => void;
 }
 
-type ExtractionStatus = "AUTO" | "REVISAR" | "CONFIRMADO" | "REJEITADO";
+type ExtractionStatus = Database["public"]["Enums"]["extracao_status"];
 
 interface ExtractionItem {
   id: string;
@@ -45,7 +46,15 @@ interface ExtractionItem {
   review_note: string | null;
 }
 
-const STATUS_CONFIG: Record<ExtractionStatus, { label: string; color: string; icon: any }> = {
+interface PipelineRow {
+  id: string;
+  template_detectado: string | null;
+  template_version: string | null;
+  empresa_detectada: string | null;
+  status: string;
+}
+
+const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
   AUTO: { label: "Auto", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300", icon: Clock },
   REVISAR: { label: "Revisar", color: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300", icon: AlertTriangle },
   CONFIRMADO: { label: "Confirmado", color: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300", icon: CheckCircle2 },
@@ -95,7 +104,7 @@ export function ExtractionReviewPanel({ caseId, pipelineId, onConfirmAll }: Prop
         .select("*")
         .eq("id", pipelineId!)
         .single();
-      return data;
+      return data as PipelineRow | null;
     },
   });
 
@@ -117,11 +126,11 @@ export function ExtractionReviewPanel({ caseId, pipelineId, onConfirmAll }: Prop
   });
 
   const handleConfirm = (id: string) => {
-    updateItem.mutate({ id, updates: { status: "CONFIRMADO" as any } });
+    updateItem.mutate({ id, updates: { status: "CONFIRMADO" } });
   };
 
   const handleReject = (id: string) => {
-    updateItem.mutate({ id, updates: { status: "REJEITADO" as any } });
+    updateItem.mutate({ id, updates: { status: "REJEITADO" } });
   };
 
   const handleEdit = (item: ExtractionItem) => {
@@ -132,7 +141,7 @@ export function ExtractionReviewPanel({ caseId, pipelineId, onConfirmAll }: Prop
   const handleSaveEdit = (id: string) => {
     updateItem.mutate({
       id,
-      updates: { valor: editValue, status: "CONFIRMADO" as any, review_note: "Editado manualmente" } as any,
+      updates: { valor: editValue, status: "CONFIRMADO", review_note: "Editado manualmente" },
     });
     setEditingId(null);
   };
@@ -190,17 +199,17 @@ export function ExtractionReviewPanel({ caseId, pipelineId, onConfirmAll }: Prop
       {/* Pipeline header */}
       {pipeline && (
         <div className="flex items-center gap-2 flex-wrap text-xs">
-          <Badge variant="outline">{(pipeline as any).template_detectado || "?"}</Badge>
-          <Badge variant="secondary">{(pipeline as any).template_version || "?"}</Badge>
-          {(pipeline as any).empresa_detectada && (
-            <Badge variant="outline" className="font-mono">{(pipeline as any).empresa_detectada}</Badge>
+          <Badge variant="outline">{pipeline.template_detectado || "?"}</Badge>
+          <Badge variant="secondary">{pipeline.template_version || "?"}</Badge>
+          {pipeline.empresa_detectada && (
+            <Badge variant="outline" className="font-mono">{pipeline.empresa_detectada}</Badge>
           )}
           <Badge className={
-            (pipeline as any).status === "extraido"
+            pipeline.status === "extraido"
               ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
               : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
           }>
-            {(pipeline as any).status}
+            {pipeline.status}
           </Badge>
         </div>
       )}

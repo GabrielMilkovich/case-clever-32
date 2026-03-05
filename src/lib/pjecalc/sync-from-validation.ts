@@ -3,6 +3,7 @@
  * Extraído de PjeCalcInline.syncFromOCR para reuso pós-validação.
  */
 import { supabase } from "@/integrations/supabase/client";
+import * as svc from "./service";
 
 export interface SyncResult {
   syncedFields: number;
@@ -13,23 +14,21 @@ export async function syncFromValidation(caseId: string): Promise<SyncResult> {
   const errors: string[] = [];
 
   // Fetch facts, case, contract, existing params, extraction items in parallel
-  const [factsRes, caseRes, contractRes, paramsRes, dpRes, existingHistRes, existingVerbasRes, extractionItemsRes, extractionsRes] = await Promise.all([
+  const [factsRes, caseRes, contractRes, existingParams, existingDP, existingHistRes, existingVerbasRes, extractionItemsRes, extractionsRes] = await Promise.all([
     supabase.from("facts").select("*").eq("case_id", caseId),
     supabase.from("cases").select("*").eq("id", caseId).maybeSingle(),
     supabase.from("employment_contracts").select("*").eq("case_id", caseId).maybeSingle(),
-    supabase.from("pjecalc_parametros" as any).select("*").eq("case_id", caseId).maybeSingle(),
-    supabase.from("pjecalc_dados_processo" as any).select("*").eq("case_id", caseId).maybeSingle(),
-    supabase.from("pjecalc_historico_salarial" as any).select("id").eq("case_id", caseId),
-    supabase.from("pjecalc_verbas" as any).select("id").eq("case_id", caseId),
-    supabase.from("extracao_item" as any).select("*").eq("case_id", caseId).in("status", ["AUTO", "APROVADO"]),
+    svc.getParametros(caseId),
+    svc.getDadosProcesso(caseId),
+    svc.getHistoricoSalarial(caseId),
+    svc.getVerbas(caseId),
+    supabase.from("extracao_item").select("*").eq("case_id", caseId).in("status", ["AUTO", "APROVADO"] as any),
     supabase.from("extractions").select("*").eq("case_id", caseId).in("status", ["validado", "pendente"]),
   ]);
 
   const facts = factsRes.data || [];
   const caseData = caseRes.data;
   const contractData = contractRes.data;
-  const params = paramsRes.data as any;
-  const dadosProcesso = dpRes.data as any;
 
   // Build fact map preferring confirmed facts
   const factMap: Record<string, string> = {};
@@ -42,21 +41,18 @@ export async function syncFromValidation(caseId: string): Promise<SyncResult> {
   // Enrich from extractions table (validated OCR data)
   const extractions = extractionsRes.data || [];
   for (const ext of extractions) {
-    const e = ext as any;
-    if (e.valor_proposto && e.campo && !factMap[e.campo]) {
-      factMap[e.campo] = e.valor_proposto;
+    if (ext.valor_proposto && ext.campo && !factMap[ext.campo]) {
+      factMap[ext.campo] = ext.valor_proposto;
     }
   }
 
   // Enrich from extracao_item (pipeline-extracted fields)
   const extracaoItems = extractionItemsRes.data || [];
   for (const item of extracaoItems) {
-    const ei = item as any;
-    if (ei.valor && ei.field_key && ei.target_field) {
-      // Map pipeline extraction fields to fact keys
-      const key = ei.target_field;
+    if (item.valor && item.field_key && item.target_field) {
+      const key = item.target_field;
       if (!factMap[key] && !key.startsWith('rubrica_')) {
-        factMap[key] = ei.valor;
+        factMap[key] = item.valor;
       }
     }
   }
@@ -74,7 +70,7 @@ export async function syncFromValidation(caseId: string): Promise<SyncResult> {
   }
 
   // ── Parâmetros ──
-  const autoParams: any = { case_id: caseId };
+  const autoParams: Record<string, unknown> = { case_id: caseId };
   if (factMap.data_admissao) autoParams.data_admissao = factMap.data_admissao;
   if (factMap.data_demissao) autoParams.data_demissao = factMap.data_demissao;
   if (factMap.data_ajuizamento) autoParams.data_ajuizamento = factMap.data_ajuizamento;
@@ -96,20 +92,25 @@ export async function syncFromValidation(caseId: string): Promise<SyncResult> {
   if (factMap.estado || factMap.uf) autoParams.estado = (factMap.estado || factMap.uf).toUpperCase().trim();
   if (factMap.municipio || factMap.cidade) autoParams.municipio = factMap.municipio || factMap.cidade;
 
-  if (params?.id) {
-    const { error } = await supabase.from("pjecalc_parametros" as any).update(autoParams).eq("id", params.id);
-    if (error) errors.push(`Parâmetros: ${error.message}`);
-  } else {
-    if (!autoParams.data_admissao) autoParams.data_admissao = new Date().toISOString().slice(0, 10);
-    if (!autoParams.data_ajuizamento) autoParams.data_ajuizamento = new Date().toISOString().slice(0, 10);
-    autoParams.regime_trabalho = 'tempo_integral';
-    autoParams.sabado_dia_util = true;
-    const { error } = await supabase.from("pjecalc_parametros" as any).insert(autoParams);
-    if (error) errors.push(`Parâmetros: ${error.message}`);
+  try {
+    await svc.upsertParametros({
+      case_id: caseId,
+      data_admissao: (autoParams.data_admissao as string) || new Date().toISOString().slice(0, 10),
+      data_ajuizamento: (autoParams.data_ajuizamento as string) || new Date().toISOString().slice(0, 10),
+      ...(autoParams.data_demissao ? { data_demissao: autoParams.data_demissao as string } : {}),
+      ...(autoParams.ultima_remuneracao ? { ultima_remuneracao: autoParams.ultima_remuneracao as number } : {}),
+      ...(autoParams.maior_remuneracao ? { maior_remuneracao: autoParams.maior_remuneracao as number } : {}),
+      ...(autoParams.carga_horaria_padrao ? { carga_horaria_padrao: autoParams.carga_horaria_padrao as number } : {}),
+      ...(autoParams.estado ? { estado: autoParams.estado as string } : {}),
+      ...(autoParams.municipio ? { municipio: autoParams.municipio as string } : {}),
+      ...(!existingParams ? { regime_trabalho: 'tempo_integral', sabado_dia_util: true } : {}),
+    });
+  } catch (e) {
+    errors.push(`Parâmetros: ${(e as Error).message}`);
   }
 
   // ── Dados do Processo ──
-  const processData: any = { case_id: caseId };
+  const processData: Record<string, unknown> = { case_id: caseId };
   if (factMap.numero_processo) processData.numero_processo = factMap.numero_processo;
   if (factMap.reclamante || factMap.nome_reclamante) processData.reclamante_nome = factMap.reclamante || factMap.nome_reclamante;
   if (factMap.cpf_reclamante || factMap.cpf) processData.reclamante_cpf = factMap.cpf_reclamante || factMap.cpf;
@@ -120,41 +121,40 @@ export async function syncFromValidation(caseId: string): Promise<SyncResult> {
   if (factMap.cargo || factMap.funcao) processData.objeto = factMap.cargo || factMap.funcao;
 
   if (Object.keys(processData).length > 1) {
-    if (dadosProcesso?.id) {
-      const { error } = await supabase.from("pjecalc_dados_processo" as any).update(processData).eq("id", dadosProcesso.id);
-      if (error) errors.push(`Dados Processo: ${error.message}`);
-    } else {
-      const { error } = await supabase.from("pjecalc_dados_processo" as any).insert(processData);
-      if (error) errors.push(`Dados Processo: ${error.message}`);
+    try {
+      await svc.upsertDadosProcesso(processData as any);
+    } catch (e) {
+      errors.push(`Dados Processo: ${(e as Error).message}`);
     }
   }
 
   // ── Histórico Salarial ──
-  if (autoParams.data_admissao && autoParams.ultima_remuneracao && !existingHistRes.data?.length) {
-    const { error } = await supabase.from("pjecalc_historico_salarial" as any).insert({
-      case_id: caseId,
-      nome: 'Salário Base',
-      periodo_inicio: autoParams.data_admissao,
-      periodo_fim: autoParams.data_demissao || new Date().toISOString().slice(0, 10),
-      tipo_valor: 'informado',
-      valor_informado: autoParams.ultima_remuneracao,
-      incidencia_fgts: true,
-      incidencia_cs: true,
-    });
-    if (error) errors.push(`Histórico: ${error.message}`);
+  if (autoParams.data_admissao && autoParams.ultima_remuneracao && !existingHistRes.length) {
+    try {
+      await svc.insertHistoricoSalarial({
+        case_id: caseId,
+        nome: 'Salário Base',
+        periodo_inicio: autoParams.data_admissao as string,
+        periodo_fim: (autoParams.data_demissao as string) || new Date().toISOString().slice(0, 10),
+        tipo_valor: 'informado',
+        valor_informado: autoParams.ultima_remuneracao as number,
+        incidencia_fgts: true,
+        incidencia_cs: true,
+      });
+    } catch (e) {
+      errors.push(`Histórico: ${(e as Error).message}`);
+    }
   }
 
   // ── Verbas auto-geradas ──
-  if (!existingVerbasRes.data?.length && autoParams.data_admissao) {
+  if (!existingVerbasRes.length && autoParams.data_admissao) {
     const periodo = {
-      inicio: autoParams.data_admissao,
-      fim: autoParams.data_demissao || new Date().toISOString().slice(0, 10),
+      inicio: autoParams.data_admissao as string,
+      fim: (autoParams.data_demissao as string) || new Date().toISOString().slice(0, 10),
     };
 
-    // Fetch existing historico IDs for base_calculo linkage
-    const { data: histRows } = await supabase.from("pjecalc_historico_salarial" as any)
-      .select("id").eq("case_id", caseId);
-    const histIds = (histRows || []).map((h: any) => h.id);
+    const updatedHist = await svc.getHistoricoSalarial(caseId);
+    const histIds = updatedHist.map(h => h.id);
 
     const baseCalculoPrincipal = {
       historicos: histIds,
@@ -164,29 +164,35 @@ export async function syncFromValidation(caseId: string): Promise<SyncResult> {
       integralizar: false,
     };
 
-    const { data: principalData, error: principalError } = await supabase.from("pjecalc_verbas" as any).insert({
-      case_id: caseId, nome: 'Horas Extras 50%', caracteristica: 'comum', ocorrencia_pagamento: 'mensal',
-      tipo: 'principal', multiplicador: 1.5, divisor_informado: autoParams.carga_horaria_padrao || 220,
-      periodo_inicio: periodo.inicio, periodo_fim: periodo.fim, ordem: 0,
-      base_calculo: baseCalculoPrincipal,
-      incidencias: { fgts: true, irpf: true, contribuicao_social: true, previdencia_privada: false, pensao_alimenticia: false },
-    }).select("id").single();
-    if (principalError) errors.push(`Verba HE: ${principalError.message}`);
-
-    const principalId = (principalData as any)?.id || null;
-    const reflexas = [
-      { nome: 'RSR s/ Horas Extras', caracteristica: 'comum', ocorrencia_pagamento: 'mensal', tipo: 'reflexa', multiplicador: 1, divisor_informado: 26, ordem: 1 },
-      { nome: '13º Salário', caracteristica: '13_salario', ocorrencia_pagamento: 'dezembro', tipo: 'reflexa', multiplicador: 1, divisor_informado: 12, ordem: 2 },
-      { nome: 'Férias + 1/3', caracteristica: 'ferias', ocorrencia_pagamento: 'periodo_aquisitivo', tipo: 'reflexa', multiplicador: 1.3333, divisor_informado: 12, ordem: 3 },
-    ];
-    for (const ref of reflexas) {
-      const { error } = await supabase.from("pjecalc_verbas" as any).insert({
-        case_id: caseId, ...ref, periodo_inicio: periodo.inicio, periodo_fim: periodo.fim,
-        verba_principal_id: principalId,
-        base_calculo: { historicos: [], verbas: principalId ? [principalId] : [], tabelas: [], proporcionalizar: false, integralizar: false },
+    try {
+      const principalData = await svc.insertVerba({
+        case_id: caseId, nome: 'Horas Extras 50%', caracteristica: 'comum', ocorrencia_pagamento: 'mensal',
+        tipo: 'principal', multiplicador: 1.5, divisor_informado: (autoParams.carga_horaria_padrao as number) || 220,
+        periodo_inicio: periodo.inicio, periodo_fim: periodo.fim, ordem: 0,
+        base_calculo: baseCalculoPrincipal,
         incidencias: { fgts: true, irpf: true, contribuicao_social: true, previdencia_privada: false, pensao_alimenticia: false },
       });
-      if (error) errors.push(`Verba ${ref.nome}: ${error.message}`);
+
+      const principalId = principalData?.id || null;
+      const reflexas = [
+        { nome: 'RSR s/ Horas Extras', caracteristica: 'comum', ocorrencia_pagamento: 'mensal', tipo: 'reflexa', multiplicador: 1, divisor_informado: 26, ordem: 1 },
+        { nome: '13º Salário', caracteristica: '13_salario', ocorrencia_pagamento: 'dezembro', tipo: 'reflexa', multiplicador: 1, divisor_informado: 12, ordem: 2 },
+        { nome: 'Férias + 1/3', caracteristica: 'ferias', ocorrencia_pagamento: 'periodo_aquisitivo', tipo: 'reflexa', multiplicador: 1.3333, divisor_informado: 12, ordem: 3 },
+      ];
+      for (const ref of reflexas) {
+        try {
+          await svc.insertVerba({
+            case_id: caseId, ...ref, periodo_inicio: periodo.inicio, periodo_fim: periodo.fim,
+            verba_principal_id: principalId,
+            base_calculo: { historicos: [], verbas: principalId ? [principalId] : [], tabelas: [], proporcionalizar: false, integralizar: false },
+            incidencias: { fgts: true, irpf: true, contribuicao_social: true, previdencia_privada: false, pensao_alimenticia: false },
+          });
+        } catch (e) {
+          errors.push(`Verba ${ref.nome}: ${(e as Error).message}`);
+        }
+      }
+    } catch (e) {
+      errors.push(`Verba HE: ${(e as Error).message}`);
     }
   }
 
@@ -196,22 +202,8 @@ export async function syncFromValidation(caseId: string): Promise<SyncResult> {
   return { syncedFields: Object.keys(factMap).length, errors };
 }
 
-/** Upsert helper: check if row exists, update or insert */
-async function upsertConfig(table: string, caseId: string, payload: any, errors: string[], label: string) {
-  const { data: existing } = await supabase.from(table as any).select("id").eq("case_id", caseId).maybeSingle();
-  if (existing) {
-    const { error } = await supabase.from(table as any).update(payload).eq("case_id", caseId);
-    if (error) errors.push(`${label}: ${error.message}`);
-  } else {
-    const { error } = await supabase.from(table as any).insert({ case_id: caseId, ...payload });
-    if (error) errors.push(`${label}: ${error.message}`);
-  }
-}
-
 /** Auto-configura módulos de config via pjecalc_calculos e pjecalc_correcao_config */
-async function autoConfigureModules(caseId: string, params: any, factMap: Record<string, string>, errors: string[]) {
-  const dataCitacao = factMap.data_citacao || factMap.data_notificacao || '';
-
+async function autoConfigureModules(caseId: string, params: Record<string, unknown>, factMap: Record<string, string>, errors: string[]) {
   // Wait for pjecalc_calculos to exist (created by trigger on parametros insert)
   await new Promise(r => setTimeout(r, 300));
 
@@ -223,6 +215,7 @@ async function autoConfigureModules(caseId: string, params: any, factMap: Record
     .maybeSingle();
 
   if (calculoRow) {
+    const calcId = calculoRow.id;
     // Update writable columns directly on pjecalc_calculos
     const { error } = await supabase.from("pjecalc_calculos").update({
       honorarios_percentual: 15,
@@ -231,31 +224,28 @@ async function autoConfigureModules(caseId: string, params: any, factMap: Record
       custas_limite: 10.64,
       multa_477_habilitada: true,
       multa_467_habilitada: false,
-    }).eq("id", (calculoRow as any).id);
+    }).eq("id", calcId);
     if (error) errors.push(`Config Calculos: ${error.message}`);
-  }
 
-  // Correção config — write directly to pjecalc_atualizacao_config + pjecalc_calculos
-  if (calculoRow) {
-    const calcId = (calculoRow as any).id;
-    
     // Set data_liquidacao on calculos
     await supabase.from("pjecalc_calculos").update({
       data_liquidacao: new Date().toISOString().slice(0, 10),
     }).eq("id", calcId);
 
-    // Upsert correcao config
-    const { data: existCorrecao } = await supabase
+    // Upsert correcao config via fromView helper in service
+    const existCorrecaoRes = await supabase
       .from("pjecalc_atualizacao_config" as any)
       .select("id")
       .eq("calculo_id", calcId)
       .eq("tipo", "correcao")
       .maybeSingle();
 
+    const existCorrecao = existCorrecaoRes.data as unknown as { id: string } | null;
+
     if (existCorrecao) {
       await supabase.from("pjecalc_atualizacao_config" as any).update({
         regime_padrao: "IPCA-E",
-      }).eq("id", (existCorrecao as any).id);
+      }).eq("id", existCorrecao.id);
     } else {
       const { error } = await supabase.from("pjecalc_atualizacao_config" as any).insert({
         calculo_id: calcId,
@@ -266,17 +256,19 @@ async function autoConfigureModules(caseId: string, params: any, factMap: Record
     }
 
     // Upsert juros config
-    const { data: existJuros } = await supabase
+    const existJurosRes = await supabase
       .from("pjecalc_atualizacao_config" as any)
       .select("id")
       .eq("calculo_id", calcId)
       .eq("tipo", "juros")
       .maybeSingle();
 
+    const existJuros = existJurosRes.data as unknown as { id: string } | null;
+
     if (existJuros) {
       await supabase.from("pjecalc_atualizacao_config" as any).update({
         regime_padrao: "simples_mensal",
-      }).eq("id", (existJuros as any).id);
+      }).eq("id", existJuros.id);
     } else {
       const { error } = await supabase.from("pjecalc_atualizacao_config" as any).insert({
         calculo_id: calcId,
