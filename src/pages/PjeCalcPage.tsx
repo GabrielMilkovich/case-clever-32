@@ -138,9 +138,9 @@ export default function PjeCalcPage() {
       })();
 
   // =====================================================
-  // Phase 4: Completude indicators
+  // Phase 4: Completude indicators (use hook's completude)
   // =====================================================
-  const completude = calcularCompletude({ params, faltas, ferias, historicos, verbas, resultado });
+  const completude = hookCompletude;
 
   // =====================================================
   // PARÂMETROS - LOCAL STATE
@@ -181,15 +181,8 @@ export default function PjeCalcPage() {
         considerar_feriado_municipal: params.considerar_feriado_municipal || false,
         comentarios: params.comentarios || '',
       });
-    } else if (contract) {
-      setFormParams(prev => ({
-        ...prev,
-        data_admissao: contract.data_admissao || '',
-        data_demissao: contract.data_demissao || '',
-        carga_horaria_padrao: (contract.jornada_contratual as any)?.divisor || 220,
-      }));
     }
-  }, [params, contract]);
+  }, [params]);
 
   // =====================================================
   // SAVE PARAMS (with audit log)
