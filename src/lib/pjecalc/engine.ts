@@ -1699,9 +1699,10 @@ export class PjeCalcEngine {
       
       // Use combination-by-date if available
       if (this.correcaoConfig.combinacoes_indice?.length) {
-        const compDate = compClean + '-01';
+        // Súmula 381: FGTS correction also starts from mês subsequente
+        const compDateFgts = this.mesSubsequente(compClean) + '-01';
         const breakpoints = new Set<string>();
-        breakpoints.add(compDate);
+        breakpoints.add(compDateFgts);
         breakpoints.add(this.correcaoConfig.data_liquidacao);
         for (const ci of this.correcaoConfig.combinacoes_indice) {
           if (ci.de && ci.de > compDate && ci.de <= this.correcaoConfig.data_liquidacao) breakpoints.add(ci.de);
