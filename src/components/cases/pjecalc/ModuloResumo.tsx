@@ -141,7 +141,7 @@ export function ModuloResumo({ caseId }: Props) {
       const histIds = histData.map(h => h.id);
       const histOcorrencias = await svc.getHistoricoOcorrenciasByIds(histIds);
 
-      const historicos: PjeHistoricoSalarial[] = histData.map((h) => ({
+      const historicos = histData.map((h) => ({
         ...(h as unknown as PjeHistoricoSalarial),
         periodo_inicio: h.periodo_inicio || params.data_inicial || params.data_admissao,
         periodo_fim: h.periodo_fim || params.data_final || params.data_demissao,
@@ -152,8 +152,8 @@ export function ModuloResumo({ caseId }: Props) {
             return { id: oc.id as string, historico_id: oc.historico_id as string, competencia: oc.competencia as string, valor: Number(oc.valor), tipo: (oc.tipo as string) || 'calculado' };
           }),
       }));
-      const faltas: PjeFalta[] = faltasData.map((f) => ({ ...(f as unknown as PjeFalta) }));
-      const ferias: PjeFerias[] = feriasData.map((f) => ({ ...(f as unknown as PjeFerias) }));
+      const faltas = faltasData as unknown as PjeFalta[];
+      const ferias = feriasData as unknown as PjeFerias[];
 
       const cartaoPonto: PjeCartaoPonto[] = cartaoData.map((r) => ({
         competencia: r.competencia,
@@ -167,7 +167,7 @@ export function ModuloResumo({ caseId }: Props) {
         sobreaviso: r.sobreaviso || 0,
       }));
 
-      const verbas: PjeVerba[] = verbasData.map((v) => ({
+      const verbas = verbasData.map((v) => ({
         ...(v as unknown as PjeVerba),
         base_calculo: {
           historicos: (v as Record<string, any>).base_calculo?.historicos || [],
@@ -274,7 +274,7 @@ export function ModuloResumo({ caseId }: Props) {
         filhos_detalhes: d(sfData, 'filhos_detalhes'),
       } as PjeSalarioFamiliaConfig;
 
-      const feriadosDB: PjeFeriadoDB[] = feriadosData.map((f) => ({
+      const feriadosDB = feriadosData.map((f) => ({
         data: f.data as string, nome: f.nome as string, tipo: (f.tipo as string) || 'nacional',
         uf: f.uf as string | undefined, municipio: f.municipio as string | undefined,
       }));
@@ -298,8 +298,8 @@ export function ModuloResumo({ caseId }: Props) {
       // Execute engine com TODOS os dados
       const engine = new PjeCalcEngine(
         params, historicos, faltas, ferias, verbas, cartaoPonto,
-        fgtsConfig, csConfig, irConfig, correcaoConfig,
-        honorariosConfig, custasConfig, seguroConfig,
+        fgtsConfig, csConfig, irConfig, correcaoConfigLocal,
+        honorariosConfig, custasConfigLocal, seguroConfig,
         indicesDB, faixasINSSDB, faixasIRDB,
         [], // excecoesCargas (TODO: load if table exists)
         feriadosDB,
