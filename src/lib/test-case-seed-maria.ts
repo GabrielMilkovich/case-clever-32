@@ -61,14 +61,13 @@ export async function seedCasoMaria(): Promise<string> {
       }))
     );
 
-    // 5. Parâmetros
-    // 07/03/2015 → 15/09/2024 = ~9 anos 6 meses → 30 + 9×3 = 57 dias aviso prévio
+    // 5. Parâmetros — this auto-creates pjecalc_calculos via INSTEAD OF trigger
     await supabase.from("pjecalc_parametros" as any).insert({
       case_id: caseId,
       data_admissao: "2015-03-07",
       data_demissao: "2024-09-15",
       data_ajuizamento: "2025-01-20",
-      data_inicial: "2020-01-20", // prescrição quinquenal
+      data_inicial: "2020-01-20",
       data_final: "2024-09-15",
       carga_horaria_padrao: 220,
       sabado_dia_util: false,
@@ -82,104 +81,113 @@ export async function seedCasoMaria(): Promise<string> {
       prazo_aviso_previo: "indenizado",
       prazo_aviso_dias: 57,
       regime_trabalho: "CLT",
-      ultima_remuneracao: 3500, // média aprox. últimos meses
+      ultima_remuneracao: 3500,
       maior_remuneracao: 4200,
     });
 
-    // 6. Histórico Salarial — 6 rubricas conforme PJe-Calc real
-    // Período do cálculo: 01/2020 a 09/2024 (prescrição quinquenal)
-    const periodoCalc = { inicio: "2020-01-01", fim: "2024-09-15" };
+    // Get calculo_id for direct table inserts
+    const { data: calculoRow } = await supabase
+      .from("pjecalc_calculos")
+      .select("id")
+      .eq("case_id", caseId)
+      .maybeSingle();
+    const calculoId = (calculoRow as any)?.id;
+    if (!calculoId) throw new Error("pjecalc_calculos não foi criado pelo trigger");
 
+    // 6. Histórico Salarial — 6 rubricas via tabela real pjecalc_hist_salarial
     const historicoRubricas = [
-      { nome: "COMISSÕES PAGAS", tipo_valor: "VARIAVEL", valor_informado: 1800 },
-      { nome: "COMISSÕES ESTORNADAS", tipo_valor: "VARIAVEL", valor_informado: 150 },
-      { nome: "DSR S/ COMISSÃO", tipo_valor: "VARIAVEL", valor_informado: 360 },
-      { nome: "MÍNIMO GARANTIDO", tipo_valor: "VARIAVEL", valor_informado: 1200 },
-      { nome: "PRÊMIOS PAGOS", tipo_valor: "VARIAVEL", valor_informado: 280 },
-      { nome: "VENDAS \"VF\"", tipo_valor: "VARIAVEL", valor_informado: 450 },
+      { nome: "COMISSÕES PAGAS", tipo_variacao: "variavel", valor_fixo: 1800, incide_fgts: true },
+      { nome: "COMISSÕES ESTORNADAS", tipo_variacao: "variavel", valor_fixo: 150, incide_fgts: false },
+      { nome: "DSR S/ COMISSÃO", tipo_variacao: "variavel", valor_fixo: 360, incide_fgts: true },
+      { nome: "MÍNIMO GARANTIDO", tipo_variacao: "variavel", valor_fixo: 1200, incide_fgts: true },
+      { nome: "PRÊMIOS PAGOS", tipo_variacao: "variavel", valor_fixo: 280, incide_fgts: true },
+      { nome: "VENDAS VF", tipo_variacao: "variavel", valor_fixo: 450, incide_fgts: true },
     ];
 
     for (const rub of historicoRubricas) {
-      const { data: histInserted } = await supabase.from("pjecalc_historico_salarial" as any).insert({
-        case_id: caseId,
+      const { data: histInserted, error: histErr } = await supabase.from("pjecalc_hist_salarial").insert({
+        calculo_id: calculoId,
         nome: rub.nome,
-        periodo_inicio: periodoCalc.inicio,
-        periodo_fim: periodoCalc.fim,
-        tipo_valor: rub.tipo_valor,
-        valor_informado: rub.valor_informado,
-        incidencia_fgts: rub.nome !== "COMISSÕES ESTORNADAS", // estornos não incidem FGTS
-        incidencia_cs: true,
+        tipo_variacao: rub.tipo_variacao,
+        valor_fixo: rub.valor_fixo,
+        incide_fgts: rub.incide_fgts,
+        incide_inss: true,
+        incide_ir: true,
       }).select("id").single();
 
-      // Generate monthly occurrences with realistic variation
-      if ((histInserted as any)?.id) {
-        const ocorrencias: any[] = [];
-        const cur = new Date(2020, 0, 1);
-        const end = new Date(2024, 8, 1);
-        while (cur <= end) {
-          const comp = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`;
-          // Realistic variation: ±30% from average
-          const variation = 0.7 + Math.random() * 0.6; // 0.7 to 1.3
-          let valor = Math.round(rub.valor_informado * variation * 100) / 100;
+      if (histErr || !histInserted) {
+        console.warn(`Erro ao inserir hist_salarial ${rub.nome}:`, histErr?.message);
+        continue;
+      }
 
-          // Estornos are negative
-          if (rub.nome === "COMISSÕES ESTORNADAS") {
-            valor = -Math.abs(valor);
-          }
+      // Generate monthly occurrences in pjecalc_hist_salarial_mes
+      const ocorrencias: any[] = [];
+      const cur = new Date(2020, 0, 1);
+      const end = new Date(2024, 8, 1);
+      while (cur <= end) {
+        const comp = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`;
+        const variation = 0.7 + Math.random() * 0.6;
+        let valor = Math.round(rub.valor_fixo * variation * 100) / 100;
 
-          // Mínimo garantido: only applies when comissões are low (some months = 0)
-          if (rub.nome === "MÍNIMO GARANTIDO") {
-            valor = Math.random() > 0.4 ? 0 : Math.round(rub.valor_informado * variation * 100) / 100;
-          }
-
-          ocorrencias.push({
-            historico_id: (histInserted as any).id,
-            case_id: caseId,
-            competencia: comp,
-            valor,
-            tipo: "informado",
-          });
-          cur.setMonth(cur.getMonth() + 1);
+        if (rub.nome === "COMISSÕES ESTORNADAS") {
+          valor = -Math.abs(valor);
         }
-        if (ocorrencias.length > 0) {
-          await supabase.from("pjecalc_historico_ocorrencias" as any).insert(ocorrencias);
+        if (rub.nome === "MÍNIMO GARANTIDO") {
+          valor = Math.random() > 0.4 ? 0 : Math.round(rub.valor_fixo * variation * 100) / 100;
+        }
+
+        ocorrencias.push({
+          calculo_id: calculoId,
+          hist_salarial_id: histInserted.id,
+          competencia: comp,
+          valor,
+          origem: "seed",
+        });
+        cur.setMonth(cur.getMonth() + 1);
+      }
+
+      if (ocorrencias.length > 0) {
+        // Insert in batches of 50 to avoid payload limits
+        for (let i = 0; i < ocorrencias.length; i += 50) {
+          const batch = ocorrencias.slice(i, i + 50);
+          const { error: mesErr } = await supabase.from("pjecalc_hist_salarial_mes").insert(batch);
+          if (mesErr) console.warn(`Erro ao inserir mes batch ${rub.nome}:`, mesErr.message);
         }
       }
     }
 
-    // 7. Férias — períodos aquisitivos
+    // 7. Férias — via view (INSTEAD OF trigger handles it)
     await supabase.from("pjecalc_ferias" as any).insert([
       {
         case_id: caseId,
         periodo_aquisitivo_inicio: "2020-03-07", periodo_aquisitivo_fim: "2021-03-06",
         periodo_concessivo_inicio: "2021-03-07", periodo_concessivo_fim: "2022-03-06",
-        situacao: "gozadas", relativas: "integrais", prazo_dias: 30,
+        situacao: "gozadas", dias: 30,
         gozo_inicio: "2021-07-01", gozo_fim: "2021-07-30",
       },
       {
         case_id: caseId,
         periodo_aquisitivo_inicio: "2021-03-07", periodo_aquisitivo_fim: "2022-03-06",
         periodo_concessivo_inicio: "2022-03-07", periodo_concessivo_fim: "2023-03-06",
-        situacao: "gozadas", relativas: "integrais", prazo_dias: 30,
+        situacao: "gozadas", dias: 30,
         gozo_inicio: "2022-09-01", gozo_fim: "2022-09-30",
       },
       {
         case_id: caseId,
         periodo_aquisitivo_inicio: "2022-03-07", periodo_aquisitivo_fim: "2023-03-06",
         periodo_concessivo_inicio: "2023-03-07", periodo_concessivo_fim: "2024-03-06",
-        situacao: "nao_gozadas", relativas: "integrais", prazo_dias: 30, dobra: true,
+        situacao: "nao_gozadas", dias: 30, dobra: true,
       },
       {
         case_id: caseId,
         periodo_aquisitivo_inicio: "2023-03-07", periodo_aquisitivo_fim: "2024-03-06",
         periodo_concessivo_inicio: "2024-03-07", periodo_concessivo_fim: "2025-03-06",
-        situacao: "nao_gozadas", relativas: "integrais", prazo_dias: 30, dobra: true,
+        situacao: "nao_gozadas", dias: 30, dobra: true,
       },
       {
         case_id: caseId,
         periodo_aquisitivo_inicio: "2024-03-07", periodo_aquisitivo_fim: "2024-09-15",
-        situacao: "indenizadas", relativas: "proporcionais", prazo_dias: 15,
-        dias: 15,
+        situacao: "proporcionais", dias: 15,
       },
     ]);
 
@@ -190,10 +198,10 @@ export async function seedCasoMaria(): Promise<string> {
       { case_id: caseId, data_inicial: "2023-03-20", data_final: "2023-03-20", justificada: true, motivo: "Consulta médica" },
     ]);
 
-    // 9. Verbas Principais — comissionista com adicional noturno e HE
+    // 9. Verbas Principais
     const incidenciasPadrao = { dsr: true, decimo_terceiro: true, ferias: true, fgts: true, aviso_previo: true };
+    const periodoCalc = { inicio: "2020-01-20", fim: "2024-09-15" };
 
-    // Diferenças de Comissão (verba principal - base do cálculo)
     const { data: difComissao } = await supabase.from("pjecalc_verbas" as any).insert({
       case_id: caseId, nome: "Diferenças de Comissão", tipo: "principal", caracteristica: "comum",
       ocorrencia_pagamento: "mensal", multiplicador: 1, divisor_informado: 1,
@@ -201,25 +209,21 @@ export async function seedCasoMaria(): Promise<string> {
       incidencias: incidenciasPadrao,
     }).select("id").single();
 
-    // Adicional Noturno 20%
     const { data: adicNot } = await supabase.from("pjecalc_verbas" as any).insert({
       case_id: caseId, nome: "Adicional Noturno 20%", tipo: "principal", caracteristica: "comum",
       ocorrencia_pagamento: "mensal", multiplicador: 0.2, divisor_informado: 220,
-      quantidade_informada: 60, tipo_quantidade: "informada",
       periodo_inicio: periodoCalc.inicio, periodo_fim: periodoCalc.fim, ordem: 1,
       incidencias: incidenciasPadrao,
     }).select("id").single();
 
-    // Horas Extras 100%
     const { data: he100 } = await supabase.from("pjecalc_verbas" as any).insert({
       case_id: caseId, nome: "Horas Extras 100%", tipo: "principal", caracteristica: "comum",
       ocorrencia_pagamento: "mensal", multiplicador: 2.0, divisor_informado: 220,
-      quantidade_informada: 10, tipo_quantidade: "informada",
       periodo_inicio: periodoCalc.inicio, periodo_fim: periodoCalc.fim, ordem: 2,
       incidencias: incidenciasPadrao,
     }).select("id").single();
 
-    // 10. Reflexas para cada principal
+    // 10. Reflexas
     const principalIds = [(difComissao as any)?.id, (adicNot as any)?.id, (he100 as any)?.id].filter(Boolean);
     let ordem = 3;
 
@@ -326,7 +330,6 @@ export async function seedCasoMaria(): Promise<string> {
 
     return caseId;
   } catch (err: any) {
-    // Rollback: delete the case (cascades)
     await supabase.from("cases").delete().eq("id", caseId);
     throw err;
   }
