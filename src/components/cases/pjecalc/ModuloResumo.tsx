@@ -97,7 +97,7 @@ export function ModuloResumo({ caseId }: Props) {
         .select("resumo_verbas")
         .eq("calculo_id", (calculoRow as any).id)
         .maybeSingle();
-      return pjcData?.resumo_verbas || null;
+      return (pjcData as any)?.resumo_verbas || null;
     },
   });
 
