@@ -56,6 +56,7 @@ import { ObservacoesModulo } from "@/components/cases/pjecalc/ObservacoesModulo"
 import { AssistenteContextual } from "@/components/cases/pjecalc/AssistenteContextual";
 import { ImportadorFichaFinanceira } from "@/components/cases/pjecalc/ImportadorFichaFinanceira";
 import { MemoriaCalculoExpandida } from "@/components/cases/pjecalc/MemoriaCalculoExpandida";
+import { ModuloAjusteSentenca } from "@/components/cases/pjecalc/ModuloAjusteSentenca";
 import { ComparacaoCenarios } from "@/components/cases/pjecalc/ComparacaoCenarios";
 import { calcularCompletude, getRastreabilidadeGeral, type ModuleStatus } from "@/lib/pjecalc/completude";
 
@@ -66,6 +67,7 @@ const MODULOS = [
   { id: 'ferias', label: 'Férias', icon: Calendar, desc: 'Períodos aquisitivos' },
   { id: 'historico', label: 'Histórico Salarial', icon: DollarSign, desc: 'Bases de cálculo' },
   { id: 'cartao_ponto', label: 'Cartão de Ponto', icon: Clock, desc: 'Jornada mensal' },
+  { id: 'ajuste_sentenca', label: 'Ajustes Sentença', icon: Scale, desc: 'Motor de ajuste de jornada' },
   { id: 'verbas', label: 'Verbas', icon: FileText, desc: 'Parcelas do cálculo' },
   { id: 'fgts', label: 'FGTS', icon: Building2, desc: 'Depósitos e multa' },
   { id: 'cs', label: 'Contrib. Social', icon: Receipt, desc: 'Segurado e empregador' },
@@ -245,6 +247,7 @@ export default function PjeCalcPage() {
         case 'ferias': return renderFerias();
         case 'historico': return renderHistorico();
         case 'cartao_ponto': return <ModuloCartaoPontoDiario caseId={caseId!} dataAdmissao={formParams.data_admissao} dataDemissao={formParams.data_demissao} cargaHoraria={formParams.carga_horaria_padrao} />;
+        case 'ajuste_sentenca': return <ModuloAjusteSentenca caseId={caseId!} dataAdmissao={formParams.data_admissao} dataDemissao={formParams.data_demissao} cargaHoraria={formParams.carga_horaria_padrao} />;
         case 'verbas': return renderVerbas();
         case 'fgts': return <ModuloFGTS caseId={caseId!} />;
         case 'cs': return <ModuloCS caseId={caseId!} />;
