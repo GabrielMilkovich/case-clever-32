@@ -154,6 +154,8 @@ export function ModuloResumo({ caseId }: Props) {
       }
       const historicos: PjeHistoricoSalarial[] = (histRes.data || []).map((h: any) => ({
         ...h,
+        periodo_inicio: h.periodo_inicio || params.data_inicial || params.data_admissao,
+        periodo_fim: h.periodo_fim || params.data_final || params.data_demissao,
         ocorrencias: histOcorrencias
           .filter((o: any) => o.historico_id === h.id)
           .map((o: any) => ({ id: o.id, historico_id: o.historico_id, competencia: o.competencia, valor: Number(o.valor), tipo: o.tipo || 'calculado' })),
