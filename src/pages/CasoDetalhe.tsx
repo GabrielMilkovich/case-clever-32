@@ -179,8 +179,8 @@ export default function CasoDetalhe() {
   const { data: pjecalcLiquidacao } = useQuery({
     queryKey: ["pjecalc_liquidacao", id],
     queryFn: async () => {
-      const { data } = await supabase.from("pjecalc_liquidacao_resultado" as any).select("total_bruto, created_at").eq("case_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle();
-      return data as any;
+      const { default: svc } = await import("@/lib/pjecalc/service");
+      return svc.getResultado(id!);
     },
   });
 
@@ -265,7 +265,7 @@ export default function CasoDetalhe() {
   const snapshotsCount = snapshotsData.length;
   // Use most recent total from either calc_snapshots or pjecalc_liquidacao_resultado
   const snapshotTotal = snapshotsData[0]?.total_bruto ?? null;
-  const pjecalcTotal = (pjecalcLiquidacao as any)?.total_bruto ?? null;
+  const pjecalcTotal = pjecalcLiquidacao?.total_bruto ?? null;
   const latestTotal = pjecalcTotal ?? snapshotTotal;
 
   // Progress calculation
