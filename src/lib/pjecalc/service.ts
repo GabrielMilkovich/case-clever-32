@@ -396,10 +396,12 @@ export async function upsertCustasConfig(payload: PjecalcCustasConfigInsert): Pr
 }
 
 export async function getMultasConfig(caseId: string): Promise<PjecalcMultasConfigRow | null> {
-  const { data, error } = await fromView('pjecalc_multas_config')
-    .select('*').eq('case_id', caseId).maybeSingle();
-  if (error) throw error;
-  return data as PjecalcMultasConfigRow | null;
+  try {
+    const { data, error } = await fromView('pjecalc_multas_config')
+      .select('*').eq('case_id', caseId).maybeSingle();
+    if (error) { console.warn('getMultasConfig:', error.message); return null; }
+    return data as PjecalcMultasConfigRow | null;
+  } catch { return null; }
 }
 
 export async function upsertMultasConfig(caseId: string, payload: Record<string, unknown>): Promise<void> {
@@ -600,9 +602,11 @@ export async function insertCsOcorrenciasBatch(rows: Record<string, unknown>[]):
 // =====================================================
 
 export async function getFgtsSaldosSaques(caseId: string): Promise<Record<string, unknown>[]> {
-  const { data, error } = await fromView('pjecalc_fgts_saldos_saques').select('*').eq('case_id', caseId).order('data');
-  if (error) throw error;
-  return (data || []) as Record<string, unknown>[];
+  try {
+    const { data, error } = await fromView('pjecalc_fgts_saldos_saques').select('*').eq('case_id', caseId).order('data');
+    if (error) { console.warn('getFgtsSaldosSaques:', error.message); return []; }
+    return (data || []) as Record<string, unknown>[];
+  } catch { return []; }
 }
 
 export async function insertFgtsSaldoSaque(payload: Record<string, unknown>): Promise<void> {
@@ -754,13 +758,15 @@ export interface PjecalcObservacaoRow {
 }
 
 export async function getObservacoes(caseId: string, modulo: string): Promise<PjecalcObservacaoRow[]> {
-  const { data, error } = await fromView('pjecalc_observacoes')
-    .select('*')
-    .eq('case_id', caseId)
-    .eq('modulo', modulo)
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return (data || []) as PjecalcObservacaoRow[];
+  try {
+    const { data, error } = await fromView('pjecalc_observacoes')
+      .select('*')
+      .eq('case_id', caseId)
+      .eq('modulo', modulo)
+      .order('created_at', { ascending: false });
+    if (error) { console.warn('getObservacoes:', error.message); return []; }
+    return (data || []) as PjecalcObservacaoRow[];
+  } catch { return []; }
 }
 
 export async function insertObservacao(payload: { case_id: string; modulo: string; tipo: string; texto: string; created_by?: string }): Promise<void> {
@@ -822,21 +828,27 @@ export async function getIndicesCorrecao(): Promise<Record<string, unknown>[]> {
 }
 
 export async function getInssFaixas(): Promise<Record<string, unknown>[]> {
-  const { data, error } = await fromView('pjecalc_inss_faixas').select('*').order('competencia_inicio,faixa');
-  if (error) throw error;
-  return (data || []) as Record<string, unknown>[];
+  try {
+    const { data, error } = await fromView('pjecalc_inss_faixas').select('*').order('competencia_inicio,faixa');
+    if (error) { console.warn('getInssFaixas:', error.message); return []; }
+    return (data || []) as Record<string, unknown>[];
+  } catch { return []; }
 }
 
 export async function getIrFaixas(): Promise<Record<string, unknown>[]> {
-  const { data, error } = await fromView('pjecalc_ir_faixas').select('*').order('competencia_inicio,faixa');
-  if (error) throw error;
-  return (data || []) as Record<string, unknown>[];
+  try {
+    const { data, error } = await fromView('pjecalc_ir_faixas').select('*').order('competencia_inicio,faixa');
+    if (error) { console.warn('getIrFaixas:', error.message); return []; }
+    return (data || []) as Record<string, unknown>[];
+  } catch { return []; }
 }
 
 export async function getFeriados(): Promise<Record<string, unknown>[]> {
-  const { data, error } = await fromView('pjecalc_feriados').select('*');
-  if (error) throw error;
-  return (data || []) as Record<string, unknown>[];
+  try {
+    const { data, error } = await fromView('pjecalc_feriados').select('*');
+    if (error) { console.warn('getFeriados:', error.message); return []; }
+    return (data || []) as Record<string, unknown>[];
+  } catch { return []; }
 }
 
 // =====================================================
