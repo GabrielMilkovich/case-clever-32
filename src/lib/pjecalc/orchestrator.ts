@@ -152,41 +152,87 @@ function toEngineHistoricos(
 }
 
 function toEngineVerbas(verbas: PjecalcVerbaRow[]): PjeVerba[] {
-  return verbas.map(v => ({
-    id: v.id,
-    nome: v.nome,
-    tipo: (v.tipo === 'reflexa' ? 'reflexa' : 'principal') as 'principal' | 'reflexa',
-    valor: (v.valor as 'calculado' | 'informado') || 'calculado',
-    caracteristica: (v.caracteristica as 'comum' | '13_salario' | 'aviso_previo' | 'ferias') || 'comum',
-    ocorrencia_pagamento: (v.ocorrencia_pagamento as 'mensal' | 'dezembro' | 'periodo_aquisitivo' | 'desligamento') || 'mensal',
-    compor_principal: true,
-    zerar_valor_negativo: false,
-    dobrar_valor_devido: false,
-    periodo_inicio: v.periodo_inicio || '',
-    periodo_fim: v.periodo_fim || '',
-    base_calculo: {
-      historicos: v.hist_salarial_nome ? [v.hist_salarial_nome] : [],
-      verbas: [],
-      tabelas: [],
-      proporcionalizar: false,
-      integralizar: false,
-    },
-    tipo_divisor: 'informado' as const,
-    divisor_informado: v.divisor_informado || 1,
-    multiplicador: v.multiplicador || 1,
-    tipo_quantidade: 'informada' as const,
-    quantidade_informada: 1,
-    quantidade_proporcionalizar: false,
-    exclusoes: { faltas_justificadas: false, faltas_nao_justificadas: false, ferias_gozadas: false },
-    valor_informado_devido: v.valor_informado_devido ?? undefined,
-    valor_informado_pago: v.valor_informado_pago ?? undefined,
-    incidencias: { fgts: true, irpf: true, contribuicao_social: true, previdencia_privada: false, pensao_alimenticia: false },
-    juros_ajuizamento: 'ocorrencias_vencidas' as const,
-    verba_principal_id: v.verba_principal_id ?? undefined,
-    gerar_verba_reflexa: 'diferenca' as const,
-    gerar_verba_principal: 'diferenca' as const,
-    ordem: v.ordem || 0,
-  }));
+  return verbas.map(v => {
+    // Parse base_calculo from DB view (contains historicos IDs and verba_principal_id)
+    let bcHistoricos: string[] = [];
+    let bcVerbas: string[] = [];
+    let bcTabelas: string[] = [];
+    let bcProporcionalizar = false;
+    let bcIntegralizar = false;
+
+    if (v.base_calculo && typeof v.base_calculo === 'object') {
+      const bc = v.base_calculo as Record<string, unknown>;
+      if (Array.isArray(bc.historicos)) bcHistoricos = bc.historicos.map(String);
+      if (Array.isArray(bc.verbas)) bcVerbas = bc.verbas.map(String);
+      if (Array.isArray(bc.tabelas)) bcTabelas = bc.tabelas.map(String);
+      if (bc.proporcionalizar) bcProporcionalizar = true;
+      if (bc.integralizar) bcIntegralizar = true;
+    }
+
+    // Fallback: if no historicos from base_calculo, try hist_salarial_nome
+    if (bcHistoricos.length === 0 && v.hist_salarial_nome) {
+      bcHistoricos = [v.hist_salarial_nome];
+    }
+
+    // Map characteristic to lowercase engine format
+    const caracteristicaMap: Record<string, string> = {
+      'COMUM': 'comum', '13_SALARIO': '13_salario', 'AVISO_PREVIO': 'aviso_previo', 'FERIAS': 'ferias',
+    };
+    const rawCaract = (v.caracteristica || 'COMUM').toUpperCase();
+    const caracteristica = (caracteristicaMap[rawCaract] || rawCaract.toLowerCase()) as PjeVerba['caracteristica'];
+
+    // Map ocorrencia_pagamento to lowercase
+    const ocorrenciaMap: Record<string, string> = {
+      'MENSAL': 'mensal', 'DEZEMBRO': 'dezembro', 'PERIODO_AQUISITIVO': 'periodo_aquisitivo', 'DESLIGAMENTO': 'desligamento',
+    };
+    const rawOcorr = (v.ocorrencia_pagamento || 'MENSAL').toUpperCase();
+    const ocorrenciaPagamento = (ocorrenciaMap[rawOcorr] || rawOcorr.toLowerCase()) as PjeVerba['ocorrencia_pagamento'];
+
+    // Use actual incidencias from DB columns instead of hardcoding
+    const incidencias = {
+      fgts: v.incide_fgts !== false,
+      irpf: v.incide_ir !== false,
+      contribuicao_social: v.incide_inss !== false,
+      previdencia_privada: false,
+      pensao_alimenticia: false,
+    };
+
+    return {
+      id: v.id,
+      nome: v.nome,
+      tipo: (v.tipo === 'reflexa' ? 'reflexa' : 'principal') as 'principal' | 'reflexa',
+      valor: (v.valor as 'calculado' | 'informado') || 'calculado',
+      caracteristica,
+      ocorrencia_pagamento: ocorrenciaPagamento,
+      compor_principal: true,
+      zerar_valor_negativo: false,
+      dobrar_valor_devido: false,
+      periodo_inicio: v.periodo_inicio || '',
+      periodo_fim: v.periodo_fim || '',
+      base_calculo: {
+        historicos: bcHistoricos,
+        verbas: bcVerbas,
+        tabelas: bcTabelas,
+        proporcionalizar: bcProporcionalizar,
+        integralizar: bcIntegralizar,
+      },
+      tipo_divisor: 'informado' as const,
+      divisor_informado: v.divisor_informado || 1,
+      multiplicador: v.multiplicador || 1,
+      tipo_quantidade: caracteristica === '13_salario' || caracteristica === 'ferias' ? 'avos' as const : 'informada' as const,
+      quantidade_informada: 1,
+      quantidade_proporcionalizar: false,
+      exclusoes: { faltas_justificadas: false, faltas_nao_justificadas: false, ferias_gozadas: false },
+      valor_informado_devido: v.valor_informado_devido ?? undefined,
+      valor_informado_pago: v.valor_informado_pago ?? undefined,
+      incidencias,
+      juros_ajuizamento: 'ocorrencias_vencidas' as const,
+      verba_principal_id: v.verba_principal_id ?? undefined,
+      gerar_verba_reflexa: 'diferenca' as const,
+      gerar_verba_principal: 'diferenca' as const,
+      ordem: v.ordem || 0,
+    };
+  });
 }
 
 function toEngineCartaoPonto(cp: PjecalcCartaoPontoRow[]): PjeCartaoPonto[] {
