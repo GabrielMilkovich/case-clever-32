@@ -266,9 +266,9 @@ export default function PjeCalcPage() {
         case 'resumo': return <ModuloResumo caseId={caseId!} />;
         case 'tabelas_regionais': return <ModuloTabelasRegionais caseId={caseId!} estado={formParams.estado} municipio={formParams.municipio} />;
         // Phase 4 modules
-        case 'memoria': return resultado?.resultado ? <MemoriaCalculoExpandida resultado={resultado.resultado} /> : <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Execute a liquidação primeiro.</CardContent></Card>;
+        case 'memoria': return resultado?.resultado ? <MemoriaCalculoExpandida resultado={resultado.resultado as any} /> : <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Execute a liquidação primeiro.</CardContent></Card>;
         case 'comparacao': return <ComparacaoCenarios caseId={caseId!} />;
-        case 'revisao': return <PainelRevisao caseId={caseId!} validacao={null} resultado={resultado?.resultado || null} modulosStatus={completude} />;
+        case 'revisao': return <PainelRevisao caseId={caseId!} validacao={null} resultado={(resultado?.resultado || null) as any} modulosStatus={completude} />;
         case 'rastreabilidade': return renderRastreabilidade();
         case 'auditoria': return <AuditLog caseId={caseId!} />;
         case 'dashboard': return <DashboardProdutividade />;
