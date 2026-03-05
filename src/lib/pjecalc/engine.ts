@@ -1705,7 +1705,7 @@ export class PjeCalcEngine {
         breakpoints.add(compDateFgts);
         breakpoints.add(this.correcaoConfig.data_liquidacao);
         for (const ci of this.correcaoConfig.combinacoes_indice) {
-          if (ci.de && ci.de > compDate && ci.de <= this.correcaoConfig.data_liquidacao) breakpoints.add(ci.de);
+          if (ci.de && ci.de > compDateFgts && ci.de <= this.correcaoConfig.data_liquidacao) breakpoints.add(ci.de);
         }
         const datas = Array.from(breakpoints).sort();
         let fatorTotal = new Decimal(1);
