@@ -4650,6 +4650,10 @@ export type Database = {
           quantidade_valor: number | null
           tipo_variacao: string | null
           updated_at: string | null
+          valor: string
+          valor_informado_devido: number | null
+          valor_informado_pago: number | null
+          verba_principal_id: string | null
         }
         Insert: {
           ativa?: boolean | null
@@ -4684,6 +4688,10 @@ export type Database = {
           quantidade_valor?: number | null
           tipo_variacao?: string | null
           updated_at?: string | null
+          valor?: string
+          valor_informado_devido?: number | null
+          valor_informado_pago?: number | null
+          verba_principal_id?: string | null
         }
         Update: {
           ativa?: boolean | null
@@ -4718,6 +4726,10 @@ export type Database = {
           quantidade_valor?: number | null
           tipo_variacao?: string | null
           updated_at?: string | null
+          valor?: string
+          valor_informado_devido?: number | null
+          valor_informado_pago?: number | null
+          verba_principal_id?: string | null
         }
         Relationships: [
           {
@@ -4788,6 +4800,20 @@ export type Database = {
             columns: ["calculo_id"]
             isOneToOne: false
             referencedRelation: "pjecalc_parametros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_verba_base_verba_principal_id_fkey"
+            columns: ["verba_principal_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_verba_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_verba_base_verba_principal_id_fkey"
+            columns: ["verba_principal_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_verbas"
             referencedColumns: ["id"]
           },
         ]
@@ -6807,6 +6833,7 @@ export type Database = {
           codigo: string | null
           created_at: string | null
           divisor_informado: number | null
+          hist_salarial_nome: string | null
           id: string | null
           incide_fgts: boolean | null
           incide_inss: boolean | null
@@ -6821,6 +6848,9 @@ export type Database = {
           periodo_inicio: string | null
           tipo: string | null
           updated_at: string | null
+          valor: string | null
+          valor_informado_devido: number | null
+          valor_informado_pago: number | null
           verba_principal_id: string | null
         }
         Relationships: [
@@ -6906,6 +6936,20 @@ export type Database = {
             columns: ["calculo_id"]
             isOneToOne: false
             referencedRelation: "pjecalc_parametros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_verba_base_verba_principal_id_fkey"
+            columns: ["verba_principal_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_verba_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pjecalc_verba_base_verba_principal_id_fkey"
+            columns: ["verba_principal_id"]
+            isOneToOne: false
+            referencedRelation: "pjecalc_verbas"
             referencedColumns: ["id"]
           },
         ]
