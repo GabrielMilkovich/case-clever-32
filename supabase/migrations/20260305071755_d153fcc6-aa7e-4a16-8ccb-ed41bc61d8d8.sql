@@ -1,0 +1,1 @@
+UPDATE documents SET status = 'uploaded', processing_started_at = NULL, error_message = NULL WHERE case_id = 'f78752c0-ff29-47f0-9012-4ae14d69acd6' AND status = 'extracting';
