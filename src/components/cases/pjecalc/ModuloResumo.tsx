@@ -144,6 +144,14 @@ export function ModuloResumo({ caseId }: Props) {
         params.data_citacao = dadosProcesso.data_citacao;
       }
 
+      // Calcular ultima_remuneracao a partir dos historicos se não informada
+      if (!params.ultima_remuneracao && histRes.data?.length) {
+        const somaHistoricos = (histRes.data as any[]).reduce((sum: number, h: any) => {
+          return sum + (Number(h.valor_informado) || 0);
+        }, 0);
+        if (somaHistoricos > 0) params.ultima_remuneracao = somaHistoricos;
+      }
+
       // Load historico ocorrencias per historico
       const histIds = (histRes.data || []).map((h: any) => h.id);
       let histOcorrencias: any[] = [];
