@@ -249,7 +249,41 @@ function toEngineIrConfig(cfg: PjecalcIrConfigRow | null): PjeIRConfig {
   };
 }
 
-function toEngineCorrecaoConfig(cfg: PjecalcCorrecaoConfigRow | null): PjeCorrecaoConfig {
+function toEngineCorrecaoConfig(
+  cfg: PjecalcCorrecaoConfigRow | null,
+  atualizacaoConfig: svc.PjecalcAtualizacaoConfigRow[] = [],
+): PjeCorrecaoConfig {
+  // Parse combination-by-date from pjecalc_atualizacao_config
+  let combinacoes_indice: PjeCorrecaoConfig['combinacoes_indice'];
+  let combinacoes_juros: PjeCorrecaoConfig['combinacoes_juros'];
+
+  const correcaoRow = atualizacaoConfig.find(a => a.tipo === 'correcao');
+  if (correcaoRow?.combinacoes_indice) {
+    try {
+      const parsed = typeof correcaoRow.combinacoes_indice === 'string'
+        ? JSON.parse(correcaoRow.combinacoes_indice)
+        : correcaoRow.combinacoes_indice;
+      combinacoes_indice = parsed;
+    } catch { /* ignore */ }
+  }
+  if (correcaoRow?.combinacoes_juros) {
+    try {
+      const parsed = typeof correcaoRow.combinacoes_juros === 'string'
+        ? JSON.parse(correcaoRow.combinacoes_juros)
+        : correcaoRow.combinacoes_juros;
+      combinacoes_juros = parsed;
+    } catch { /* ignore */ }
+  }
+
+  // Also check juros row for additional combination data
+  const jurosRow = atualizacaoConfig.find(a => a.tipo === 'juros');
+  if (!combinacoes_juros && jurosRow?.regimes) {
+    const regimes = jurosRow.regimes as Record<string, unknown>;
+    if (Array.isArray(regimes.combinacoes)) {
+      combinacoes_juros = regimes.combinacoes;
+    }
+  }
+
   return {
     indice: cfg?.indice || 'IPCA-E',
     epoca: (cfg?.epoca as 'mensal' | 'fixo') || 'mensal',
@@ -259,6 +293,9 @@ function toEngineCorrecaoConfig(cfg: PjecalcCorrecaoConfigRow | null): PjeCorrec
     multa_523: cfg?.multa_523 ?? false,
     multa_523_percentual: cfg?.multa_523_percentual ?? 10,
     data_liquidacao: cfg?.data_liquidacao || new Date().toISOString().slice(0, 10),
+    combinacoes_indice,
+    combinacoes_juros,
+    juros_apos_deducao_cs: true, // PJe-Calc standard: interest after CS deduction
   };
 }
 
@@ -344,7 +381,7 @@ export async function executarLiquidacao(
   const engineFgts = toEngineFgtsConfig(caseData.fgtsConfig);
   const engineCs = toEngineCsConfig(caseData.csConfig);
   const engineIr = toEngineIrConfig(caseData.irConfig);
-  const engineCorrecao = toEngineCorrecaoConfig(caseData.correcaoConfig);
+  const engineCorrecao = toEngineCorrecaoConfig(caseData.correcaoConfig, caseData.atualizacaoConfig);
   const engineHonorarios = toEngineHonorariosConfig(caseData.honorarios);
   const engineCustas = toEngineCustasConfig(caseData.custasConfig);
 
