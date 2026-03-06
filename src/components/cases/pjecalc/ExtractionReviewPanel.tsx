@@ -171,6 +171,23 @@ export function ExtractionReviewPanel({ caseId, pipelineId, onConfirmAll }: Prop
 
   const fmtConf = (c: number | null) => c ? `${Math.round(c * 100)}%` : "—";
 
+  const getConfidenceIcon = (confidence: number | null) => {
+    if (confidence === null || confidence === undefined) return { icon: AlertTriangle, color: 'text-muted-foreground', label: 'Sem dados' };
+    if (confidence >= 0.85) return { icon: CheckCircle2, color: 'text-emerald-500', label: 'Alta' };
+    if (confidence >= 0.6) return { icon: AlertTriangle, color: 'text-yellow-500', label: 'Média' };
+    return { icon: X, color: 'text-destructive', label: 'Requer Revisão' };
+  };
+
+  const handleGoToSource = (item: ExtractionItem) => {
+    if (!item.page) {
+      toast.info("Página de origem não disponível para este item.");
+      return;
+    }
+    // Open the source document with page reference
+    const docWindow = window.open(`#extraction-source-page=${item.page}&field=${item.field_key}`, '_blank');
+    toast.success(`Navegando para página ${item.page} — campo "${item.field_key}"`);
+  };
+
   if (isLoading) {
     return (
       <div className="p-8 text-center">
