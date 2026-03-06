@@ -1,0 +1,1 @@
+ALTER TABLE public.facts ADD CONSTRAINT facts_case_id_chave_unique UNIQUE (case_id, chave);
