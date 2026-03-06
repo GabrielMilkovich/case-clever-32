@@ -906,7 +906,7 @@ async function autoFill(supabase: any, caseId: string, extracted: any) {
             chave: `fgts_deposito_${dep.competencia}`,
             valor: String(dep.valor_deposito),
             tipo: "monetario",
-            origem: "extracao",
+            origem: "ia_extracao",
             confianca: extracted.confianca_geral || 0.9,
           }, { onConflict: 'case_id,chave' });
         }
@@ -918,7 +918,7 @@ async function autoFill(supabase: any, caseId: string, extracted: any) {
           chave: "fgts_saldo_total",
           valor: String(extracted.fgts.saldo_total),
           tipo: "monetario",
-          origem: "extracao",
+          origem: "ia_extracao",
         }, { onConflict: 'case_id,chave' });
       }
     }
