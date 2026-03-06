@@ -2743,44 +2743,38 @@ export class PjeCalcEngine {
 
   private aplicarAbatimentoGlobalOJ415(verbaResults: PjeVerbaResult[]): void {
     for (const vr of verbaResults) {
-      let totalDevido = 0;
-      let totalPago = 0;
-      for (const oc of vr.ocorrencias) {
-        totalDevido += oc.devido;
-        totalPago += oc.pago;
-      }
-
-      if (totalPago >= totalDevido) {
-        for (const oc of vr.ocorrencias) {
-          oc.diferenca = 0;
-        }
-        vr.total_diferenca = 0;
-        continue;
-      }
-
-      const diferencaGlobal = Number(new Decimal(totalDevido).minus(totalPago).toDP(2));
-      const somaDiferencasMensais = Number(
-        vr.ocorrencias.reduce((s, oc) => s.plus(oc.diferenca), new Decimal(0)).toDP(2)
+      // Sort occurrences chronologically for sequential credit accumulation
+      const ocsSorted = [...vr.ocorrencias].sort((a, b) =>
+        a.competencia.localeCompare(b.competencia)
       );
 
-      if (Math.abs(diferencaGlobal - somaDiferencasMensais) < 0.01) continue;
+      let creditoAcumulado = new Decimal(0);
 
-      const mesesPositivos = vr.ocorrencias.filter(oc => oc.diferenca > 0);
-      if (mesesPositivos.length === 0) continue;
+      for (const oc of ocsSorted) {
+        const saldoMes = new Decimal(oc.devido).minus(oc.pago);
 
-      const somaPositivos = mesesPositivos.reduce((s, oc) => s + oc.diferenca, 0);
-
-      for (const oc of vr.ocorrencias) {
-        if (oc.diferenca < 0) oc.diferenca = 0;
-      }
-
-      const fatorAjuste = diferencaGlobal / somaPositivos;
-      if (fatorAjuste < 1) {
-        for (const oc of mesesPositivos) {
-          oc.diferenca = Number(new Decimal(oc.diferenca).times(fatorAjuste).toDP(2));
+        if (saldoMes.isNegative()) {
+          // Empresa pagou a mais neste mês: acumula crédito para meses seguintes
+          creditoAcumulado = creditoAcumulado.plus(saldoMes.abs());
+          oc.diferenca = 0;
+        } else if (saldoMes.isZero()) {
+          oc.diferenca = 0;
+        } else {
+          // Empresa deve neste mês: tenta abater do crédito acumulado primeiro
+          if (creditoAcumulado.greaterThanOrEqualTo(saldoMes)) {
+            creditoAcumulado = creditoAcumulado.minus(saldoMes);
+            oc.diferenca = 0;
+          } else if (creditoAcumulado.greaterThan(0)) {
+            const restante = saldoMes.minus(creditoAcumulado);
+            creditoAcumulado = new Decimal(0);
+            oc.diferenca = Number(restante.toDP(2));
+          } else {
+            oc.diferenca = Number(saldoMes.toDP(2));
+          }
         }
       }
 
+      // Recalculate total difference
       vr.total_diferenca = Number(
         vr.ocorrencias.reduce((s, oc) => s.plus(oc.diferenca), new Decimal(0)).toDP(2)
       );
