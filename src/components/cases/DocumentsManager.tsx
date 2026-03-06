@@ -373,13 +373,14 @@ export function DocumentsManager({
     let successCount = 0;
     let errorCount = 0;
 
-    // Fire all extractions (they return immediately, process in background)
+    // Process documents ONE AT A TIME to avoid memory exhaustion on Edge Functions
     for (let i = 0; i < docIds.length; i++) {
       if (batchAbortRef.current) break;
 
       const docId = docIds[i];
       setBatchCurrentIndex(i);
       setBatchResults(prev => ({ ...prev, [docId]: "processing" }));
+      setProcessingDocId(docId);
 
       try {
         const { data, error } = await supabase.functions.invoke("extract-and-fill", {
@@ -390,47 +391,44 @@ export function DocumentsManager({
         console.error(`Trigger error for ${docId}:`, err);
         setBatchResults(prev => ({ ...prev, [docId]: "error" }));
         errorCount++;
+        continue; // Skip to next document
       }
-    }
 
-    // Poll for completion of all documents
-    const pollInterval = 5000; // 5 seconds
-    const maxPolls = 120; // 10 minutes max
-    let polls = 0;
-    const processingIds = docIds.filter(id => !batchAbortRef.current);
+      // Wait for THIS document to finish before starting the next one
+      const pollInterval = 3000;
+      const maxPolls = 80; // ~4 minutes max per document
+      let finished = false;
 
-    while (polls < maxPolls && processingIds.length > 0) {
-      await new Promise(r => setTimeout(r, pollInterval));
-      polls++;
+      for (let poll = 0; poll < maxPolls && !finished; poll++) {
+        await new Promise(r => setTimeout(r, pollInterval));
 
-      const { data: docs } = await supabase
-        .from("documents")
-        .select("id, status")
-        .in("id", processingIds);
+        const { data: docStatus } = await supabase
+          .from("documents")
+          .select("id, status")
+          .eq("id", docId)
+          .maybeSingle();
 
-      if (!docs) continue;
+        if (!docStatus) continue;
 
-      for (const d of docs) {
-        if (d.status === "extracted") {
-          setBatchResults(prev => ({ ...prev, [d.id]: "done" }));
+        if (docStatus.status === "extracted") {
+          setBatchResults(prev => ({ ...prev, [docId]: "done" }));
           successCount++;
-          processingIds.splice(processingIds.indexOf(d.id), 1);
-        } else if (d.status === "failed") {
-          setBatchResults(prev => ({ ...prev, [d.id]: "error" }));
+          finished = true;
+        } else if (docStatus.status === "failed") {
+          setBatchResults(prev => ({ ...prev, [docId]: "error" }));
           errorCount++;
-          processingIds.splice(processingIds.indexOf(d.id), 1);
+          finished = true;
         }
+        // Still extracting — continue polling
+      }
+
+      if (!finished) {
+        // Timeout — mark as error and continue to next
+        setBatchResults(prev => ({ ...prev, [docId]: "error" }));
+        errorCount++;
       }
 
       onDocumentsChange();
-
-      if (processingIds.length === 0) break;
-    }
-
-    // Mark remaining as error (timeout)
-    for (const id of processingIds) {
-      setBatchResults(prev => ({ ...prev, [id]: "error" }));
-      errorCount++;
     }
 
     setProcessingDocId(null);
