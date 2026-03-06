@@ -2591,6 +2591,12 @@ export class PjeCalcEngine {
       processVerba(verba);
     }
 
+    // ── 3b. Abatimento Global (OJ 415 SDI-1 TST) ──
+    // Permite deduzir valores pagos sob o mesmo título globalmente,
+    // mesmo que o pagamento tenha ocorrido em competência diferente.
+    // O excedente pago em uma competência abate o devido em outra.
+    this.aplicarAbatimentoGlobalOJ415(verbaResults);
+
     // ── 4. Correção Monetária + Juros ──
     // PJe-Calc Criterion 8: "Juros de mora sobre verbas apurados após a dedução 
     // da contribuição social devida pelo reclamante"
