@@ -206,6 +206,10 @@ export function DocumentsManager({
     if (name.includes("holerite") || name.includes("contracheque") || name.includes("recibo_pagamento") || name.includes("folha_pagamento") || name.includes("demonstrativo")) {
       return "holerite";
     }
+    // CTPS
+    if (name.includes("ctps") || name.includes("carteira de trabalho")) {
+      return "ctps";
+    }
     // Cartão de ponto
     if (name.includes("ponto") || name.includes("cartao_ponto") || name.includes("registro_ponto") || name.includes("jornada") || name.includes("frequencia")) {
       return "cartao_ponto";
