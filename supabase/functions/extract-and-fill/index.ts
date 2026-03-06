@@ -876,7 +876,7 @@ async function autoFill(supabase: any, caseId: string, extracted: any) {
           case_id: caseId,
           chave: fact.chave,
           valor: fact.valor,
-          tipo: "monetario",
+          tipo: "moeda",
           origem: "ia_extracao",
           confianca: extracted.confianca_geral || 0.9,
         }, { onConflict: 'case_id,chave' }).then(({ error }: any) => {
@@ -905,7 +905,7 @@ async function autoFill(supabase: any, caseId: string, extracted: any) {
             case_id: caseId,
             chave: `fgts_deposito_${dep.competencia}`,
             valor: String(dep.valor_deposito),
-            tipo: "monetario",
+            tipo: "moeda",
             origem: "ia_extracao",
             confianca: extracted.confianca_geral || 0.9,
           }, { onConflict: 'case_id,chave' });
@@ -917,7 +917,7 @@ async function autoFill(supabase: any, caseId: string, extracted: any) {
           case_id: caseId,
           chave: "fgts_saldo_total",
           valor: String(extracted.fgts.saldo_total),
-          tipo: "monetario",
+          tipo: "moeda",
           origem: "ia_extracao",
         }, { onConflict: 'case_id,chave' });
       }
@@ -1046,9 +1046,9 @@ async function autoFill(supabase: any, caseId: string, extracted: any) {
     if (cont.data_admissao) allFacts.push({ chave: "data_admissao", valor: cont.data_admissao, tipo: "data" });
     if (cont.data_demissao) allFacts.push({ chave: "data_demissao", valor: cont.data_demissao, tipo: "data" });
     if (cont.cargo_funcao) allFacts.push({ chave: "cargo", valor: cont.cargo_funcao, tipo: "texto" });
-    if (cont.salario_base) allFacts.push({ chave: "salario_base", valor: String(cont.salario_base), tipo: "monetario" });
+    if (cont.salario_base) allFacts.push({ chave: "salario_base", valor: String(cont.salario_base), tipo: "moeda" });
     if (cont.jornada) allFacts.push({ chave: "jornada_contratual", valor: cont.jornada, tipo: "texto" });
-    if (cont.carga_horaria_mensal) allFacts.push({ chave: "carga_horaria", valor: String(cont.carga_horaria_mensal), tipo: "numerico" });
+    if (cont.carga_horaria_mensal) allFacts.push({ chave: "carga_horaria", valor: String(cont.carga_horaria_mensal), tipo: "numero" });
     if (cont.tipo_demissao) allFacts.push({ chave: "tipo_demissao", valor: cont.tipo_demissao, tipo: "texto" });
     if (dp.numero_processo) allFacts.push({ chave: "numero_processo", valor: dp.numero_processo, tipo: "texto" });
     if (dp.vara) allFacts.push({ chave: "vara", valor: dp.vara, tipo: "texto" });
