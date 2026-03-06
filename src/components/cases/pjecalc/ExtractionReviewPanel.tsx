@@ -171,6 +171,23 @@ export function ExtractionReviewPanel({ caseId, pipelineId, onConfirmAll }: Prop
 
   const fmtConf = (c: number | null) => c ? `${Math.round(c * 100)}%` : "—";
 
+  const getConfidenceIcon = (confidence: number | null) => {
+    if (confidence === null || confidence === undefined) return { icon: AlertTriangle, color: 'text-muted-foreground', label: 'Sem dados' };
+    if (confidence >= 0.85) return { icon: CheckCircle2, color: 'text-emerald-500', label: 'Alta' };
+    if (confidence >= 0.6) return { icon: AlertTriangle, color: 'text-yellow-500', label: 'Média' };
+    return { icon: X, color: 'text-destructive', label: 'Requer Revisão' };
+  };
+
+  const handleGoToSource = (item: ExtractionItem) => {
+    if (!item.page) {
+      toast.info("Página de origem não disponível para este item.");
+      return;
+    }
+    // Open the source document with page reference
+    const docWindow = window.open(`#extraction-source-page=${item.page}&field=${item.field_key}`, '_blank');
+    toast.success(`Navegando para página ${item.page} — campo "${item.field_key}"`);
+  };
+
   if (isLoading) {
     return (
       <div className="p-8 text-center">
@@ -275,9 +292,24 @@ export function ExtractionReviewPanel({ caseId, pipelineId, onConfirmAll }: Prop
                       </Badge>
                     )}
 
-                    <span className="text-[10px] text-muted-foreground">
-                      {fmtConf(item.confidence)}
-                    </span>
+                    {/* Confidence Icon */}
+                    {(() => {
+                      const conf = getConfidenceIcon(item.confidence);
+                      const ConfIcon = conf.icon;
+                      return (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className={`flex items-center gap-0.5 text-[10px] ${conf.color}`}>
+                                <ConfIcon className="h-3 w-3" />
+                                {fmtConf(item.confidence)}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent><p className="text-xs">Confiança: {conf.label} ({fmtConf(item.confidence)})</p></TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      );
+                    })()}
 
                     <div className="flex-1" />
 
@@ -340,9 +372,14 @@ export function ExtractionReviewPanel({ caseId, pipelineId, onConfirmAll }: Prop
                           {item.evidence_text}
                         </div>
                       )}
-                      {item.page && (
-                        <p className="text-[10px] text-muted-foreground">Página: {item.page}</p>
-                      )}
+                       {item.page && (
+                        <div className="flex items-center gap-2">
+                          <p className="text-[10px] text-muted-foreground">Página: {item.page}</p>
+                          <Button size="sm" variant="outline" className="h-5 text-[9px] px-1.5" onClick={() => handleGoToSource(item)}>
+                            <Eye className="h-2.5 w-2.5 mr-0.5" /> Ir para Fonte
+                          </Button>
+                        </div>
+                       )}
                       {item.review_note && (
                         <p className="text-[10px] text-muted-foreground italic">Nota: {item.review_note}</p>
                       )}

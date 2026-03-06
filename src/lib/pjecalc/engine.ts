@@ -441,6 +441,8 @@ export interface PjeOcorrenciaResult {
   base_integral?: number;
   quantidade_integral?: number;
   devido_integral?: number;
+  /** Rastreabilidade de arredondamento por etapa (Método PJe-Calc) */
+  arredondamento_trace?: { etapa: string; valor_cheio: string; valor_truncado: string }[];
 }
 
 export interface PjeFGTSResult {
@@ -996,12 +998,21 @@ export class PjeCalcEngine {
       }
     }
 
-    // Fórmula oficial PJe-Calc
+    // Fórmula oficial PJe-Calc (com truncamento por etapa — Método PJe-Calc)
+    // Cada operação intermediária é truncada a 2 casas antes da próxima.
+    // Isso garante paridade de centavos com o PJe-Calc oficial.
     let devido: Decimal;
     if (verba.valor === 'informado') {
       devido = new Decimal(verba.valor_informado_devido || 0);
     } else {
-      devido = base.times(mult).div(div).times(qtd).times(dobra);
+      // Etapa 1: valor_hora = Base / Divisor (truncado)
+      const valorHora = base.div(div).toDP(2);
+      // Etapa 2: valor_hora_com_mult = valor_hora × Multiplicador (truncado)
+      const valorHoraComMult = valorHora.times(mult).toDP(2);
+      // Etapa 3: subtotal = valor_hora_com_mult × Quantidade (truncado)
+      const subtotal = valorHoraComMult.times(qtd).toDP(2);
+      // Etapa 4: devido = subtotal × Dobra (truncado)
+      devido = subtotal.times(dobra).toDP(2);
     }
 
     // Proporcionalizar DEVIDO separadamente (Fase 6 - PJe-Calc)
@@ -1052,9 +1063,23 @@ export class PjeCalcEngine {
 
     const diferenca = devido.minus(pago);
 
-    const formula = verba.valor === 'calculado'
-      ? `(${base.toFixed(2)} × ${mult.toFixed(4)} / ${div.toFixed(2)}) × ${qtd.toFixed(4)} × ${dobra.toFixed(0)}`
-      : `Valor Informado: ${devido.toFixed(2)}`;
+    // Build formula string with rounding trace
+    let formula: string;
+    let arredondamento_trace: { etapa: string; valor_cheio: string; valor_truncado: string }[] | undefined;
+    if (verba.valor === 'calculado') {
+      const valorHoraTrace = base.div(div);
+      const valorHoraComMultTrace = base.div(div).toDP(2).times(mult);
+      const subtotalTrace = base.div(div).toDP(2).times(mult).toDP(2).times(qtd);
+      arredondamento_trace = [
+        { etapa: 'Base / Divisor', valor_cheio: valorHoraTrace.toFixed(6), valor_truncado: valorHoraTrace.toDP(2).toFixed(2) },
+        { etapa: '× Multiplicador', valor_cheio: valorHoraComMultTrace.toFixed(6), valor_truncado: valorHoraComMultTrace.toDP(2).toFixed(2) },
+        { etapa: '× Quantidade', valor_cheio: subtotalTrace.toFixed(6), valor_truncado: subtotalTrace.toDP(2).toFixed(2) },
+        { etapa: '× Dobra', valor_cheio: subtotalTrace.toDP(2).times(dobra).toFixed(6), valor_truncado: devido.toFixed(2) },
+      ];
+      formula = `(${base.toFixed(2)} ÷ ${div.toFixed(2)} = ${valorHoraTrace.toDP(2).toFixed(2)}) × ${mult.toFixed(4)} = ${valorHoraComMultTrace.toDP(2).toFixed(2)} × ${qtd.toFixed(4)} × ${dobra.toFixed(0)} = ${devido.toFixed(2)}`;
+    } else {
+      formula = `Valor Informado: ${devido.toFixed(2)}`;
+    }
 
     // Compute integral values (full-month) for integralization in reflexos
     let baseIntegral: number | undefined;
@@ -1095,6 +1120,7 @@ export class PjeCalcEngine {
       juros: 0,
       valor_final: diferenca.toDP(2).toNumber(),
       formula,
+      arredondamento_trace,
       base_integral: baseIntegral,
       quantidade_integral: qtdIntegral,
       devido_integral: devidoIntegral,
