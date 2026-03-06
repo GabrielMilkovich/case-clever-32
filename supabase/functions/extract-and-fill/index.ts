@@ -249,13 +249,9 @@ const EXTRACTION_TOOLS = [
             }
           },
           // TEXTO OCR COMPLETO (para referência e chunks)
-          texto_ocr_completo: {
-            type: "string",
-            description: "Texto completo extraído do documento preservando formatação"
-          },
           paginas_detectadas: { type: "number" },
         },
-        required: ["tipo_documento", "confianca_geral", "texto_ocr_completo"]
+        required: ["tipo_documento", "confianca_geral"]
       }
     }
   }
@@ -442,15 +438,13 @@ async function extractStructured(
   let lastError: Error | null = null;
   // Cascade: try Google Gemini first (cheaper/faster), then OpenAI as fallback
   const models = [
+    "google/gemini-3-flash-preview",
     "google/gemini-2.5-flash",
     "google/gemini-2.5-pro",
-    "google/gemini-3-flash-preview",
-    "openai/gpt-5-mini",
-    "openai/gpt-5",
   ];
 
-  // Truncate OCR text if too large (>200k chars) to avoid token limits
-  const maxChars = 200000;
+  // Truncate OCR text to avoid token limits and timeouts
+  const maxChars = 80000;
   const truncatedOcr = ocrText.length > maxChars
     ? ocrText.substring(0, maxChars) + "\n\n[... TEXTO TRUNCADO ...]"
     : ocrText;
@@ -471,12 +465,12 @@ async function extractStructured(
               { role: "system", content: SYSTEM_PROMPT },
               {
                 role: "user",
-                content: `Analise o texto abaixo extraído por OCR de um documento trabalhista e extraia ABSOLUTAMENTE TODOS os dados usando a função extrair_dados_documento. Não omita nenhuma informação.\n\n--- TEXTO DO DOCUMENTO ---\n${truncatedOcr}\n--- FIM DO TEXTO ---`
+              content: `Analise o texto abaixo extraído por OCR de um documento trabalhista e extraia os dados usando a função extrair_dados_documento. NÃO repita o texto OCR na resposta. Para cartão de ponto, extraia no máximo os 60 primeiros registros diários como amostra.\n\n--- TEXTO DO DOCUMENTO ---\n${truncatedOcr}\n--- FIM DO TEXTO ---`
               },
             ],
             tools: EXTRACTION_TOOLS,
             tool_choice: { type: "function", function: { name: "extrair_dados_documento" } },
-            max_tokens: 128000,
+            max_tokens: 32000,
             temperature: 0.05,
           }),
         });
@@ -502,7 +496,8 @@ async function extractStructured(
         if (toolCall?.function?.arguments) {
           try {
             const extracted = JSON.parse(toolCall.function.arguments);
-            if (!extracted.texto_ocr_completo) extracted.texto_ocr_completo = ocrText;
+            // Store OCR text separately — don't require model to return it
+            extracted.texto_ocr_completo = ocrText;
             console.log(`[EXTRACT] SUCCESS with ${model}: tipo=${extracted.tipo_documento}, rubricas=${extracted.rubricas?.length || 0}`);
             return extracted;
           } catch (parseErr) {
@@ -1202,16 +1197,15 @@ async function processDocumentInBackground(
     }
     console.log(`[EXTRACT] OCR complete: ${ocrText.length} chars`);
 
-    // Truncate very large OCR to avoid memory exhaustion during Gemini extraction
-    const MAX_OCR_CHARS = 120000;
-    if (ocrText.length > MAX_OCR_CHARS) {
-      console.log(`[EXTRACT] Truncating OCR from ${ocrText.length} to ${MAX_OCR_CHARS} chars`);
-      ocrText = ocrText.substring(0, MAX_OCR_CHARS);
-    }
+    // Keep full OCR for storage but extractStructured will truncate internally
+    const fullOcrText = ocrText;
+    console.log(`[EXTRACT] OCR total: ${ocrText.length} chars`);
 
     // Stage 2: Structured extraction from OCR text
     const extracted = await extractStructured(ocrText, LOVABLE_API_KEY);
-    // Release OCR text from memory immediately
+    // Ensure texto_ocr_completo has the full text for chunking
+    extracted.texto_ocr_completo = fullOcrText;
+    // Release OCR text from memory
     ocrText = "";
 
     // Pre-create pjecalc_calculos with user_id to avoid NULL user_id errors from view triggers
