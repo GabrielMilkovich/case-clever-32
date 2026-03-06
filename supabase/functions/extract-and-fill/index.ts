@@ -1063,7 +1063,7 @@ async function autoFill(supabase: any, caseId: string, extracted: any) {
           chave: fact.chave,
           valor: fact.valor,
           tipo: fact.tipo as any,
-          origem: "extracao",
+          origem: "ia_extracao",
           confianca: extracted.confianca_geral || 0.9,
           confirmado: true,
         }, { onConflict: 'case_id,chave' }).then(({ error }: any) => {
