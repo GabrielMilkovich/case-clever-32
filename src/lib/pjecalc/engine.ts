@@ -996,12 +996,21 @@ export class PjeCalcEngine {
       }
     }
 
-    // Fórmula oficial PJe-Calc
+    // Fórmula oficial PJe-Calc (com truncamento por etapa — Método PJe-Calc)
+    // Cada operação intermediária é truncada a 2 casas antes da próxima.
+    // Isso garante paridade de centavos com o PJe-Calc oficial.
     let devido: Decimal;
     if (verba.valor === 'informado') {
       devido = new Decimal(verba.valor_informado_devido || 0);
     } else {
-      devido = base.times(mult).div(div).times(qtd).times(dobra);
+      // Etapa 1: valor_hora = Base / Divisor (truncado)
+      const valorHora = base.div(div).toDP(2);
+      // Etapa 2: valor_hora_com_mult = valor_hora × Multiplicador (truncado)
+      const valorHoraComMult = valorHora.times(mult).toDP(2);
+      // Etapa 3: subtotal = valor_hora_com_mult × Quantidade (truncado)
+      const subtotal = valorHoraComMult.times(qtd).toDP(2);
+      // Etapa 4: devido = subtotal × Dobra (truncado)
+      devido = subtotal.times(dobra).toDP(2);
     }
 
     // Proporcionalizar DEVIDO separadamente (Fase 6 - PJe-Calc)
