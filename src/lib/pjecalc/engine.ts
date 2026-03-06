@@ -520,6 +520,17 @@ export interface PjeResumo {
   pensao_total: number;
   liquido_reclamante: number;
   total_reclamada: number;
+  /** Metadata for transparency */
+  meta?: {
+    /** Arredondamento: por competência (item a item) conforme metodologia judiciária */
+    arredondamento: string;
+    /** Tipo de mês utilizado: civil (dias reais) ou comercial (30 dias fixos, Art. 64 CLT) */
+    tipo_mes: string;
+    /** Último índice SELIC utilizado e sua data de referência */
+    selic_referencia?: { data: string; acumulado: number };
+    /** OJ 415 aplicada em alguma verba */
+    oj415_aplicada: boolean;
+  };
 }
 
 // =====================================================
