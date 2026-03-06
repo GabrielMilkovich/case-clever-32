@@ -110,9 +110,17 @@ function calcularFatorCorrecao(
     return Math.pow(1 + taxa, meses);
   }
 
+  // PJe-Calc rule: only use indices from CLOSED months (last complete month).
+  // The current month's index is not yet final, so we cap at the previous month.
+  const hoje = new Date();
+  const ultimoMesFechado = `${hoje.getFullYear()}-${String(hoje.getMonth()).padStart(2, '0')}`; // getMonth() is 0-indexed, so this gives previous month
+  const compDestinoEfetivo = compDestino.slice(0, 7) > ultimoMesFechado
+    ? ultimoMesFechado + '-01'
+    : compDestino;
+
   // Find accumulated values
   const origemArr = dados.filter(i => i.competencia.slice(0, 7) >= compOrigem.slice(0, 7));
-  const destArr = dados.filter(i => i.competencia.slice(0, 7) <= compDestino.slice(0, 7));
+  const destArr = dados.filter(i => i.competencia.slice(0, 7) <= compDestinoEfetivo.slice(0, 7));
   const idxOrigem = origemArr[0] || dados[0];
   const idxDest = destArr[destArr.length - 1] || dados[dados.length - 1];
 
