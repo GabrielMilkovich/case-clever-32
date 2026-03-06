@@ -282,7 +282,11 @@ export function GradeOcorrencias({ caseId, verbaId, verbaNome, periodoInicio, pe
                       <Checkbox checked={selectedRows.has(o.id)} onCheckedChange={() => toggleRow(o.id)} />
                     </td>
                     <td className="p-1 text-center">
-                      <Checkbox checked={o.ativa} onCheckedChange={v => updateCell(o.id, 'ativa', !!v)} />
+                      <Checkbox
+                        checked={o.ativa}
+                        onCheckedChange={v => updateCell(o.id, 'ativa', !!v)}
+                        title={o.ativa ? 'Ativa — incluída no cálculo' : 'Inativa — zerada no cálculo (mês preservado para IRRF RRA)'}
+                      />
                     </td>
                     <td className="p-2 font-mono font-medium">{o.competencia}</td>
                     <td className="p-1 text-center">
