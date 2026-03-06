@@ -8162,6 +8162,11 @@ export type Database = {
         | "cartao_ponto"
         | "sentenca"
         | "outro"
+        | "ctps"
+        | "contrato"
+        | "cct"
+        | "fgts"
+        | "ponto"
       extracao_status: "AUTO" | "REVISAR" | "CONFIRMADO" | "REJEITADO"
       fact_origem: "ia_extracao" | "usuario" | "documento"
       fact_type: "data" | "moeda" | "numero" | "texto" | "boolean"
@@ -8325,6 +8330,11 @@ export const Constants = {
         "cartao_ponto",
         "sentenca",
         "outro",
+        "ctps",
+        "contrato",
+        "cct",
+        "fgts",
+        "ponto",
       ],
       extracao_status: ["AUTO", "REVISAR", "CONFIRMADO", "REJEITADO"],
       fact_origem: ["ia_extracao", "usuario", "documento"],
