@@ -786,24 +786,33 @@ async function autoFill(supabase: any, caseId: string, extracted: any) {
     // =====================================================
     if (extracted.cartao_ponto?.registros?.length > 0) {
       const registros = extracted.cartao_ponto.registros;
+      // pjecalc_cartao_ponto is a VIEW without INSTEAD OF INSERT trigger.
+      // Insert directly into the real table: pjecalc_apuracao_diaria
       for (let i = 0; i < registros.length; i += 50) {
-        const batch = registros.slice(i, i + 50).map((r: any) => ({
-          case_id: caseId,
-          data: r.data,
-          entrada_1: r.entrada1 || null,
-          saida_1: r.saida1 || null,
-          entrada_2: r.entrada2 || null,
-          saida_2: r.saida2 || null,
-          entrada_3: r.entrada3 || null,
-          saida_3: r.saida3 || null,
-          horas_normais: r.horas_normais || null,
-          horas_extras: r.horas_extras || null,
-          horas_noturnas: r.horas_noturnas || null,
-          observacao: r.observacao || null,
-          origem: "OCR",
-        }));
+        const batch = registros.slice(i, i + 50).map((r: any) => {
+          // Parse hours to minutes for the real table schema
+          const horasNormais = parseFloat(r.horas_normais) || 0;
+          const horasExtras = parseFloat(r.horas_extras) || 0;
+          const horasNoturnas = parseFloat(r.horas_noturnas) || 0;
+          const isFalta = !r.entrada1 && /falta|ausencia|ausência/i.test(r.observacao || "");
+          return {
+            calculo_id: calculoId,
+            data: r.data,
+            frequencia_str: [r.entrada1, r.saida1, r.entrada2, r.saida2, r.entrada3, r.saida3].filter(Boolean).join(" | ") || null,
+            horas_trabalhadas: horasNormais,
+            horas_extras_diaria: horasExtras,
+            horas_noturnas: horasNoturnas,
+            minutos_trabalhados: Math.round(horasNormais * 60),
+            minutos_extra_diaria: Math.round(horasExtras * 60),
+            minutos_noturno: Math.round(horasNoturnas * 60),
+            is_falta: isFalta,
+            is_dsr: /dsr|domingo|repouso/i.test(r.observacao || ""),
+            is_feriado: /feriado/i.test(r.observacao || ""),
+            origem: "OCR",
+          };
+        });
 
-        await supabase.from("pjecalc_cartao_ponto").insert(batch).then(({ error }: any) => {
+        await supabase.from("pjecalc_apuracao_diaria").insert(batch).then(({ error }: any) => {
           if (error) console.error("[FILL] cartao_ponto batch:", error.message);
         });
       }
@@ -881,14 +890,12 @@ async function autoFill(supabase: any, caseId: string, extracted: any) {
     // 8. FGTS
     // =====================================================
     if (extracted.fgts) {
-      // Configure FGTS via the view (trigger handles upsert)
+      // pjecalc_fgts_config is a VIEW without INSTEAD OF INSERT trigger.
+      // FGTS config is derived from pjecalc_calculos, so just update that table.
       await safeOp("fgts_config", () =>
-        supabase.from("pjecalc_fgts_config").insert({
-          case_id: caseId,
-          apurar_fgts: true,
-          apurar_multa_40: true,
-          percentual_multa: 40,
-        })
+        supabase.from("pjecalc_calculos").update({
+          multa_477_habilitada: true,
+        }).eq("id", calculoId)
       );
 
       // Store FGTS deposits as facts
