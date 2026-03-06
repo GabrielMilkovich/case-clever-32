@@ -2735,8 +2735,57 @@ export class PjeCalcEngine {
   }
 
   // =====================================================
-  // CALCULAR VERBA REFLEXA
+  // ABATIMENTO GLOBAL - OJ 415 SDI-1 TST
+  // "A dedução das parcelas pagas deve ser realizada pelo
+  // valor total, e não mês a mês." Permite compensar
+  // excedentes pagos em uma competência com devidos em outra.
   // =====================================================
+
+  private aplicarAbatimentoGlobalOJ415(verbaResults: PjeVerbaResult[]): void {
+    for (const vr of verbaResults) {
+      let totalDevido = 0;
+      let totalPago = 0;
+      for (const oc of vr.ocorrencias) {
+        totalDevido += oc.devido;
+        totalPago += oc.pago;
+      }
+
+      if (totalPago >= totalDevido) {
+        for (const oc of vr.ocorrencias) {
+          oc.diferenca = 0;
+        }
+        vr.total_diferenca = 0;
+        continue;
+      }
+
+      const diferencaGlobal = Number(new Decimal(totalDevido).minus(totalPago).toDP(2));
+      const somaDiferencasMensais = Number(
+        vr.ocorrencias.reduce((s, oc) => s.plus(oc.diferenca), new Decimal(0)).toDP(2)
+      );
+
+      if (Math.abs(diferencaGlobal - somaDiferencasMensais) < 0.01) continue;
+
+      const mesesPositivos = vr.ocorrencias.filter(oc => oc.diferenca > 0);
+      if (mesesPositivos.length === 0) continue;
+
+      const somaPositivos = mesesPositivos.reduce((s, oc) => s + oc.diferenca, 0);
+
+      for (const oc of vr.ocorrencias) {
+        if (oc.diferenca < 0) oc.diferenca = 0;
+      }
+
+      const fatorAjuste = diferencaGlobal / somaPositivos;
+      if (fatorAjuste < 1) {
+        for (const oc of mesesPositivos) {
+          oc.diferenca = Number(new Decimal(oc.diferenca).times(fatorAjuste).toDP(2));
+        }
+      }
+
+      vr.total_diferenca = Number(
+        vr.ocorrencias.reduce((s, oc) => s.plus(oc.diferenca), new Decimal(0)).toDP(2)
+      );
+    }
+  }
 
   // =====================================================
   // SALÁRIO-FAMÍLIA (Art. 65, Lei 8.213/91)
