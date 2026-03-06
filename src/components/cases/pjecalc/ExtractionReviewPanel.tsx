@@ -292,9 +292,24 @@ export function ExtractionReviewPanel({ caseId, pipelineId, onConfirmAll }: Prop
                       </Badge>
                     )}
 
-                    <span className="text-[10px] text-muted-foreground">
-                      {fmtConf(item.confidence)}
-                    </span>
+                    {/* Confidence Icon */}
+                    {(() => {
+                      const conf = getConfidenceIcon(item.confidence);
+                      const ConfIcon = conf.icon;
+                      return (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className={`flex items-center gap-0.5 text-[10px] ${conf.color}`}>
+                                <ConfIcon className="h-3 w-3" />
+                                {fmtConf(item.confidence)}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent><p className="text-xs">Confiança: {conf.label} ({fmtConf(item.confidence)})</p></TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      );
+                    })()}
 
                     <div className="flex-1" />
 
