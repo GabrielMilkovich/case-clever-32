@@ -756,6 +756,44 @@ export function ModuloResumo({ caseId }: Props) {
             ))}
           </div>
 
+          {/* Copiar Fundamentação para Petição */}
+          <Card>
+            <CardContent className="p-4">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => {
+                  const dataLiq = resultado?.data_liquidacao || new Date().toISOString().slice(0, 10);
+                  const indice = correcaoData?.indice || 'IPCA-E';
+                  const jurosDesc = correcaoData?.juros_tipo === 'selic' ? 'Taxa SELIC' : `${correcaoData?.juros_percentual ?? 1}% a.m.`;
+                  const texto = `FUNDAMENTAÇÃO LEGAL DA LIQUIDAÇÃO
+
+O presente cálculo foi elaborado em estrita conformidade com os critérios fixados pelo E. STF na ADC 58 (Ações Declaratórias de Constitucionalidade nºs 58 e 59), que determinou a aplicação do ${indice} como índice de correção monetária para débitos trabalhistas na fase pré-judicial, e da Taxa SELIC a partir do ajuizamento da reclamação trabalhista, conforme tese vinculante.
+
+A atualização monetária observou o regime de combinação por data, respeitando as transições de índices determinadas pela jurisprudência consolidada.
+
+Os juros de mora foram aplicados na modalidade ${jurosDesc}, conforme o Art. 39 da Lei 8.177/91, incidindo a partir do ajuizamento da ação (Art. 883 da CLT c/c Súmula 200 do TST).
+
+O Imposto de Renda foi calculado pelo regime de Rendimentos Recebidos Acumuladamente (RRA), nos termos do Art. 12-A da Lei 7.713/88, com ${res.imposto_renda.meses_rra} meses de acumulação.
+
+A Contribuição Social do segurado foi apurada conforme tabela progressiva vigente (Art. 28, §9º, Lei 8.212/91), e a cota patronal conforme alíquotas legais (20% + SAT + Terceiros).
+
+Os honorários advocatícios sucumbenciais foram fixados em conformidade com o Art. 791-A da CLT, observada a OJ 394 da SDI-1 do TST, que determina a incidência sobre o valor bruto da condenação.
+
+${res.resumo.fgts_total > 0 ? 'O FGTS foi calculado à alíquota de 8% sobre as verbas de natureza salarial, com multa rescisória de 40% conforme Art. 18, §1º, da Lei 8.036/90.\n\n' : ''}Data da liquidação: ${dataLiq}
+Valor líquido do reclamante: ${fmt(res.resumo.liquido_reclamante)}
+Total da reclamada: ${fmt(res.resumo.total_reclamada)}`;
+
+                  navigator.clipboard.writeText(texto);
+                  toast.success("Fundamentação copiada para a área de transferência!");
+                }}
+              >
+                <Gavel className="h-4 w-4 mr-2" />
+                Copiar Fundamentação para Petição (ADC 58 + OJ 394)
+              </Button>
+            </CardContent>
+          </Card>
           {/* Detailed Breakdown */}
           <Card>
             <CardHeader className="pb-3"><CardTitle className="text-sm">Composição da Liquidação</CardTitle></CardHeader>
