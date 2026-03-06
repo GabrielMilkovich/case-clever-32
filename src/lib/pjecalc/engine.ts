@@ -38,6 +38,8 @@ export interface PjeParametros {
   sabado_dia_util: boolean;
   considerar_feriado_estadual: boolean;
   considerar_feriado_municipal: boolean;
+  /** Art. 64 CLT: 'comercial' usa 30 dias fixos; 'civil' usa dias reais do mês */
+  tipo_mes?: 'civil' | 'comercial';
 }
 
 export interface PjeHistoricoSalarial {
@@ -797,7 +799,8 @@ export class PjeCalcEngine {
 
   calcularQuantidadeCalendario(competencia: string, tipo: 'dias_uteis' | 'repousos' | 'feriados'): number {
     const [ano, mes] = competencia.split('-').map(Number);
-    const diasNoMes = new Date(ano, mes, 0).getDate();
+    // Art. 64 CLT: mês comercial = 30 dias fixos
+    const diasNoMes = this.params.tipo_mes === 'comercial' ? 30 : new Date(ano, mes, 0).getDate();
     
     // Contar feriados no mês para o estado/município do cálculo
     const feriadosNoMes = this.feriadosDB.filter(f => {
