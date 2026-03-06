@@ -1120,6 +1120,7 @@ export class PjeCalcEngine {
       juros: 0,
       valor_final: diferenca.toDP(2).toNumber(),
       formula,
+      arredondamento_trace,
       base_integral: baseIntegral,
       quantidade_integral: qtdIntegral,
       devido_integral: devidoIntegral,
