@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Play, Loader2, FileBarChart, Printer, FileCode, AlertTriangle, CheckCircle2, Info, XCircle, Lock, Unlock, Copy, MoreVertical, FileText, FileSpreadsheet, ClipboardCheck, GitCompareArrows, Download, Scale } from "lucide-react";
+import { Play, Loader2, FileBarChart, Printer, FileCode, AlertTriangle, CheckCircle2, Info, XCircle, Lock, Unlock, Copy, MoreVertical, FileText, FileSpreadsheet, ClipboardCheck, GitCompareArrows, Download, Scale, Gavel } from "lucide-react";
 import { PainelRevisao } from "./PainelRevisao";
 import { MemoriaCalculoExpandida } from "./MemoriaCalculoExpandida";
 import { ComparacaoCenarios } from "./ComparacaoCenarios";
