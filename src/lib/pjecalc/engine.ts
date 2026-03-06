@@ -38,6 +38,8 @@ export interface PjeParametros {
   sabado_dia_util: boolean;
   considerar_feriado_estadual: boolean;
   considerar_feriado_municipal: boolean;
+  /** Art. 64 CLT: 'comercial' usa 30 dias fixos; 'civil' usa dias reais do mês */
+  tipo_mes?: 'civil' | 'comercial';
 }
 
 export interface PjeHistoricoSalarial {
@@ -518,6 +520,17 @@ export interface PjeResumo {
   pensao_total: number;
   liquido_reclamante: number;
   total_reclamada: number;
+  /** Metadata for transparency */
+  meta?: {
+    /** Arredondamento: por competência (item a item) conforme metodologia judiciária */
+    arredondamento: string;
+    /** Tipo de mês utilizado: civil (dias reais) ou comercial (30 dias fixos, Art. 64 CLT) */
+    tipo_mes: string;
+    /** Último índice SELIC utilizado e sua data de referência */
+    selic_referencia?: { data: string; acumulado: number };
+    /** OJ 415 aplicada em alguma verba */
+    oj415_aplicada: boolean;
+  };
 }
 
 // =====================================================
@@ -797,7 +810,8 @@ export class PjeCalcEngine {
 
   calcularQuantidadeCalendario(competencia: string, tipo: 'dias_uteis' | 'repousos' | 'feriados'): number {
     const [ano, mes] = competencia.split('-').map(Number);
-    const diasNoMes = new Date(ano, mes, 0).getDate();
+    // Art. 64 CLT: mês comercial = 30 dias fixos
+    const diasNoMes = this.params.tipo_mes === 'comercial' ? 30 : new Date(ano, mes, 0).getDate();
     
     // Contar feriados no mês para o estado/município do cálculo
     const feriadosNoMes = this.feriadosDB.filter(f => {
@@ -2725,6 +2739,18 @@ export class PjeCalcEngine {
       honorarios_contratuais: honorarios.contratuais, custas: custasResult.total,
       custas_detalhadas: custasResult.detalhadas, pensao_sobre_fgts: pensaoSobreFgts, pensao_total: pensaoTotal,
       liquido_reclamante: liquido, total_reclamada: totalReclamada,
+      meta: {
+        arredondamento: 'Arredondamento por competência (item a item, 2 casas decimais) conforme metodologia judiciária. Pequenas diferenças de centavos são esperadas.',
+        tipo_mes: this.params.tipo_mes === 'comercial' ? 'Mês Comercial (30 dias fixos — Art. 64 CLT)' : 'Calendário Civil (dias reais do mês)',
+        selic_referencia: (() => {
+          const selicRows = this.indicesDB.filter(i => i.indice === 'SELIC').sort((a, b) => b.competencia.localeCompare(a.competencia));
+          return selicRows.length > 0 ? { data: selicRows[0].competencia, acumulado: selicRows[0].acumulado } : undefined;
+        })(),
+        oj415_aplicada: verbaResults.some(vr => {
+          const hasOverpay = vr.ocorrencias.some(oc => oc.pago > oc.devido);
+          return hasOverpay;
+        }),
+      },
     };
 
     return {

@@ -162,6 +162,100 @@ export function PainelRevisao({ caseId, validacao, resultado, modulosStatus }: P
           ))}
         </div>
       )}
+
+      {/* Metadata de Transparência */}
+      {resultado?.resumo.meta && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Shield className="h-4 w-4 text-primary" />
+              Parâmetros de Cálculo
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-xs">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-[9px]">Arredondamento</Badge>
+              <span className="text-muted-foreground">{resultado.resumo.meta.arredondamento}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-[9px]">Tipo Mês</Badge>
+              <span className="text-muted-foreground">{resultado.resumo.meta.tipo_mes}</span>
+            </div>
+            {resultado.resumo.meta.selic_referencia && (
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-[9px]">SELIC</Badge>
+                <span className="text-muted-foreground">
+                  Acumulada até {resultado.resumo.meta.selic_referencia.data}: {resultado.resumo.meta.selic_referencia.acumulado.toFixed(6)}
+                </span>
+              </div>
+            )}
+            {resultado.resumo.meta.oj415_aplicada && (
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-[9px] border-amber-500 text-amber-600">OJ 415</Badge>
+                <span className="text-muted-foreground">Abatimento global aplicado em uma ou mais verbas</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Guia de Check-up de Erros */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            Guia de Check-up — Divergências Comuns com PJe-Calc
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b bg-muted/30">
+                <th className="p-2 text-left font-semibold">Se a diferença for em...</th>
+                <th className="p-2 text-left font-semibold">Provável Causa</th>
+                <th className="p-2 text-left font-semibold">O que conferir no PJe-Calc</th>
+              </tr>
+            </thead>
+            <tbody className="text-muted-foreground">
+              <tr className="border-b border-border/30">
+                <td className="p-2">Centavos (R$ 0,01 a R$ 0,99)</td>
+                <td className="p-2">Arredondamento de rubricas</td>
+                <td className="p-2">Critério: Truncar vs Arredondar (ROUND_HALF_UP)</td>
+              </tr>
+              <tr className="border-b border-border/30">
+                <td className="p-2">INSS / Previdência</td>
+                <td className="p-2">Tabela progressiva ou Teto</td>
+                <td className="p-2">Tabela de salários de contribuição atualizada</td>
+              </tr>
+              <tr className="border-b border-border/30">
+                <td className="p-2">Juros / Correção</td>
+                <td className="p-2">Data da Citação ou SELIC</td>
+                <td className="p-2">Data de citação idêntica; versão da tabela SELIC</td>
+              </tr>
+              <tr className="border-b border-border/30">
+                <td className="p-2">Reflexos de HE</td>
+                <td className="p-2">OJ 394 (DSR sobre Reflexos)</td>
+                <td className="p-2">Trava temporal 20/03/2023 ativada</td>
+              </tr>
+              <tr className="border-b border-border/30">
+                <td className="p-2">Saldo de Salário / Faltas</td>
+                <td className="p-2">Mês Comercial vs Civil</td>
+                <td className="p-2">Divisor 30 fixo (Art. 64 CLT) ou dias reais do mês</td>
+              </tr>
+              <tr className="border-b border-border/30">
+                <td className="p-2">FGTS (pequena)</td>
+                <td className="p-2">LC 110/01 (0,5% ou 0,8%)</td>
+                <td className="p-2">Flag de Contribuição Social LC 110 ativada/desativada</td>
+              </tr>
+              <tr>
+                <td className="p-2">Intervalo / Horas In Itinere</td>
+                <td className="p-2">Reforma Trabalhista (11/11/2017)</td>
+                <td className="p-2">Data de corte da reforma e modo de cálculo (integral vs proporcional)</td>
+              </tr>
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
