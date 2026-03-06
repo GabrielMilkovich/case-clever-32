@@ -3030,14 +3030,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -6107,14 +6107,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -6147,14 +6147,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -6201,14 +6201,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -6242,14 +6242,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -6365,14 +6365,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -6425,14 +6425,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -6455,14 +6455,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -6565,14 +6565,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -6677,14 +6677,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -6718,14 +6718,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -6829,14 +6829,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -6875,14 +6875,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -6984,14 +6984,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -7026,14 +7026,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -7077,14 +7077,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -7186,14 +7186,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -7227,14 +7227,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -7413,14 +7413,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -7445,14 +7445,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -7545,14 +7545,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -7643,14 +7643,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -7743,14 +7743,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -7854,14 +7854,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -7985,14 +7985,14 @@ export type Database = {
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "case_processing_stats"
             referencedColumns: ["case_id"]
           },
           {
             foreignKeyName: "pjecalc_calculos_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
