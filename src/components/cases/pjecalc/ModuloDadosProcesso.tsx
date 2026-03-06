@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { Save, Loader2 } from "lucide-react";
 
 interface Props { caseId: string; }
@@ -49,10 +50,21 @@ export function ModuloDadosProcesso({ caseId }: Props) {
     finally { setSaving(false); }
   };
 
-  const f = (key: string, label: string, type = "text") => (
+  const f = (key: string, label: string, type = "text", required = false) => (
     <div>
-      <Label className="text-xs">{label}</Label>
-      <Input type={type} value={(form as any)[key] || ''} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} className="mt-1 h-8 text-xs" />
+      <Label className="text-xs">
+        {label}
+        {required && <span className="text-destructive ml-0.5">*</span>}
+      </Label>
+      <Input
+        type={type}
+        value={(form as any)[key] || ''}
+        onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
+        className={cn("mt-1 h-8 text-xs", required && !(form as any)[key] && "border-destructive/50")}
+      />
+      {required && !(form as any)[key] && (
+        <p className="text-[10px] text-destructive mt-0.5">Obrigatório para liquidação</p>
+      )}
     </div>
   );
 
@@ -107,7 +119,7 @@ export function ModuloDadosProcesso({ caseId }: Props) {
         <CardHeader className="pb-3"><CardTitle className="text-sm">Datas Processuais</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-3 gap-4">
           {f("data_distribuicao", "Distribuição", "date")}
-          {f("data_citacao", "Citação", "date")}
+          {f("data_citacao", "Citação (ADC 58)", "date", true)}
           {f("data_transito", "Trânsito em Julgado", "date")}
         </CardContent>
       </Card>
