@@ -83,6 +83,15 @@ export function calcularFeriadosMoveis(ano: number): FeriadoNacional[] {
   ];
 }
 
+/**
+ * Verifica se o Dia da Consciência Negra (20/11) é feriado nacional.
+ * Lei 14.759/2023: feriado nacional somente a partir de 2024.
+ * NÃO pode ser aplicado retroativamente para anos anteriores.
+ */
+export const isConscienciaNegraFeriado = (ano: number): boolean => {
+  return ano >= 2024;
+};
+
 // Retorna todos os feriados de um ano
 export function obterFeriadosDoAno(
   ano: number,
@@ -96,6 +105,14 @@ export function obterFeriadosDoAno(
     result.push({
       data: new Date(ano, parseInt(mm) - 1, parseInt(dd)),
       nome: f.nome,
+    });
+  }
+  
+  // Dia da Consciência Negra — Lei 14.759/2023 (apenas a partir de 2024)
+  if (isConscienciaNegraFeriado(ano)) {
+    result.push({
+      data: new Date(ano, 10, 20), // Mês 10 = Novembro (0-indexed)
+      nome: "Dia da Consciência Negra",
     });
   }
   
