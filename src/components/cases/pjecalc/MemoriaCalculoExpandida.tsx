@@ -62,6 +62,14 @@ export function MemoriaCalculoExpandida({ resultado }: Props) {
                     </Badge>
                     <span className="text-sm font-medium">{vr.nome}</span>
                     <Badge variant="outline" className="text-[10px]">{vr.caracteristica}</Badge>
+                    {(() => {
+                      const hasOverpay = vr.ocorrencias.some(oc => oc.pago > oc.devido);
+                      const naiveDif = vr.ocorrencias.reduce((s, oc) => s + Math.max(0, oc.devido - oc.pago), 0);
+                      const oj415Applied = hasOverpay && Math.abs(naiveDif - vr.total_diferenca) > 0.01;
+                      return oj415Applied ? (
+                        <Badge variant="outline" className="text-[9px] border-amber-500 text-amber-600">OJ 415 — Abatimento Global</Badge>
+                      ) : null;
+                    })()}
                   </div>
                   <div className="flex items-center gap-4 text-xs font-mono">
                     <span className="text-muted-foreground">Dif: {fmt(vr.total_diferenca)}</span>

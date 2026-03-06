@@ -839,7 +839,18 @@ export function ModuloResumo({ caseId }: Props) {
                       // Principal row
                       rows.push(
                         <tr key={p.verba_id} className="border-b border-border/30 bg-muted/20">
-                          <td className="p-2 font-semibold">{p.nome}</td>
+                          <td className="p-2 font-semibold">
+                            {p.nome}
+                            {(() => {
+                              // Detect OJ 415: credit was absorbed if any month had pago > devido
+                              const hasOverpay = p.ocorrencias.some(oc => oc.pago > oc.devido);
+                              const naiveDif = p.ocorrencias.reduce((s, oc) => s + Math.max(0, oc.devido - oc.pago), 0);
+                              const oj415Applied = hasOverpay && Math.abs(naiveDif - p.total_diferenca) > 0.01;
+                              return oj415Applied ? (
+                                <Badge variant="outline" className="ml-2 text-[9px] border-amber-500 text-amber-600">OJ 415</Badge>
+                              ) : null;
+                            })()}
+                          </td>
                           <td className="p-2 text-center"><Badge variant="default" className="text-[10px]">P</Badge></td>
                           <td className="p-2 text-right font-mono">{fmt(p.total_devido)}</td>
                           <td className="p-2 text-right font-mono">{fmt(p.total_pago)}</td>
