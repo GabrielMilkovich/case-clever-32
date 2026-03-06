@@ -16,11 +16,21 @@ interface Props { caseId: string; }
 export function ModuloDadosProcesso({ caseId }: Props) {
   const qc = useQueryClient();
   const [saving, setSaving] = useState(false);
+  const [conflictModal, setConflictModal] = useState<{ field: string; label: string; valorManual: string; valorImportado: string } | null>(null);
 
   const { data } = useQuery({
     queryKey: ["pjecalc_dados_processo", caseId],
     queryFn: async () => {
       const { data } = await supabase.from("pjecalc_dados_processo" as any).select("*").eq("case_id", caseId).maybeSingle();
+      return data as any;
+    },
+  });
+
+  // Load params to detect date conflicts with imported data
+  const { data: paramsData } = useQuery({
+    queryKey: ["pjecalc_parametros_conflict", caseId],
+    queryFn: async () => {
+      const { data } = await supabase.from("pjecalc_parametros" as any).select("*").eq("case_id", caseId).maybeSingle();
       return data as any;
     },
   });
@@ -35,6 +45,39 @@ export function ModuloDadosProcesso({ caseId }: Props) {
   useEffect(() => {
     if (data) setForm(prev => ({ ...prev, ...Object.fromEntries(Object.entries(data).filter(([k, v]) => k in prev && v != null)) }));
   }, [data]);
+
+  // Detect date conflicts when data loads from both sources
+  useEffect(() => {
+    if (!data || !paramsData) return;
+    const conflictFields = [
+      { field: 'data_citacao', dpField: 'data_citacao', paramField: 'data_ajuizamento', label: 'Data de Ajuizamento' },
+    ];
+    // Check if imported documento has a different date than manually entered params
+    if (data.data_citacao && paramsData.data_ajuizamento && data.data_citacao !== paramsData.data_ajuizamento) {
+      // Only show if both are non-empty and different
+      setConflictModal({
+        field: 'data_ajuizamento',
+        label: 'Data de Ajuizamento',
+        valorManual: paramsData.data_ajuizamento,
+        valorImportado: data.data_citacao,
+      });
+    }
+  }, [data, paramsData]);
+
+  const resolveConflict = async (useImported: boolean) => {
+    if (!conflictModal) return;
+    if (useImported) {
+      // Update params with imported value
+      await supabase.from("pjecalc_parametros" as any)
+        .update({ [conflictModal.field]: conflictModal.valorImportado })
+        .eq("case_id", caseId);
+      qc.invalidateQueries({ queryKey: ["pjecalc_parametros_conflict", caseId] });
+      toast.success(`${conflictModal.label} atualizada com o valor do documento importado.`);
+    } else {
+      toast.info(`Mantido o valor digitado manualmente para ${conflictModal.label}.`);
+    }
+    setConflictModal(null);
+  };
 
   const save = async () => {
     setSaving(true);
@@ -71,6 +114,41 @@ export function ModuloDadosProcesso({ caseId }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* Date Conflict Modal */}
+      <Dialog open={!!conflictModal} onOpenChange={() => setConflictModal(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              Conflito de Datas Detectado
+            </DialogTitle>
+          </DialogHeader>
+          {conflictModal && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                A <strong>{conflictModal.label}</strong> do documento importado é diferente da digitada manualmente. Qual deve prevalecer?
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <Card className="cursor-pointer hover:border-primary transition-colors" onClick={() => resolveConflict(false)}>
+                  <CardContent className="p-4 text-center">
+                    <div className="text-[10px] text-muted-foreground mb-1">Digitado Manualmente</div>
+                    <div className="font-mono font-bold text-sm">{conflictModal.valorManual}</div>
+                    <Button variant="outline" size="sm" className="mt-2 w-full">Manter</Button>
+                  </CardContent>
+                </Card>
+                <Card className="cursor-pointer hover:border-primary transition-colors" onClick={() => resolveConflict(true)}>
+                  <CardContent className="p-4 text-center">
+                    <div className="text-[10px] text-muted-foreground mb-1">Documento Importado</div>
+                    <div className="font-mono font-bold text-sm">{conflictModal.valorImportado}</div>
+                    <Button variant="default" size="sm" className="mt-2 w-full">Usar Este</Button>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Dados do Processo</h2>
         <Button onClick={save} disabled={saving} size="sm">
