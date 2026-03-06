@@ -877,7 +877,7 @@ async function autoFill(supabase: any, caseId: string, extracted: any) {
           chave: fact.chave,
           valor: fact.valor,
           tipo: "monetario",
-          origem: "extracao",
+          origem: "ia_extracao",
           confianca: extracted.confianca_geral || 0.9,
         }, { onConflict: 'case_id,chave' }).then(({ error }: any) => {
           if (error) console.error(`[FILL] fact ${fact.chave}:`, error.message);
