@@ -441,6 +441,8 @@ export interface PjeOcorrenciaResult {
   base_integral?: number;
   quantidade_integral?: number;
   devido_integral?: number;
+  /** Rastreabilidade de arredondamento por etapa (Método PJe-Calc) */
+  arredondamento_trace?: { etapa: string; valor_cheio: string; valor_truncado: string }[];
 }
 
 export interface PjeFGTSResult {
