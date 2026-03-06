@@ -1202,8 +1202,17 @@ async function processDocumentInBackground(
     }
     console.log(`[EXTRACT] OCR complete: ${ocrText.length} chars`);
 
-    // Stage 2: OpenAI structured extraction from OCR text
+    // Truncate very large OCR to avoid memory exhaustion during Gemini extraction
+    const MAX_OCR_CHARS = 120000;
+    if (ocrText.length > MAX_OCR_CHARS) {
+      console.log(`[EXTRACT] Truncating OCR from ${ocrText.length} to ${MAX_OCR_CHARS} chars`);
+      ocrText = ocrText.substring(0, MAX_OCR_CHARS);
+    }
+
+    // Stage 2: Structured extraction from OCR text
     const extracted = await extractStructured(ocrText, LOVABLE_API_KEY);
+    // Release OCR text from memory immediately
+    ocrText = "";
 
     // Pre-create pjecalc_calculos with user_id to avoid NULL user_id errors from view triggers
     let userId = doc.owner_user_id;
