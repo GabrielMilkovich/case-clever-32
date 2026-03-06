@@ -2739,6 +2739,18 @@ export class PjeCalcEngine {
       honorarios_contratuais: honorarios.contratuais, custas: custasResult.total,
       custas_detalhadas: custasResult.detalhadas, pensao_sobre_fgts: pensaoSobreFgts, pensao_total: pensaoTotal,
       liquido_reclamante: liquido, total_reclamada: totalReclamada,
+      meta: {
+        arredondamento: 'Arredondamento por competência (item a item, 2 casas decimais) conforme metodologia judiciária. Pequenas diferenças de centavos são esperadas.',
+        tipo_mes: this.params.tipo_mes === 'comercial' ? 'Mês Comercial (30 dias fixos — Art. 64 CLT)' : 'Calendário Civil (dias reais do mês)',
+        selic_referencia: (() => {
+          const selicRows = this.indicesDB.filter(i => i.indice === 'SELIC').sort((a, b) => b.competencia.localeCompare(a.competencia));
+          return selicRows.length > 0 ? { data: selicRows[0].competencia, acumulado: selicRows[0].acumulado } : undefined;
+        })(),
+        oj415_aplicada: verbaResults.some(vr => {
+          const hasOverpay = vr.ocorrencias.some(oc => oc.pago > oc.devido);
+          return hasOverpay;
+        }),
+      },
     };
 
     return {
