@@ -372,9 +372,14 @@ export function ExtractionReviewPanel({ caseId, pipelineId, onConfirmAll }: Prop
                           {item.evidence_text}
                         </div>
                       )}
-                      {item.page && (
-                        <p className="text-[10px] text-muted-foreground">Página: {item.page}</p>
-                      )}
+                       {item.page && (
+                        <div className="flex items-center gap-2">
+                          <p className="text-[10px] text-muted-foreground">Página: {item.page}</p>
+                          <Button size="sm" variant="outline" className="h-5 text-[9px] px-1.5" onClick={() => handleGoToSource(item)}>
+                            <Eye className="h-2.5 w-2.5 mr-0.5" /> Ir para Fonte
+                          </Button>
+                        </div>
+                       )}
                       {item.review_note && (
                         <p className="text-[10px] text-muted-foreground italic">Nota: {item.review_note}</p>
                       )}
