@@ -119,7 +119,7 @@ export function ModuloDadosProcesso({ caseId }: Props) {
         <CardHeader className="pb-3"><CardTitle className="text-sm">Datas Processuais</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-3 gap-4">
           {f("data_distribuicao", "Distribuição", "date")}
-          {f("data_citacao", "Citação", "date")}
+          {f("data_citacao", "Citação (ADC 58)", "date", true)}
           {f("data_transito", "Trânsito em Julgado", "date")}
         </CardContent>
       </Card>
