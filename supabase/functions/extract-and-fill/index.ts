@@ -958,7 +958,7 @@ async function autoFill(supabase: any, caseId: string, extracted: any) {
           chave: "pedidos_indeferidos",
           valor: sent.pedidos_indeferidos.join("; "),
           tipo: "texto",
-          origem: "extracao",
+          origem: "ia_extracao",
         }, { onConflict: 'case_id,chave' });
       }
 
@@ -986,17 +986,17 @@ async function autoFill(supabase: any, caseId: string, extracted: any) {
         // Store correction/juros info as facts
         if (pl.indice_correcao) {
           await supabase.from("facts").upsert({
-            case_id: caseId, chave: "indice_correcao", valor: pl.indice_correcao, tipo: "texto", origem: "extracao",
+            case_id: caseId, chave: "indice_correcao", valor: pl.indice_correcao, tipo: "texto", origem: "ia_extracao",
           }, { onConflict: 'case_id,chave' });
         }
         if (pl.juros) {
           await supabase.from("facts").upsert({
-            case_id: caseId, chave: "juros_mora", valor: pl.juros, tipo: "texto", origem: "extracao",
+            case_id: caseId, chave: "juros_mora", valor: pl.juros, tipo: "texto", origem: "ia_extracao",
           }, { onConflict: 'case_id,chave' });
         }
         if (pl.data_inicio_juros) {
           await supabase.from("facts").upsert({
-            case_id: caseId, chave: "data_inicio_juros", valor: pl.data_inicio_juros, tipo: "data", origem: "extracao",
+            case_id: caseId, chave: "data_inicio_juros", valor: pl.data_inicio_juros, tipo: "data", origem: "ia_extracao",
           }, { onConflict: 'case_id,chave' });
         }
 
