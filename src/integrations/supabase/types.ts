@@ -2090,6 +2090,27 @@ export type Database = {
         }
         Relationships: []
       }
+      indices_oficiais: {
+        Row: {
+          data_referencia: string
+          serie_id: number
+          ultima_atualizacao: string | null
+          valor: number
+        }
+        Insert: {
+          data_referencia: string
+          serie_id: number
+          ultima_atualizacao?: string | null
+          valor: number
+        }
+        Update: {
+          data_referencia?: string
+          serie_id?: number
+          ultima_atualizacao?: string | null
+          valor?: number
+        }
+        Relationships: []
+      }
       legal_rules: {
         Row: {
           ativo: boolean | null
@@ -5799,6 +5820,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sync_status: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          id: string
+          last_processed_date: string | null
+          last_sync_attempt: string | null
+          serie_id: number
+          serie_nome: string | null
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          last_processed_date?: string | null
+          last_sync_attempt?: string | null
+          serie_id: number
+          serie_nome?: string | null
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          last_processed_date?: string | null
+          last_sync_attempt?: string | null
+          serie_id?: number
+          serie_nome?: string | null
+          status?: string | null
+        }
+        Relationships: []
       }
       tax_tables: {
         Row: {
