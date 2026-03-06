@@ -100,6 +100,7 @@ export function Topbar({ breadcrumbs = [], title }: TopbarProps) {
 
         {/* Right */}
         <div className="flex items-center gap-2">
+          <IndexStatusBadge />
           {/* Search */}
           <Button
             variant="outline"

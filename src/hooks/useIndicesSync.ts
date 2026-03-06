@@ -74,10 +74,10 @@ export function useIndicesSync() {
       if (error) throw error;
 
       const results = data?.results || {};
-      const totalInserted = Object.values(results).reduce(
+      const totalInserted: number = Object.values(results).reduce(
         (sum: number, r: any) => sum + (r.inserted || 0),
-        0
-      );
+        0 as number
+      ) as number;
       const hasErrors = Object.values(results).some((r: any) => r.error);
 
       if (hasErrors) {
